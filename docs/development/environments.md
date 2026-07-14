@@ -1,6 +1,6 @@
 # Reproducible Development Environments
 
-Factory Floor uses one shared bootstrap path for Codespaces, Codex Cloud, and ordinary Linux development hosts.
+Factory Floor uses repository-owned entrypoints for Codespaces, Codex Cloud, and ordinary Linux development hosts.
 
 ## Environment contract
 
@@ -10,7 +10,7 @@ The base environment must provide:
 - Node.js 22 with Corepack;
 - Python 3.12.
 
-The repository bootstrap then:
+The shared workspace bootstrap then:
 
 1. validates the Node and Python major/minor versions;
 2. adds `$HOME/.local/bin` to the current and future shell environment;
@@ -49,7 +49,7 @@ To rebuild the complete container, use **Codespaces: Rebuild Container** from th
 
 ## Codex Cloud
 
-Create a Codex environment for `laurajoyhutchins/factory-floor` with a base image or runtime configuration that provides Node 22 and Python 3.12.
+Create a Codex environment for `laurajoyhutchins/factory-floor` with Node 22 and Python 3.12.
 
 Set its setup command to:
 
@@ -57,13 +57,40 @@ Set its setup command to:
 bash scripts/codex-cloud-setup.sh
 ```
 
-The wrapper sets noninteractive CI behavior and delegates to the shared bootstrap. The initial setup needs network access to obtain pnpm, uv, and repository dependencies that are not already cached. Agent-time internet access can remain governed separately by the task environment.
+Set its maintenance command to:
 
-Do not paste a second copy of the setup logic into the Codex environment UI. Keep the UI command as the single repository entrypoint above, so changes remain versioned and reviewable in Git.
+```bash
+bash scripts/codex-cloud-maintenance.sh
+```
+
+The setup and maintenance wrappers install the Docker CLI and Compose plugin from Docker's official Ubuntu apt repository before synchronizing workspace dependencies. They intentionally do **not** install Docker Engine or assume that a daemon is available.
+
+Codex runs setup scripts with internet access and may resume a cached environment using the maintenance script. Keep both environment settings pointed at these repository entrypoints rather than copying their contents into the Codex UI.
+
+### Docker capability levels
+
+The repository distinguishes three capabilities:
+
+1. **Docker CLI available** — `docker --version` succeeds.
+2. **Compose plugin available** — `docker compose version` and `docker compose config` succeed.
+3. **Docker daemon reachable** — `docker info` succeeds and containers can be started.
+
+`scripts/install-docker-cli.sh` provisions the first two capabilities on the Ubuntu-based Codex universal image. It reports daemon reachability but does not treat an unavailable daemon as an installation failure.
+
+Verify the environment with:
+
+```bash
+docker --version
+docker compose version
+docker compose config
+docker info
+```
+
+A successful `docker compose config` validates the development service definition. PostgreSQL and MinIO runtime health may only be claimed after `docker compose up` succeeds and the services report healthy. If Codex Cloud has no daemon, perform runtime service verification in Codespaces.
 
 ## Routine maintenance
 
-The maintenance entrypoint is:
+The generic maintenance entrypoint is:
 
 ```bash
 bash scripts/maintain-workspace.sh [command ...]
@@ -81,7 +108,7 @@ Supported commands are:
 | `integration` | Run the root `test:integration` script when defined. |
 | `clean` | Remove transient build and test caches while preserving installed dependencies. |
 | `reset` | Remove `node_modules`, Python virtual environments, and the local pnpm store, then bootstrap again. |
-| `pull-services` | Pull Docker Compose images when a Compose file exists. |
+| `pull-services` | Pull Docker Compose images when a Compose file exists and a daemon is reachable. |
 | `all` | Run `sync` followed by `verify`. |
 
 Commands may be combined and are executed from left to right:
@@ -118,7 +145,7 @@ cd factory-floor
 bash scripts/bootstrap-workspace.sh
 ```
 
-Docker and GitHub CLI are optional for the shared bootstrap, but Docker is required for the planned PostgreSQL and MinIO integration environment.
+Docker and GitHub CLI are optional for the shared bootstrap, but a reachable Docker daemon is required for the planned PostgreSQL and MinIO integration environment.
 
 ## Dependency reproducibility
 
@@ -142,14 +169,13 @@ FACTORY_FLOOR_PNPM_VERSION=10.12.1 \
   bash scripts/bootstrap-workspace.sh
 ```
 
-The maintenance script reads the same overrides.
-
-Changing these values does not change the approved architecture. A permanent version change requires corresponding updates to the specification, devcontainer, documentation, and lockfiles.
+The maintenance script reads the same overrides. A permanent version change requires corresponding updates to the specification, devcontainer, documentation, and lockfiles.
 
 ## Troubleshooting
 
 - **Wrong Node or Python version:** change the base image or host version manager; the bootstrap intentionally fails rather than silently using an unsupported runtime.
 - **`uv` or `pnpm` is not found in a later shell:** open a new shell or source `$HOME/.bashrc`; bootstrap persists `$HOME/.local/bin` in both `.bashrc` and `.profile`.
 - **Frozen pnpm install fails:** the manifest and lockfile disagree. Update them together in the same reviewed change.
+- **Docker CLI installation cannot reach `download.docker.com`:** allow that domain during setup or maintenance, then reset the Codex environment cache.
+- **`docker compose config` works but `docker info` fails:** the client is installed but no daemon is available. Run container-dependent verification in Codespaces.
 - **`doctor` reports uncommitted changes:** inspect them before running `reset`; maintenance never modifies Git state.
-- **Docker is unavailable in Codex Cloud:** complete unit-level work there and run Docker-dependent integration checks in Codespaces unless the selected cloud environment explicitly supports Docker.

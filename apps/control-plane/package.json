@@ -1,0 +1,16 @@
+{
+  "name": "@factory-floor/control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/app.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "test": "vitest run --root ../.. apps/control-plane/test/health.test.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.4.0"
+  }
+}
