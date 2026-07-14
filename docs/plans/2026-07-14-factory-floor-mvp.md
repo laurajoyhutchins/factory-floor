@@ -96,16 +96,16 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** Migrations create the normative durable model, and repository methods compose under a shared Kysely transaction.
 
-- [ ] Write a migration test against an isolated PostgreSQL database.
-- [ ] Create Kysely database types and `createDatabase(connectionString)`.
-- [ ] Add the initial migration for definitions, schemas, regions, topology revisions, component instances, connections, commands, events, deliveries, executions, attempts, execution inputs/outputs, artifacts, derivations, staging, capabilities, grants, policy decisions, approvals, external actions, resource ledger, and projection checkpoints.
-- [ ] Add required uniqueness, foreign keys, check constraints, lease indexes, and ready-delivery indexes.
-- [ ] Enforce exactly one delivery source: command or event.
-- [ ] Enforce unique `(execution_id, attempt_number)` and artifact digest identity rules.
-- [ ] Create focused repositories whose methods accept `Kysely<Database> | Transaction<Database>`.
-- [ ] Add migration CLI and reset helpers restricted to tests/development.
-- [ ] Verify migration up/down or clean-database recreation behavior.
-- [ ] Commit as `feat: add durable runtime database`.
+- [x] Write a migration test against an isolated PostgreSQL database.
+- [x] Create Kysely database types and `createDatabase(connectionString)`.
+- [x] Add the initial migration for definitions, schemas, regions, topology revisions, component instances, connections, commands, events, deliveries, executions, attempts, execution inputs/outputs, artifacts, derivations, staging, capabilities, grants, policy decisions, approvals, external actions, resource ledger, and projection checkpoints.
+- [x] Add required uniqueness, foreign keys, check constraints, lease indexes, and ready-delivery indexes.
+- [x] Enforce exactly one delivery source: command or event.
+- [x] Enforce unique `(execution_id, attempt_number)` and artifact digest identity rules.
+- [x] Create focused repositories whose methods accept `Kysely<Database> | Transaction<Database>`.
+- [x] Add migration CLI and reset helpers restricted to tests/development.
+- [x] Verify migration up/down or clean-database recreation behavior.
+- [x] Commit as `feat: add durable runtime database`.
 
 ## Task 4: Implement immutable artifact staging and reconciliation
 
