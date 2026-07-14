@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc -p tsconfig.json --pretty false",
-    "test": "vitest run --config ../../vitest.config.ts apps/control-plane/test/health.test.ts"
+    "test": "vitest run --config ../../vitest.config.ts test/health.test.ts"
   },
   "dependencies": {
     "fastify": "^5.4.0"
