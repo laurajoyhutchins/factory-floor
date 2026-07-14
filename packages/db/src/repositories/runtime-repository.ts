@@ -1,4 +1,5 @@
 import type { RuntimeDb, Json } from '../database.js';
+import { createUuidV7 } from '../ids.js';
 export class RuntimeRepository {
   async createRegion(
     db: RuntimeDb,
@@ -7,6 +8,7 @@ export class RuntimeRepository {
     return db
       .insertInto('regions')
       .values({
+        id: createUuidV7(),
         name: input.name,
         parent_region_id: input.parentRegionId ?? null,
       })
@@ -25,6 +27,7 @@ export class RuntimeRepository {
     return db
       .insertInto('commands')
       .values({
+        id: createUuidV7(),
         region_id: input.regionId,
         command_type: input.commandType,
         payload: input.payload,
@@ -46,6 +49,7 @@ export class RuntimeRepository {
     return db
       .insertInto('deliveries')
       .values({
+        id: createUuidV7(),
         region_id: input.regionId,
         topology_revision_id: input.topologyRevisionId,
         target_component_instance_id: input.targetComponentInstanceId,

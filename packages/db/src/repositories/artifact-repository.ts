@@ -1,10 +1,11 @@
 import type { RuntimeDb, Json } from '../database.js';
+import { createUuidV7 } from '../ids.js';
 export class ArtifactRepository {
   async createCommittedArtifact(
     db: RuntimeDb,
     input: {
       digest: string;
-      sizeBytes: number;
+      sizeBytes: string;
       schemaId: string;
       mediaType: string;
       locator: string;
@@ -14,9 +15,10 @@ export class ArtifactRepository {
     return db
       .insertInto('artifacts')
       .values({
+        id: createUuidV7(),
         digest_algorithm: 'sha256',
         digest: input.digest,
-        size_bytes: String(input.sizeBytes),
+        size_bytes: input.sizeBytes,
         schema_id: input.schemaId,
         state: 'committed',
         media_type: input.mediaType,

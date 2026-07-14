@@ -13,9 +13,9 @@ export type RuntimeDb = Kysely<Database> | Transaction<Database>;
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
 type Jsonb = ColumnType<Json, Json, Json>;
-type BigIntString = ColumnType<string, string | number, string | number>;
+type BigIntString = ColumnType<string, string, string>;
 
-type Row = { id: Generated<string>; created_at: Generated<Timestamp> };
+type Row = { id: string; created_at: Generated<Timestamp> };
 type Versioned = Row & {
   name: string;
   version: string;
@@ -78,9 +78,14 @@ export interface Database {
     event_type: string;
     payload: Jsonb;
     stream_key: string;
-    sequence_number: number;
+    sequence_number: BigIntString;
     command_id: string | null;
-    execution_id: string | null;
+    source_kind: string;
+    source_command_id: string | null;
+    source_event_id: string | null;
+    source_execution_id: string | null;
+    source_attempt_id: string | null;
+    source_component_instance_id: string | null;
   };
   deliveries: Row & {
     region_id: string;
@@ -104,6 +109,8 @@ export interface Database {
     lifecycle_epoch: Generated<number>;
     status: Generated<string>;
     completed_at: Timestamp | null;
+    failed_at: Timestamp | null;
+    failure: Jsonb | null;
   };
   execution_attempts: Row & {
     execution_id: string;
@@ -170,11 +177,16 @@ export interface Database {
   };
   policy_decisions: Row & {
     policy_id: string | null;
+    policy_name: string;
+    policy_version: string;
+    evaluator_version: string;
     subject_kind: string;
     subject_id: string;
-    decision: string;
+    input_artifact_id: string | null;
+    normalized_inputs: Jsonb;
+    outcome: string;
     reason: string | null;
-    context: Jsonb;
+    modifications: Jsonb;
   };
   approvals: Row & {
     policy_decision_id: string;
@@ -186,9 +198,11 @@ export interface Database {
   external_actions: Row & {
     execution_id: string;
     attempt_id: string;
-    capability_id: string | null;
+    capability_grant_id: string;
+    outbound_request_artifact_id: string;
+    policy_decision_id: string | null;
+    approval_id: string | null;
     action_type: string;
-    payload: Jsonb;
     status: string;
     idempotency_key: string;
   };
@@ -201,6 +215,7 @@ export interface Database {
     response: Jsonb | null;
   };
   resource_ledger: Row & {
+    region_id: string;
     execution_id: string | null;
     attempt_id: string | null;
     external_action_id: string | null;
@@ -213,7 +228,7 @@ export interface Database {
     projection_name: string;
     stream_key: string;
     last_event_id: string | null;
-    last_sequence_number: number;
+    last_sequence_number: BigIntString;
     updated_at: Timestamp;
   };
 }
