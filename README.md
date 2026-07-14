@@ -33,7 +33,7 @@ Read the design bundle in this order:
 
 ## Reproducible environments
 
-Codespaces, Codex Cloud, and ordinary Linux hosts share one versioned bootstrap path:
+Codespaces, Codex Cloud, and ordinary Linux hosts share one versioned workspace bootstrap path:
 
 ```bash
 bash scripts/bootstrap-workspace.sh
@@ -75,17 +75,27 @@ bash scripts/maintain-workspace.sh clean sync verify
 
 ### Codex Cloud
 
-Configure the Codex environment with Node 22 and Python 3.12, then use this setup command:
+Configure the Codex environment with Node 22 and Python 3.12.
+
+Setup command:
 
 ```bash
 bash scripts/codex-cloud-setup.sh
 ```
 
-Keep the cloud configuration pointed at this repository script instead of copying setup commands into the environment UI. That keeps environment changes versioned and reviewable.
+Maintenance command:
+
+```bash
+bash scripts/codex-cloud-maintenance.sh
+```
+
+These wrappers install the Docker CLI and Compose plugin before synchronizing the workspace. They do not install Docker Engine. `docker compose config` can therefore work even when the cloud sandbox does not expose a reachable daemon; confirm daemon access separately with `docker info`.
+
+Keep the cloud configuration pointed at these repository scripts instead of copying setup commands into the environment UI. That keeps environment changes versioned and reviewable.
 
 ## Codespaces
 
-The repository includes a development container with Node 22, Python 3.12, pnpm, uv, Docker-in-Docker, GitHub CLI, and an SSH server. Its post-create command delegates to the same shared bootstrap used by Codex Cloud.
+The repository includes a development container with Node 22, Python 3.12, pnpm, uv, Docker-in-Docker, GitHub CLI, and an SSH server. Its post-create command delegates to the shared bootstrap.
 
 Create a Codespace from GitHub using **Code → Codespaces → Create codespace on main**, or from a machine with GitHub CLI:
 
