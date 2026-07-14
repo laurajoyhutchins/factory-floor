@@ -27,6 +27,14 @@ bash scripts/codex-cloud-setup.sh
 
 Do not create a second, unversioned copy of the setup logic in an agent prompt or environment UI. See `docs/development/environments.md` for the environment contract.
 
+## Workspace maintenance
+
+- Use `bash scripts/maintain-workspace.sh doctor` for non-destructive diagnosis.
+- Use `bash scripts/maintain-workspace.sh all` after manifest or lockfile changes and before reporting the development environment healthy.
+- Use `clean` only for transient build and test caches.
+- Use `reset` only after identifying a damaged local dependency installation. Do not use it to conceal a reproducibility failure.
+- The maintenance script must not modify Git state, delete `.env`, remove runtime data, or delete Docker volumes.
+
 ## Mission
 
 Deliver Milestone 1, **Durable Reactive Graph**, as a complete tested vertical slice before expanding scope.
