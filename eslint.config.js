@@ -1,21 +1,19 @@
-export default [
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     ignores: ['**/dist/**', '**/node_modules/**', '**/.venv/**', '**/__pycache__/**', 'packages/worker-sdk-py/**'],
   },
   {
-    files: ['**/*.js'],
+    files: ['**/*.ts'],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: {
-        console: 'readonly',
-        process: 'readonly',
-        URL: 'readonly',
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-    rules: {
-      'no-unused-vars': 'error',
-      'no-undef': 'error',
-    },
   },
-];
+);

@@ -10,9 +10,19 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
-    "test": "node --test apps/control-plane/test/*.test.js",
-    "test:integration": "node --test tests/integration/*.test.js",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "dev:services": "docker compose up -d postgres minio",
-    "dev:control-plane": "node apps/control-plane/src/server.js"
+    "dev:control-plane": "pnpm --filter @factory-floor/control-plane dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/node": "^22.15.34",
+    "eslint": "^9.30.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.35.1",
+    "vitest": "^3.2.4"
   }
 }

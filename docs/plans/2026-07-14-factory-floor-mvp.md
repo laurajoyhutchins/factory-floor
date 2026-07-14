@@ -73,7 +73,7 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Initialize `packages/worker-sdk-py` as a uv project and add an import/version test.
 - [x] Add Docker Compose services for PostgreSQL and MinIO.
 - [x] Add `.env.example` using local-only development credentials and no real secrets.
-- [x] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.
+- [ ] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.
 - [x] Commit as `chore: initialize factory floor monorepo`.
 
 ## Task 2: Define language-neutral runtime contracts

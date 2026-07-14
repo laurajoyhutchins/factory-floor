@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "src/server.js",
-  "types": "dist/app.d.ts"
+  "main": "dist/server.js",
+  "types": "dist/app.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "test": "vitest run --config ../../vitest.config.ts apps/control-plane/test/health.test.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.4.0"
+  }
 }
