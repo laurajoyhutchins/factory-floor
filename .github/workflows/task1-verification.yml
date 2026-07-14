@@ -3,11 +3,11 @@ name: Task 1 Verification
 on:
   push:
     branches:
-      - agent/m1-recovery
+      - main
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: task1-${{ github.ref }}
@@ -41,10 +41,9 @@ jobs:
       - name: Install uv
         run: python -m pip install --disable-pip-version-check uv
 
-      - name: Resolve locked dependencies
+      - name: Install locked dependencies
         run: |
-          pnpm install --no-frozen-lockfile
-          uv lock --project packages/worker-sdk-py
+          pnpm install --frozen-lockfile
           uv sync --project packages/worker-sdk-py --locked
 
       - name: Verify workspace bootstrap
@@ -102,32 +101,3 @@ jobs:
       - name: Stop development services
         if: always()
         run: docker compose down --volumes
-
-      - name: Commit generated verification state
-        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('docs/plans/2026-07-14-factory-floor-mvp.md')
-          text = path.read_text()
-          old = '- [ ] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.'
-          new = '- [x] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.'
-          if old in text:
-              path.write_text(text.replace(old, new, 1))
-          elif new not in text:
-              raise SystemExit('Task 1 verification checklist entry was not found.')
-          PY
-
-          if git diff --quiet -- pnpm-lock.yaml packages/worker-sdk-py/uv.lock docs/plans/2026-07-14-factory-floor-mvp.md; then
-            echo 'Generated verification state is already current.'
-            exit 0
-          fi
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add pnpm-lock.yaml packages/worker-sdk-py/uv.lock docs/plans/2026-07-14-factory-floor-mvp.md
-          git commit -m 'chore: record Task 1 verification'
-          git push
