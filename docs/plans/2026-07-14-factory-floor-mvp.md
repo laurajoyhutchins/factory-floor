@@ -65,16 +65,18 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** The repository installs deterministically, starts PostgreSQL and MinIO, exposes a minimal Fastify health endpoint, and runs TypeScript and Python tests.
 
-- [ ] Create root `package.json` with `packageManager: pnpm@10.12.1`, Node `>=22 <23`, and scripts `lint`, `typecheck`, `test`, `test:integration`, `dev:services`, and `dev:control-plane`.
-- [ ] Create `pnpm-workspace.yaml`, `tsconfig.base.json`, ESLint flat config, Prettier config, and Vitest baseline.
-- [ ] Create the normative directories and package manifests.
-- [ ] Add `apps/control-plane/src/app.ts` exporting `buildApp()` and a `/health` route returning `{ status: "ok", service: "control-plane" }`.
-- [ ] Add a failing health test before implementation.
-- [ ] Initialize `packages/worker-sdk-py` as a uv project and add an import/version test.
-- [ ] Add Docker Compose services for PostgreSQL and MinIO.
-- [ ] Add `.env.example` using local-only development credentials and no real secrets.
-- [ ] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.
-- [ ] Commit as `chore: initialize factory floor monorepo`.
+- [x] Create root `package.json` with `packageManager: pnpm@10.12.1`, Node `>=22 <23`, and scripts `lint`, `typecheck`, `test`, `test:integration`, `dev:services`, and `dev:control-plane`.
+- [x] Create `pnpm-workspace.yaml`, `tsconfig.base.json`, ESLint flat config, Prettier config, and Vitest baseline.
+- [x] Create the normative directories and package manifests.
+- [x] Add `apps/control-plane/src/app.ts` exporting `buildApp()` and a `/health` route returning `{ status: "ok", service: "control-plane" }`.
+- [x] Add a failing health test before implementation.
+- [x] Initialize `packages/worker-sdk-py` as a uv project and add an import/version test.
+- [x] Add Docker Compose services for PostgreSQL and MinIO.
+- [x] Add `.env.example` using local-only development credentials and no real secrets.
+- [x] Verify `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `uv run --project packages/worker-sdk-py pytest`.
+- [x] Commit as `chore: initialize factory floor monorepo`.
+
+Task 1 Docker runtime verification note: PostgreSQL and MinIO service definitions were added, Docker CLI and Compose are available, and `docker compose config` passes. Service startup and health observation remain unverified in Codex Cloud because no reachable Docker daemon is exposed.
 
 ## Task 2: Define language-neutral runtime contracts
 
