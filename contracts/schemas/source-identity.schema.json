@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/source-identity.schema.json",
+  "title": "SourceIdentity",
+  "description": "Identity of the runtime object or actor that caused an invocation, proposal, or artifact.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "command" },
+        "commandId": { "type": "string", "format": "uuid" },
+        "submittedBy": { "type": "string", "minLength": 1 }
+      },
+      "required": ["kind", "commandId", "submittedBy"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "event" },
+        "eventId": { "type": "string", "format": "uuid" },
+        "producerComponentId": { "type": "string", "format": "uuid" }
+      },
+      "required": ["kind", "eventId", "producerComponentId"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "artifact" },
+        "artifactId": { "type": "string", "format": "uuid" },
+        "digest": { "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest" }
+      },
+      "required": ["kind", "artifactId", "digest"]
+    }
+  ]
+}

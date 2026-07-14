@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/invocation-envelope.schema.json",
+  "title": "InvocationEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "executionId": { "type": "string", "format": "uuid" },
+    "attemptId": { "type": "string", "format": "uuid" },
+    "leaseToken": { "type": "string", "minLength": 1 },
+    "leaseExpiresAt": { "type": "string", "format": "date-time" },
+    "lifecycleEpoch": { "type": "integer", "minimum": 0 },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "componentId": { "type": "string", "format": "uuid" },
+        "definitionId": { "type": "string", "minLength": 1 },
+        "configuration": true
+      },
+      "required": ["componentId", "definitionId", "configuration"]
+    },
+    "inputs": { "type": "array", "items": { "$ref": "artifact-descriptor.schema.json" } },
+    "state": { "anyOf": [{ "$ref": "artifact-descriptor.schema.json" }, { "type": "null" }] },
+    "capabilityHandles": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "cancellationUrl": { "type": "string", "format": "uri" },
+    "heartbeatUrl": { "type": "string", "format": "uri" },
+    "traceContext": { "type": "object", "additionalProperties": { "type": "string" } },
+    "source": { "$ref": "source-identity.schema.json" }
+  },
+  "required": ["protocolVersion", "executionId", "attemptId", "leaseToken", "leaseExpiresAt", "lifecycleEpoch", "component", "inputs", "state", "capabilityHandles", "cancellationUrl", "heartbeatUrl", "traceContext", "source"]
+}

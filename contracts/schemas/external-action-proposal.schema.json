@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/external-action-proposal.schema.json",
+  "title": "ExternalActionProposal",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "proposalId": { "type": "string", "format": "uuid" },
+    "actionType": { "type": "string", "minLength": 1 },
+    "idempotencyKey": { "type": "string", "minLength": 1 },
+    "capabilityHandle": { "type": "string", "minLength": 1 },
+    "requestArtifact": { "$ref": "staged-artifact.schema.json" },
+    "risk": { "enum": ["low", "medium", "high", "irreversible"] }
+  },
+  "required": ["proposalId", "actionType", "idempotencyKey", "capabilityHandle", "requestArtifact", "risk"]
+}

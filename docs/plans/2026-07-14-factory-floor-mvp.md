@@ -80,17 +80,17 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** Canonical envelopes and artifact contracts validate in JSON Schema and generate deterministic TypeScript and Python types.
 
-- [ ] Write failing schema tests for an invocation envelope, proposed result, source identity, artifact descriptor, staged artifact, failure descriptor, external-action proposal, and resource usage.
-- [ ] Put canonical schemas under `contracts/schemas/` with `$schema: https://json-schema.org/draft/2020-12/schema`.
-- [ ] Use `additionalProperties: false` for protocol envelopes and explicit required arrays.
-- [ ] Model source identity as a discriminated union keyed by `kind`.
-- [ ] Require SHA-256 digests to match `^[a-f0-9]{64}$`.
-- [ ] Require `failure` when proposed result status is `failed` using JSON Schema `if`/`then`.
-- [ ] Add deterministic TypeScript generation using sorted schema paths and `json-schema-to-typescript`.
-- [ ] Add deterministic Python generation using `datamodel-code-generator` with Pydantic v2 output.
-- [ ] Commit generated TypeScript and Python outputs.
-- [ ] Verify a second generation produces no diff.
-- [ ] Commit as `feat: define language-neutral runtime contracts`.
+- [x] Write failing schema tests for an invocation envelope, proposed result, source identity, artifact descriptor, staged artifact, failure descriptor, external-action proposal, and resource usage.
+- [x] Put canonical schemas under `contracts/schemas/` with `$schema: https://json-schema.org/draft/2020-12/schema`.
+- [x] Use `additionalProperties: false` for protocol envelopes and explicit required arrays.
+- [x] Model source identity as a discriminated union keyed by `kind`.
+- [x] Require SHA-256 digests to match `^[a-f0-9]{64}$`.
+- [x] Require `failure` when proposed result status is `failed` using JSON Schema `if`/`then`.
+- [x] Add deterministic TypeScript generation using sorted schema paths and `json-schema-to-typescript`.
+- [x] Add deterministic Python generation using `datamodel-code-generator` with Pydantic v2 output.
+- [x] Commit generated TypeScript and Python outputs.
+- [x] Verify a second generation produces no diff.
+- [x] Commit as `feat: define language-neutral runtime contracts`.
 
 ## Task 3: Create the PostgreSQL schema and repository boundary
 

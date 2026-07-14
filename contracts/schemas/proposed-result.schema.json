@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/proposed-result.schema.json",
+  "title": "ProposedResult",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": {
+      "const": "1.0"
+    },
+    "executionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "attemptId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "leaseToken": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycleEpoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "stagedArtifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "staged-artifact.schema.json"
+      }
+    },
+    "proposedEvents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "proposedState": {
+      "$ref": "staged-artifact.schema.json"
+    },
+    "externalActionProposals": {
+      "type": "array",
+      "items": {
+        "$ref": "external-action-proposal.schema.json"
+      }
+    },
+    "resourceUsage": {
+      "$ref": "resource-usage.schema.json"
+    },
+    "failure": {
+      "$ref": "failure-descriptor.schema.json"
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "executionId",
+    "attemptId",
+    "leaseToken",
+    "lifecycleEpoch",
+    "status",
+    "stagedArtifacts",
+    "proposedEvents",
+    "externalActionProposals",
+    "resourceUsage"
+  ],
+  "if": {
+    "properties": {
+      "status": {
+        "const": "failed"
+      }
+    },
+    "required": [
+      "status"
+    ]
+  },
+  "then": {
+    "properties": {
+      "failure": {}
+    },
+    "required": [
+      "failure"
+    ]
+  }
+}
