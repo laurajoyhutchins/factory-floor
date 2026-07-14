@@ -43,6 +43,36 @@ The script validates Node 22 and Python 3.12, activates pnpm 10.12.1, installs `
 
 See [`docs/development/environments.md`](docs/development/environments.md) for the full environment contract and troubleshooting guidance.
 
+### Workspace maintenance
+
+Routine inspection is non-destructive:
+
+```bash
+bash scripts/maintain-workspace.sh
+```
+
+Common maintenance commands are:
+
+```bash
+bash scripts/maintain-workspace.sh doctor
+bash scripts/maintain-workspace.sh sync
+bash scripts/maintain-workspace.sh verify
+bash scripts/maintain-workspace.sh all
+```
+
+Cleanup and dependency reset are explicit rather than automatic:
+
+```bash
+bash scripts/maintain-workspace.sh clean
+bash scripts/maintain-workspace.sh reset
+```
+
+Commands can be combined and run from left to right, for example:
+
+```bash
+bash scripts/maintain-workspace.sh clean sync verify
+```
+
 ### Codex Cloud
 
 Configure the Codex environment with Node 22 and Python 3.12, then use this setup command:
