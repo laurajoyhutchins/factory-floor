@@ -31,9 +31,31 @@ Read the design bundle in this order:
 - Vitest and pytest
 - Docker Compose with PostgreSQL and MinIO for development
 
+## Reproducible environments
+
+Codespaces, Codex Cloud, and ordinary Linux hosts share one versioned bootstrap path:
+
+```bash
+bash scripts/bootstrap-workspace.sh
+```
+
+The script validates Node 22 and Python 3.12, activates pnpm 10.12.1, installs `uv`, uses lockfiles when present, synchronizes project dependencies, and prints the resolved environment.
+
+See [`docs/development/environments.md`](docs/development/environments.md) for the full environment contract and troubleshooting guidance.
+
+### Codex Cloud
+
+Configure the Codex environment with Node 22 and Python 3.12, then use this setup command:
+
+```bash
+bash scripts/codex-cloud-setup.sh
+```
+
+Keep the cloud configuration pointed at this repository script instead of copying setup commands into the environment UI. That keeps environment changes versioned and reviewable.
+
 ## Codespaces
 
-The repository includes a development container with Node 22, Python 3.12, pnpm, uv, Docker-in-Docker, GitHub CLI, and an SSH server.
+The repository includes a development container with Node 22, Python 3.12, pnpm, uv, Docker-in-Docker, GitHub CLI, and an SSH server. Its post-create command delegates to the same shared bootstrap used by Codex Cloud.
 
 Create a Codespace from GitHub using **Code → Codespaces → Create codespace on main**, or from a machine with GitHub CLI:
 
