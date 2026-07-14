@@ -111,13 +111,13 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** Workers can stage bytes, while only the control plane can validate and publish immutable artifact metadata.
 
-- [ ] Define the `ArtifactBlobStore` interface with stage, read-staged, promote, read-committed, remove-staged, and existence checks.
-- [ ] Implement a filesystem adapter first.
+- [x] Define the `ArtifactBlobStore` interface with stage, read-staged, promote, read-committed, remove-staged, and existence checks.
+- [x] Implement a filesystem adapter first.
 - [ ] Implement an S3-compatible adapter against MinIO.
-- [ ] Compute SHA-256 while streaming and verify claimed digest and size.
-- [ ] Store staged locators separately from committed locators.
+- [x] Compute SHA-256 while streaming and verify claimed digest and size.
+- [x] Store staged locators separately from committed locators.
 - [ ] Add schema validation by artifact schema identity before commit.
-- [ ] Make promotion idempotent.
+- [x] Make promotion idempotent.
 - [ ] Add reconciliation for staged bytes without metadata and committed metadata whose bytes have not promoted.
 - [ ] Preserve artifact identity and provenance when content is tombstoned.
 - [ ] Test duplicate staging, digest mismatch, interrupted promotion, and reconciliation.
