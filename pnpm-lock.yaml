@@ -1,0 +1,25 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  apps/cli: {}
+
+  apps/control-plane: {}
+
+  packages/artifact-store: {}
+
+  packages/contracts-ts: {}
+
+  packages/db: {}
+
+  packages/runtime-core: {}
+
+  packages/worker-sdk-ts: {}
+
+  workers/demo-ts: {}

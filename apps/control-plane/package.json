@@ -1,0 +1,8 @@
+{
+  "name": "@factory-floor/control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "types": "dist/app.d.ts"
+}

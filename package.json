@@ -1,0 +1,18 @@
+{
+  "name": "factory-floor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test apps/control-plane/test/*.test.js",
+    "test:integration": "node --test tests/integration/*.test.js",
+    "dev:services": "docker compose up -d postgres minio",
+    "dev:control-plane": "node apps/control-plane/src/server.js"
+  }
+}
