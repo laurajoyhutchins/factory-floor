@@ -56,10 +56,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Run TypeScript tests
-        run: |
-          pnpm test
-          pnpm --filter @factory-floor/control-plane test
+      - name: Run workspace TypeScript tests
+        run: pnpm test
+
+      - name: Run control-plane package tests
+        run: pnpm --filter @factory-floor/control-plane test
 
       - name: Run Python tests
         run: uv run --project packages/worker-sdk-py --locked pytest
