@@ -4,5 +4,15 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "kysely": "^0.29.3",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
+  },
+  "scripts": {
+    "migrate": "tsx src/cli/migrate.ts"
+  }
 }
