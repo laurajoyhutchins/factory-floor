@@ -7,6 +7,11 @@ import { join } from 'node:path';
 const digest = 'a'.repeat(64);
 const uuid = '018f6f63-7f89-7abc-8def-0123456789ab';
 const schemaDir = join(process.cwd(), 'contracts', 'schemas');
+const fixturesDir = join(process.cwd(), 'contracts', 'fixtures');
+
+function readFixture(path: string): unknown {
+  return JSON.parse(readFileSync(join(fixturesDir, path), 'utf8'));
+}
 
 function validators() {
   const ajv = new Ajv2020({ strict: true, allErrors: true });
@@ -59,6 +64,7 @@ describe('runtime JSON contracts', () => {
     ['failure-descriptor', failure],
     ['external-action-proposal', externalActionProposal],
     ['resource-usage', resourceUsage],
+    ['proposed-event', readFixture('proposed-events/valid-event.json')],
   ])('accepts a valid %s contract', (schema, value) => {
     expect(validators().validate(schema, value)).toBe(true);
   });
@@ -87,13 +93,11 @@ describe('runtime JSON contracts', () => {
     expect(validators().validate('artifact-descriptor', { ...artifact, digest: 'a'.repeat(63) })).toBe(false);
   });
 
-  it('requires failure details when a proposed result failed', () => {
-    const proposed = {
-      protocolVersion: '1.0', executionId: uuid, attemptId: uuid, leaseToken: 'lease', lifecycleEpoch: 0,
-      status: 'failed', stagedArtifacts: [stagedArtifact], proposedEvents: [], externalActionProposals: [], resourceUsage,
-    };
-    expect(validators().validate('proposed-result', proposed)).toBe(false);
-    expect(validators().validate('proposed-result', { ...proposed, failure })).toBe(true);
+  it('validates shared proposed-result fixtures with Ajv', () => {
+    expect(validators().validate('proposed-result', readFixture('proposed-results/valid-completed.json'))).toBe(true);
+    expect(validators().validate('proposed-result', readFixture('proposed-results/valid-failed.json'))).toBe(true);
+    expect(validators().validate('proposed-result', readFixture('proposed-results/invalid-failed-missing-failure.json'))).toBe(false);
+    expect(validators().validate('proposed-result', readFixture('proposed-results/invalid-completed-with-failure.json'))).toBe(false);
   });
 
   it('uses source identity as a kind-discriminated union', () => {
@@ -103,9 +107,13 @@ describe('runtime JSON contracts', () => {
 
   it('rejects additional properties on protocol envelopes', () => {
     const proposed = {
-      protocolVersion: '1.0', executionId: uuid, attemptId: uuid, leaseToken: 'lease', lifecycleEpoch: 0,
-      status: 'completed', stagedArtifacts: [], proposedEvents: [], externalActionProposals: [], resourceUsage, surprise: true,
+      ...readFixture('proposed-results/valid-completed.json') as Record<string, unknown>,
+      surprise: true,
     };
     expect(validators().validate('proposed-result', proposed)).toBe(false);
+  });
+
+  it('rejects malformed proposed events', () => {
+    expect(validators().validate('proposed-event', readFixture('proposed-events/invalid-event-missing-subject.json'))).toBe(false);
   });
 });

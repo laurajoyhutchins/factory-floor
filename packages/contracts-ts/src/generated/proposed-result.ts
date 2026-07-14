@@ -1,5 +1,46 @@
 /** Generated from JSON Schema. Do not edit by hand. */
 
+export type ProposedResult =
+  | {
+      protocolVersion: '1.0';
+      executionId: string;
+      attemptId: string;
+      leaseToken: string;
+      lifecycleEpoch: number;
+      stagedArtifacts: StagedArtifact[];
+      proposedEvents: ProposedEvent[];
+      proposedState?: StagedArtifact;
+      externalActionProposals: ExternalActionProposal[];
+      resourceUsage: ResourceUsage;
+      status: 'completed';
+    }
+  | {
+      protocolVersion: '1.0';
+      executionId: string;
+      attemptId: string;
+      leaseToken: string;
+      lifecycleEpoch: number;
+      stagedArtifacts: StagedArtifact[];
+      proposedEvents: ProposedEvent[];
+      proposedState?: StagedArtifact;
+      externalActionProposals: ExternalActionProposal[];
+      resourceUsage: ResourceUsage;
+      status: 'failed';
+      failure: FailureDescriptor;
+    }
+  | {
+      protocolVersion: '1.0';
+      executionId: string;
+      attemptId: string;
+      leaseToken: string;
+      lifecycleEpoch: number;
+      stagedArtifacts: StagedArtifact[];
+      proposedEvents: ProposedEvent[];
+      proposedState?: StagedArtifact;
+      externalActionProposals: ExternalActionProposal[];
+      resourceUsage: ResourceUsage;
+      status: 'cancelled';
+    };
 /**
  * Identity of the runtime object or actor that caused an invocation, proposal, or artifact.
  */
@@ -20,22 +61,6 @@ export type SourceIdentity =
       digest: string;
     };
 
-export interface ProposedResult {
-  protocolVersion: '1.0';
-  executionId: string;
-  attemptId: string;
-  leaseToken: string;
-  lifecycleEpoch: number;
-  status: 'completed' | 'failed' | 'cancelled';
-  stagedArtifacts: StagedArtifact[];
-  proposedEvents: {
-    [k: string]: unknown;
-  }[];
-  proposedState?: StagedArtifact;
-  externalActionProposals: ExternalActionProposal[];
-  resourceUsage: ResourceUsage;
-  failure?: FailureDescriptor;
-}
 export interface StagedArtifact {
   stagingId: string;
   portName: string;
@@ -45,6 +70,15 @@ export interface StagedArtifact {
   schemaId: string;
   schemaDigest: string;
   provenance: SourceIdentity;
+}
+export interface ProposedEvent {
+  eventType: string;
+  subject: string;
+  payload: unknown;
+  schemaId: string;
+  schemaDigest: string;
+  occurredAt: string;
+  source: SourceIdentity;
 }
 export interface ExternalActionProposal {
   proposalId: string;

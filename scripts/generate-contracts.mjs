@@ -1,9 +1,10 @@
 import { compileFromFile } from 'json-schema-to-typescript';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { basename, join, relative } from 'node:path';
 
-const root = new globalThis.URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new globalThis.URL('..', import.meta.url));
 const schemaDir = join(root, 'contracts', 'schemas');
 const schemaPaths = readdirSync(schemaDir).filter((name) => name.endsWith('.schema.json')).sort().map((name) => join(schemaDir, name));
 
@@ -32,7 +33,7 @@ const pyOut = join(root, 'packages', 'contracts-py', 'factory_floor_contracts');
 rmSync(pyOut, { recursive: true, force: true });
 mkdirSync(pyOut, { recursive: true });
 execFileSync('uv', [
-  'run', '--project', join(root, 'packages', 'worker-sdk-py'), '--locked', 'datamodel-codegen',
+  'run', '--project', join(root, 'packages', 'contracts-py'), '--locked', 'datamodel-codegen',
   '--input', schemaDir,
   '--input-file-type', 'jsonschema',
   '--output', pyOut,
@@ -42,5 +43,10 @@ execFileSync('uv', [
   '--disable-timestamp',
   '--formatters', 'black', 'isort',
 ], { stdio: 'inherit' });
+
+const pyModules = schemaPaths.map((schemaPath) => basename(schemaPath, '.schema.json').replaceAll('-', '_') + '_schema');
+writeFileSync(join(pyOut, '__init__.py'), `"""Generated Factory Floor Pydantic contract models."""
+${pyModules.map((moduleName) => `from .${moduleName} import *  # noqa: F401,F403`).join('\n')}
+`);
 
 globalThis.console.log(`Generated ${schemaPaths.length} schemas from sorted paths:\n${schemaPaths.map((p) => `- ${relative(root, p)}`).join('\n')}`);

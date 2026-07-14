@@ -44,10 +44,17 @@ jobs:
       - name: Install locked dependencies
         run: |
           pnpm install --frozen-lockfile
+          uv sync --project packages/contracts-py --locked
           uv sync --project packages/worker-sdk-py --locked
 
       - name: Verify workspace bootstrap
         run: bash scripts/bootstrap-workspace.sh
+
+      - name: Validate contracts
+        run: pnpm contracts:validate
+
+      - name: Check generated contract drift
+        run: pnpm contracts:check
 
       - name: Lint
         run: pnpm lint

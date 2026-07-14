@@ -3,27 +3,21 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from . import (
     external_action_proposal_schema,
     failure_descriptor_schema,
+    proposed_event_schema,
     resource_usage_schema,
     staged_artifact_schema,
 )
 
 
-class Status(Enum):
-    completed = 'completed'
-    failed = 'failed'
-    cancelled = 'cancelled'
-
-
-class ProposedResult(BaseModel):
+class ProposedResult1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -32,12 +26,56 @@ class ProposedResult(BaseModel):
     attemptId: UUID
     leaseToken: constr(min_length=1)
     lifecycleEpoch: conint(ge=0)
-    status: Status
     stagedArtifacts: list[staged_artifact_schema.StagedArtifact]
-    proposedEvents: list[dict[str, Any]]
+    proposedEvents: list[proposed_event_schema.ProposedEvent]
     proposedState: staged_artifact_schema.StagedArtifact | None = None
     externalActionProposals: list[
         external_action_proposal_schema.ExternalActionProposal
     ]
     resourceUsage: resource_usage_schema.ResourceUsage
-    failure: failure_descriptor_schema.FailureDescriptor | None = None
+    status: Literal['completed']
+
+
+class ProposedResult2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    protocolVersion: Literal['1.0']
+    executionId: UUID
+    attemptId: UUID
+    leaseToken: constr(min_length=1)
+    lifecycleEpoch: conint(ge=0)
+    stagedArtifacts: list[staged_artifact_schema.StagedArtifact]
+    proposedEvents: list[proposed_event_schema.ProposedEvent]
+    proposedState: staged_artifact_schema.StagedArtifact | None = None
+    externalActionProposals: list[
+        external_action_proposal_schema.ExternalActionProposal
+    ]
+    resourceUsage: resource_usage_schema.ResourceUsage
+    status: Literal['failed']
+    failure: failure_descriptor_schema.FailureDescriptor
+
+
+class ProposedResult3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    protocolVersion: Literal['1.0']
+    executionId: UUID
+    attemptId: UUID
+    leaseToken: constr(min_length=1)
+    lifecycleEpoch: conint(ge=0)
+    stagedArtifacts: list[staged_artifact_schema.StagedArtifact]
+    proposedEvents: list[proposed_event_schema.ProposedEvent]
+    proposedState: staged_artifact_schema.StagedArtifact | None = None
+    externalActionProposals: list[
+        external_action_proposal_schema.ExternalActionProposal
+    ]
+    resourceUsage: resource_usage_schema.ResourceUsage
+    status: Literal['cancelled']
+
+
+class ProposedResult(RootModel[ProposedResult1 | ProposedResult2 | ProposedResult3]):
+    root: ProposedResult1 | ProposedResult2 | ProposedResult3 = Field(
+        ..., title='ProposedResult'
+    )
