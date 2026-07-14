@@ -11,6 +11,22 @@ Treat the repository documents as authoritative and read them in this order befo
 7. `docs/plans/2026-07-14-factory-floor-mvp.md`
 8. `CODEX_KICKOFF_PROMPT.md`
 
+## Environment bootstrap
+
+Before changing code, initialize or verify the workspace through the repository-owned setup path:
+
+```bash
+bash scripts/bootstrap-workspace.sh
+```
+
+Codex Cloud environments should configure their setup command as:
+
+```bash
+bash scripts/codex-cloud-setup.sh
+```
+
+Do not create a second, unversioned copy of the setup logic in an agent prompt or environment UI. See `docs/development/environments.md` for the environment contract.
+
 ## Mission
 
 Deliver Milestone 1, **Durable Reactive Graph**, as a complete tested vertical slice before expanding scope.
