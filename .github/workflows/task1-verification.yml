@@ -1,4 +1,4 @@
-name: Task 1 Verification
+name: Repository Verification
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: task1-${{ github.ref }}
+  group: repository-verification-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
