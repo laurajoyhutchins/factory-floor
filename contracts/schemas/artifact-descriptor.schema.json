@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/artifact-descriptor.schema.json",
+  "title": "ArtifactDescriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "properties": {
+    "artifactId": { "type": "string", "format": "uuid" },
+    "digest": { "$ref": "#/$defs/sha256Digest" },
+    "sizeBytes": { "type": "integer", "minimum": 0 },
+    "mediaType": { "type": "string", "minLength": 1 },
+    "schemaId": { "type": "string", "minLength": 1 },
+    "schemaDigest": { "$ref": "#/$defs/sha256Digest" },
+    "uri": { "type": "string", "minLength": 1 },
+    "provenance": { "$ref": "source-identity.schema.json" }
+  },
+  "required": ["artifactId", "digest", "sizeBytes", "mediaType", "schemaId", "schemaDigest", "uri", "provenance"]
+}

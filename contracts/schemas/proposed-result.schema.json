@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/proposed-result.schema.json",
+  "title": "ProposedResult",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "executionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "leaseToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lifecycleEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stagedArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "staged-artifact.schema.json"
+          }
+        },
+        "proposedEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "proposed-event.schema.json"
+          }
+        },
+        "proposedState": {
+          "$ref": "staged-artifact.schema.json"
+        },
+        "externalActionProposals": {
+          "type": "array",
+          "items": {
+            "$ref": "external-action-proposal.schema.json"
+          }
+        },
+        "resourceUsage": {
+          "$ref": "resource-usage.schema.json"
+        },
+        "status": {
+          "const": "completed"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "executionId",
+        "attemptId",
+        "leaseToken",
+        "lifecycleEpoch",
+        "status",
+        "stagedArtifacts",
+        "proposedEvents",
+        "externalActionProposals",
+        "resourceUsage"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "executionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "leaseToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lifecycleEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stagedArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "staged-artifact.schema.json"
+          }
+        },
+        "proposedEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "proposed-event.schema.json"
+          }
+        },
+        "proposedState": {
+          "$ref": "staged-artifact.schema.json"
+        },
+        "externalActionProposals": {
+          "type": "array",
+          "items": {
+            "$ref": "external-action-proposal.schema.json"
+          }
+        },
+        "resourceUsage": {
+          "$ref": "resource-usage.schema.json"
+        },
+        "status": {
+          "const": "failed"
+        },
+        "failure": {
+          "$ref": "failure-descriptor.schema.json"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "executionId",
+        "attemptId",
+        "leaseToken",
+        "lifecycleEpoch",
+        "status",
+        "stagedArtifacts",
+        "proposedEvents",
+        "externalActionProposals",
+        "resourceUsage",
+        "failure"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "executionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "leaseToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lifecycleEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stagedArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "staged-artifact.schema.json"
+          }
+        },
+        "proposedEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "proposed-event.schema.json"
+          }
+        },
+        "proposedState": {
+          "$ref": "staged-artifact.schema.json"
+        },
+        "externalActionProposals": {
+          "type": "array",
+          "items": {
+            "$ref": "external-action-proposal.schema.json"
+          }
+        },
+        "resourceUsage": {
+          "$ref": "resource-usage.schema.json"
+        },
+        "status": {
+          "const": "cancelled"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "executionId",
+        "attemptId",
+        "leaseToken",
+        "lifecycleEpoch",
+        "status",
+        "stagedArtifacts",
+        "proposedEvents",
+        "externalActionProposals",
+        "resourceUsage"
+      ]
+    }
+  ]
+}

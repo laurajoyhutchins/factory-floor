@@ -1,0 +1,40 @@
+{
+  "protocolVersion": "1.0",
+  "executionId": "018f6f63-7f89-7abc-8def-0123456789ab",
+  "attemptId": "018f6f63-7f89-7abc-8def-0123456789ab",
+  "leaseToken": "lease",
+  "lifecycleEpoch": 0,
+  "stagedArtifacts": [],
+  "proposedEvents": [
+    {
+      "eventType": "investigation.evidence.collected",
+      "subject": "artifact:018f6f63-7f89-7abc-8def-0123456789ab",
+      "payload": {
+        "ok": true
+      },
+      "schemaId": "event.schema.json",
+      "schemaDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "occurredAt": "2026-07-14T00:00:00.000Z",
+      "source": {
+        "kind": "command",
+        "commandId": "018f6f63-7f89-7abc-8def-0123456789ab",
+        "submittedBy": "operator"
+      }
+    }
+  ],
+  "externalActionProposals": [],
+  "resourceUsage": {
+    "cpuMilliseconds": 1,
+    "wallMilliseconds": 2,
+    "inputBytes": 3,
+    "outputBytes": 4,
+    "externalCalls": 0
+  },
+  "status": "completed",
+  "failure": {
+    "code": "VERIFY_FAILED",
+    "message": "Verifier rejected the result.",
+    "category": "model",
+    "retryable": true
+  }
+}

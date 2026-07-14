@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Python worker SDK baseline for Factory Floor."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = ["factory-floor-contracts"]
 
 [dependency-groups]
 dev = ["pytest>=8.4,<9"]
@@ -15,3 +15,6 @@ package = false
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+factory-floor-contracts = { path = "../contracts-py", editable = true }

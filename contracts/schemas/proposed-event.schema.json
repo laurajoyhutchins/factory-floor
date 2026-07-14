@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/proposed-event.schema.json",
+  "title": "ProposedEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "eventType": { "type": "string", "minLength": 1 },
+    "subject": { "type": "string", "minLength": 1 },
+    "payload": true,
+    "schemaId": { "type": "string", "minLength": 1 },
+    "schemaDigest": { "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "source": { "$ref": "source-identity.schema.json" }
+  },
+  "required": ["eventType", "subject", "payload", "schemaId", "schemaDigest", "occurredAt", "source"]
+}

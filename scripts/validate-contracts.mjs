@@ -1,0 +1,14 @@
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
+const root = fileURLToPath(new globalThis.URL('..', import.meta.url));
+const schemaDir = join(root, 'contracts', 'schemas');
+const paths = readdirSync(schemaDir).filter((name) => name.endsWith('.schema.json')).sort().map((name) => join(schemaDir, name));
+const ajv = new Ajv2020({ strict: true, allErrors: true });
+addFormats(ajv);
+const schemas = paths.map((path) => JSON.parse(readFileSync(path, 'utf8')));
+for (const schema of schemas) ajv.addSchema(schema);
+for (const schema of schemas) ajv.compile(schema);
+globalThis.console.log(`Validated ${schemas.length} contract schemas:\n${paths.map((p) => `- ${relative(root, p)}`).join('\n')}`);

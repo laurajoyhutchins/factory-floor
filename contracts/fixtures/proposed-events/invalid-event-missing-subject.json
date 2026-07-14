@@ -1,0 +1,14 @@
+{
+  "eventType": "investigation.evidence.collected",
+  "payload": {
+    "ok": true
+  },
+  "schemaId": "event.schema.json",
+  "schemaDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "occurredAt": "2026-07-14T00:00:00.000Z",
+  "source": {
+    "kind": "command",
+    "commandId": "018f6f63-7f89-7abc-8def-0123456789ab",
+    "submittedBy": "operator"
+  }
+}
