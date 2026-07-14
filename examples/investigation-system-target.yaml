@@ -1,0 +1,164 @@
+apiVersion: factoryfloor.dev/v1alpha1
+kind: System
+metadata:
+  name: investigation-demo
+  version: "0.1.0"
+spec:
+  rootRegion:
+    id: investigation-demo-root
+    stable: true
+    budgets:
+      maximumConcurrentRegions: 8
+      maximumConcurrentExecutions: 24
+      dailyMonetaryCostUsd: 25
+
+  regions:
+    - id: intake
+      stable: true
+      template: request-intake@1
+
+    - id: work-manager
+      stable: true
+      template: adaptive-work-manager@1
+      dynamicRegionPermissions:
+        templates:
+          - bounded-investigation@1
+        maximumActive: 4
+
+    - id: publication
+      stable: true
+      template: controlled-publication@1
+
+  connections:
+    - from: intake.accepted
+      to: work-manager.requests
+    - from: work-manager.completed
+      to: publication.candidates
+    - from: work-manager.failed
+      to: publication.unresolved
+
+  policies:
+    - external-actions-require-capability@1
+    - every-artifact-requires-provenance@1
+    - dynamic-region-bounds@1
+    - publication-requires-verified-result@1
+    - high-risk-action-requires-approval@1
+
+---
+apiVersion: factoryfloor.dev/v1alpha1
+kind: Template
+metadata:
+  name: bounded-investigation
+  version: "1"
+spec:
+  inputs:
+    - port: objective
+      schema: objective.v1
+
+  allowedComponents:
+    - retrieve@1
+    - compare@1
+    - verify@1
+    - synthesize@1
+
+  initialTopology:
+    instances:
+      - name: retrieve-a
+        component: retrieve@1
+        configuration:
+          sourceClass: primary
+      - name: retrieve-b
+        component: retrieve@1
+        configuration:
+          sourceClass: secondary
+      - name: retrieve-c
+        component: retrieve@1
+        configuration:
+          sourceClass: adversarial
+      - name: compare
+        component: compare@1
+      - name: verify
+        component: verify@1
+        configuration:
+          failFirstAttemptForDemo: true
+      - name: synthesize
+        component: synthesize@1
+
+    connections:
+      - from: region.objective
+        to: retrieve-a.objective
+      - from: region.objective
+        to: retrieve-b.objective
+      - from: region.objective
+        to: retrieve-c.objective
+      - from: retrieve-a.evidence
+        to: compare.evidence
+      - from: retrieve-b.evidence
+        to: compare.evidence
+      - from: retrieve-c.evidence
+        to: compare.evidence
+      - from: compare.candidate-claims
+        to: verify.candidate-claims
+      - from: verify.verified-claims
+        to: synthesize.verified-claims
+      - from: synthesize.result
+        to: region.result
+      - from: synthesize.evidence-bundle
+        to: region.evidence-bundle
+      - from: synthesize.uncertainty-report
+        to: region.uncertainty-report
+
+  fanIn:
+    - input: compare.evidence
+      completion:
+        type: all-expected
+        expected: 3
+        deadlineSeconds: 90
+
+  capabilities:
+    - kind: artifact.read
+      scope:
+        region: self
+    - kind: network.read
+      scope:
+        allowlistedHosts:
+          - example.test
+      limits:
+        maximumRequests: 20
+    - kind: model.invoke
+      scope:
+        allowedModels:
+          - deterministic-demo
+      limits:
+        maximumTokens: 20000
+
+  constraints:
+    maximumDepth: 1
+    maximumComponents: 8
+    maximumChildren: 0
+    maximumParallelism: 3
+    lifetimeSeconds: 300
+
+  budgets:
+    monetaryCostUsd: 2
+    modelTokens: 25000
+    networkRequests: 25
+    humanAttentionMinutes: 0
+
+  outputs:
+    - port: result
+      schema: result.v1
+      required: true
+    - port: evidence-bundle
+      schema: evidence-bundle.v1
+      required: true
+    - port: uncertainty-report
+      schema: uncertainty-report.v1
+      required: true
+
+  completion:
+    type: all-required-outputs
+    requireValidation:
+      schema: verification-result.v1
+      field: passed
+      equals: true
