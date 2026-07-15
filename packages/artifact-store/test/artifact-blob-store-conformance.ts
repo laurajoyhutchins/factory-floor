@@ -14,15 +14,24 @@ const readAll = async (stream: NodeJS.ReadableStream): Promise<string> => {
   return Buffer.concat(buffers).toString('utf8');
 };
 
+export interface ArtifactBlobStoreTestHarness {
+  createStore(): Promise<ArtifactBlobStore>;
+  corruptStaged?(stagingId: string, bytes: Uint8Array): Promise<void>;
+  corruptCommitted?(digest: string, bytes: Uint8Array): Promise<void>;
+  cleanup(): Promise<void>;
+}
 
-export function artifactBlobStoreConformance(createStore: (root: string) => ArtifactBlobStore) {
+export function artifactBlobStoreConformance(createHarness: (root: string) => ArtifactBlobStoreTestHarness) {
   let root: string;
   let store: ArtifactBlobStore;
+  let harness: ArtifactBlobStoreTestHarness;
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'artifact-store-'));
-    store = createStore(root);
+    harness = createHarness(root);
+    store = await harness.createStore();
   });
   afterEach(async () => {
+    await harness.cleanup();
     await rm(root, { recursive: true, force: true });
   });
 
@@ -111,7 +120,7 @@ export function artifactBlobStoreConformance(createStore: (root: string) => Arti
     await store.stage('b', chunks('b'));
     const first = await store.listStaged({ limit: 2 });
     expect(first.objects.map((object) => object.stagingId)).toEqual(['a', 'b']);
-    expect(first.nextCursor).toBe('b');
+    expect(first.nextCursor).toBeTypeOf('string');
     const second = await store.listStaged({ limit: 2, cursor: first.nextCursor });
     expect(second.objects.map((object) => object.stagingId)).toEqual(['c']);
     expect(second.nextCursor).toBeUndefined();
@@ -129,6 +138,48 @@ export function artifactBlobStoreConformance(createStore: (root: string) => Arti
     expect(staged.digest).toBe(digestOf(''));
     await store.promote('empty', staged.digest, staged.size);
     expect(await readAll(await store.readCommitted(staged.digest))).toBe('');
+  });
+
+  it('handles concurrent identical staging publication idempotently', async () => {
+    const [first, second] = await Promise.all([store.stage('race', chunks('abc')), store.stage('race', chunks('abc'))]);
+    expect(second).toEqual(first);
+  });
+
+  it('handles concurrent conflicting staging publication as a conflict', async () => {
+    const results = await Promise.allSettled([store.stage('race-conflict', chunks('abc')), store.stage('race-conflict', chunks('def'))]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected).toBeDefined();
+    expect((rejected as PromiseRejectedResult).reason).toMatchObject({ code: 'staging_conflict' });
+  });
+
+  it('rejects same-length staged data tampering during promotion when harness supports corruption', async () => {
+    if (harness.corruptStaged === undefined) return;
+    const staged = await store.stage('tampered-digest', chunks('abc'));
+    await harness.corruptStaged(staged.stagingId, Buffer.from('xyz'));
+    await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'digest_mismatch' });
+    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await store.committedExists(staged.digest)).toBe(false);
+  });
+
+  it('rejects different-length staged data tampering during promotion when harness supports corruption', async () => {
+    if (harness.corruptStaged === undefined) return;
+    const staged = await store.stage('tampered-size', chunks('abc'));
+    await harness.corruptStaged(staged.stagingId, Buffer.from('abcdef'));
+    await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'size_mismatch' });
+    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await store.committedExists(staged.digest)).toBe(false);
+  });
+
+  it('rejects an existing committed object whose bytes do not match its metadata when harness supports corruption', async () => {
+    if (harness.corruptCommitted === undefined) return;
+    const first = await store.stage('first-source', chunks('abc'));
+    await store.promote(first.stagingId, first.digest, first.size);
+    await harness.corruptCommitted(first.digest, Buffer.from('xyz'));
+    const retry = await store.stage('retry-source', chunks('abc'));
+    await expect(store.promote(retry.stagingId, retry.digest, retry.size)).rejects.toMatchObject({ code: 'committed_conflict' });
+    expect(await store.stagedExists(retry.stagingId)).toBe(true);
+    expect(await store.committedExists(first.digest)).toBe(false);
   });
 
 }

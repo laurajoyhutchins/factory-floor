@@ -7,82 +7,14 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: repository-verification-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  integrate-main:
-    if: github.event_name == 'pull_request' && github.head_ref == 'codex/implement-immutable-registration-services'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out Task 5 branch
-        uses: actions/checkout@v4
-        with:
-          ref: codex/implement-immutable-registration-services
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Activate pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.12.1 --activate
-
-      - name: Merge Task 4B and resolve shared files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "OpenAI"
-          git config user.email "noreply@openai.com"
-          git fetch origin main
-          git merge --no-commit --no-ff origin/main || true
-
-          if [[ ! -f .git/MERGE_HEAD ]]; then
-            echo "Expected an in-progress merge from main"
-            exit 1
-          fi
-
-          unexpected="$(git diff --name-only --diff-filter=U | grep -Ev '^(docs/plans/2026-07-14-factory-floor-mvp\.md|pnpm-lock\.yaml)$' || true)"
-          if [[ -n "$unexpected" ]]; then
-            echo "Unexpected merge conflicts:"
-            echo "$unexpected"
-            exit 1
-          fi
-
-          if git diff --name-only --diff-filter=U | grep -qx 'docs/plans/2026-07-14-factory-floor-mvp.md'; then
-            git checkout --ours docs/plans/2026-07-14-factory-floor-mvp.md
-          fi
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('docs/plans/2026-07-14-factory-floor-mvp.md')
-          text = path.read_text()
-          old = '- [ ] Implement an S3-compatible adapter against MinIO.'
-          if old in text:
-              text = text.replace(old, '- [x] Implement an S3-compatible adapter against MinIO.', 1)
-          path.write_text(text)
-          PY
-          git add docs/plans/2026-07-14-factory-floor-mvp.md
-
-          if git diff --name-only --diff-filter=U | grep -qx 'pnpm-lock.yaml'; then
-            git checkout --ours pnpm-lock.yaml
-          fi
-          pnpm install --lockfile-only --no-frozen-lockfile
-          git add pnpm-lock.yaml
-
-          git checkout origin/main -- .github/workflows/task1-verification.yml
-          git rm .github/pr9-integrate-main
-          git diff --check
-          git commit -m "merge: integrate Task 4B into Task 5"
-          git push origin HEAD:codex/implement-immutable-registration-services
-
   verify:
-    if: github.event_name != 'pull_request' || github.head_ref != 'codex/implement-immutable-registration-services'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
