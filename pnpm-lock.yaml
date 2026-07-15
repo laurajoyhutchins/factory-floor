@@ -115,9 +115,20 @@ importers:
         specifier: ^0.29.3
         version: 0.29.3
 
-  packages/worker-sdk-ts: {}
+  packages/worker-sdk-ts:
+    dependencies:
+      '@factory-floor/contracts-ts':
+        specifier: workspace:*
+        version: link:../contracts-ts
 
-  workers/demo-ts: {}
+  workers/demo-ts:
+    dependencies:
+      '@factory-floor/contracts-ts':
+        specifier: workspace:*
+        version: link:../../packages/contracts-ts
+      '@factory-floor/worker-sdk-ts':
+        specifier: workspace:*
+        version: link:../../packages/worker-sdk-ts
 
 packages:
 
