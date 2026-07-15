@@ -29,7 +29,7 @@ function stopAll(signal = 'SIGTERM') {
   if (!shuttingDown) {
     shuttingDown = true;
     for (const child of children.values()) signalChild(child, signal);
-    forceTimer = setTimeout(() => {
+    forceTimer = globalThis.setTimeout(() => {
       for (const child of children.values()) signalChild(child, 'SIGKILL');
     }, 3_000);
     forceTimer.unref();
@@ -50,7 +50,9 @@ for (const [name, command, args] of processes) {
     process.stderr.write(`[${name}] ${chunk}`),
   );
   child.on('error', (error) => {
-    globalThis.console.error(`[factory-floor dev] ${name} failed: ${error.message}`);
+    globalThis.console.error(
+      `[factory-floor dev] ${name} failed: ${error.message}`,
+    );
     process.exitCode = 1;
     children.delete(name);
     stopAll();
@@ -66,7 +68,7 @@ for (const [name, command, args] of processes) {
       stopAll();
     }
     if (children.size === 0) {
-      if (forceTimer) clearTimeout(forceTimer);
+      if (forceTimer) globalThis.clearTimeout(forceTimer);
       process.exit(process.exitCode ?? 0);
     }
   });
