@@ -116,12 +116,12 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Implement an S3-compatible adapter against MinIO.
 - [x] Compute SHA-256 while streaming and verify claimed digest and size.
 - [x] Store staged locators separately from committed locators.
-- [ ] Add schema validation by artifact schema identity before commit.
+- [x] Add schema validation by artifact schema identity before commit.
 - [x] Make promotion idempotent.
-- [ ] Add reconciliation for staged bytes without metadata and committed metadata whose bytes have not promoted.
-- [ ] Preserve artifact identity and provenance when content is tombstoned.
-- [ ] Test duplicate staging, digest mismatch, interrupted promotion, and reconciliation.
-- [ ] Commit as `feat: add immutable artifact storage`.
+- [x] Add reconciliation for staged bytes without metadata and committed metadata whose bytes have not promoted.
+- [x] Preserve artifact identity and provenance when content is tombstoned.
+- [x] Test duplicate staging, digest mismatch, interrupted promotion, and reconciliation.
+- [x] Commit as `feat: add immutable artifact storage`.
 
 ## Task 5: Add registration, system application, and static topology
 

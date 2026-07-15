@@ -3,3 +3,8 @@ export * from './declarations/errors.js';
 export * from './declarations/validation.js';
 export * from './registration/registration-service.js';
 export * from './systems/system-application-service.js';
+export * from './artifacts/errors.js';
+export * from './artifacts/artifact-validation-service.js';
+export * from './artifacts/artifact-publication-service.js';
+export * from './artifacts/artifact-reconciliation-service.js';
+export * from './artifacts/artifact-tombstone-service.js';

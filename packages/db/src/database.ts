@@ -166,6 +166,9 @@ export interface Database {
     locator: string;
     status: string;
     metadata: Jsonb;
+    artifact_id: string | null;
+    promoted_at: Timestamp | null;
+    abandoned_at: Timestamp | null;
   };
   capabilities: Versioned & { capability_type: string; configuration: Jsonb };
   capability_grants: Row & {

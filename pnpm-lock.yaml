@@ -60,6 +60,9 @@ importers:
 
   apps/control-plane:
     dependencies:
+      '@factory-floor/artifact-store':
+        specifier: workspace:*
+        version: link:../../packages/artifact-store
       '@factory-floor/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -99,6 +102,9 @@ importers:
 
   packages/runtime-core:
     dependencies:
+      '@factory-floor/artifact-store':
+        specifier: workspace:*
+        version: link:../artifact-store
       '@factory-floor/db':
         specifier: workspace:*
         version: link:../db

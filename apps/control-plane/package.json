@@ -8,13 +8,15 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc -p tsconfig.json --pretty false",
-    "test": "vitest run --root ../.. apps/control-plane/test/health.test.ts"
+    "test": "vitest run --root ../.. apps/control-plane/test/health.test.ts",
+    "artifacts:reconcile": "tsx src/maintenance/artifacts-reconcile.ts --dry-run"
   },
   "dependencies": {
     "fastify": "^5.4.0",
     "@factory-floor/db": "workspace:*",
     "@factory-floor/runtime-core": "workspace:*",
     "yaml": "^2.9.0",
-    "kysely": "^0.29.3"
+    "kysely": "^0.29.3",
+    "@factory-floor/artifact-store": "workspace:*"
   }
 }
