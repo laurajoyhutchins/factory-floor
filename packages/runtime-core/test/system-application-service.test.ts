@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { describe, expect, it } from 'vitest';
 import { canonicalJsonDigest, SystemApplicationService } from '../src/index.js';
 
