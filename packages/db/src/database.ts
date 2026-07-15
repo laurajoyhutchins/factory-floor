@@ -223,11 +223,13 @@ export interface Database {
   external_actions: Row & {
     execution_id: string;
     attempt_id: string;
+    proposal_id: string;
     capability_grant_id: string;
     outbound_request_artifact_id: string;
     policy_decision_id: string | null;
     approval_id: string | null;
     action_type: string;
+    risk: string;
     status: string;
     idempotency_key: string;
   };

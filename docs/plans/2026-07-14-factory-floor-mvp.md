@@ -170,16 +170,16 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 **Outcome:** A valid proposed result publishes all runtime metadata atomically; failed attempts remain visible and retry safely.
 
 - [ ] Write integration tests that fail if artifacts, events, resource entries, downstream deliveries, or terminal statuses become partially visible.
-- [ ] Lock the execution, attempt, delivery, region, and component instance rows required for validation.
-- [ ] Verify active lease token and current region lifecycle epoch.
-- [ ] Validate declared output ports, artifact digests, artifact schemas, proposed events, state, and authority.
-- [ ] In one transaction commit artifacts and derivations, execution outputs, events, downstream deliveries, state version, resource ledger, external-action proposals, and terminal attempt/execution/delivery status.
-- [ ] Promote blobs after commit and reconcile promotion failure.
-- [ ] Implement failed-attempt transaction preserving failure artifact, resource use, and staged partial artifacts.
-- [ ] Apply retry policy by creating a new attempt under the same execution.
-- [ ] Default retry to three attempts with backoff 1s, 5s, and 30s.
-- [ ] Dead-letter terminal unresolved work instead of deleting it.
-- [ ] Test duplicate completion, stale lease, stale epoch, schema-invalid output, undeclared port, promotion failure, and safe retry.
+- [x] Lock the execution, attempt, delivery, region, and component instance rows required for validation.
+- [x] Verify active lease token and current region lifecycle epoch.
+- [x] Validate declared output ports, artifact digests, artifact schemas, proposed events, state, and authority.
+- [x] In one transaction commit artifacts and derivations, execution outputs, events, downstream deliveries, state version, resource ledger, external-action proposals, and terminal attempt/execution/delivery status.
+- [x] Promote blobs after commit and reconcile promotion failure.
+- [x] Implement failed-attempt transaction preserving failure artifact, resource use, and staged partial artifacts.
+- [x] Apply retry policy by creating a new attempt under the same execution.
+- [x] Default retry to three attempts with backoff 1s, 5s, and 30s.
+- [x] Dead-letter terminal unresolved work instead of deleting it.
+- [x] Test duplicate completion, stale lease, stale epoch, schema-invalid output, undeclared port, promotion failure, and safe retry.
 - [ ] Commit as `feat: atomically commit execution results`.
 
 ## Task 9: Complete the investigation vertical slice

@@ -107,9 +107,7 @@ describe('runtime database migration', () => {
 
   afterAll(async () => {
     await db.destroy();
-    await q(`drop database if exists ${dbName} with (force)`).catch(
-      () => undefined,
-    );
+    await q(`drop database if exists ${dbName}`).catch(() => undefined);
     await admin.end();
   });
 
