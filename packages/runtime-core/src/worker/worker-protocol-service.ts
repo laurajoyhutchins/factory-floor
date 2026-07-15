@@ -13,6 +13,7 @@ import {
 } from '@factory-floor/artifact-store';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { SchedulerService } from '../scheduling/scheduler-service.js';
+import { ExecutionCommitError, ExecutionCommitService } from '../commit/execution-commit-service.js';
 
 export type WorkerErrorCode =
   | 'invalid_request'
@@ -567,13 +568,28 @@ export class WorkerProtocolService {
 
   async submitResult(input: ProposedResultInput) {
     const digest = canonicalJsonDigest(input);
-    return this.db.transaction().execute(async (transaction) => {
+    const handoff = await this.db.transaction().execute(async (transaction) => {
+      const existing = await transaction
+        .selectFrom('worker_result_submissions')
+        .select('submission_digest')
+        .where('attempt_id', '=', input.attemptId)
+        .executeTakeFirst();
+      if (existing) {
+        if (existing.submission_digest === digest)
+          return { duplicate: true as const };
+        throw new WorkerProtocolError(
+          'duplicate_conflicting_result',
+          'attempt already has a different proposed result',
+          false,
+          409,
+        );
+      }
       await this.activeAttempt(input, transaction, true);
       await this.validateStagedArtifacts(transaction, input.attemptId, [
         ...input.stagedArtifacts,
         ...(input.proposedState ? [input.proposedState] : []),
       ]);
-      const inserted = await transaction
+      await transaction
         .insertInto('worker_result_submissions')
         .values({
           id: createUuidV7(),
@@ -582,35 +598,31 @@ export class WorkerProtocolService {
           submission_digest: digest,
           result: input as unknown as Json,
         })
-        .onConflict((conflict) => conflict.column('attempt_id').doNothing())
-        .returning('id')
-        .executeTakeFirst();
-      if (inserted)
-        return {
-          protocolVersion: '1.0' as const,
-          accepted: true,
-          duplicate: false,
-          handoff: 'recorded_for_task_8_commit' as const,
-        };
-      const existing = await transaction
-        .selectFrom('worker_result_submissions')
-        .select('submission_digest')
-        .where('attempt_id', '=', input.attemptId)
-        .executeTakeFirstOrThrow();
-      if (existing.submission_digest === digest)
-        return {
-          protocolVersion: '1.0' as const,
-          accepted: true,
-          duplicate: true,
-          handoff: 'recorded_for_task_8_commit' as const,
-        };
-      throw new WorkerProtocolError(
-        'duplicate_conflicting_result',
-        'attempt already has a different proposed result',
-        false,
-        409,
-      );
+        .execute();
+      return { duplicate: false as const };
     });
+    try {
+      await new ExecutionCommitService(this.db, this.blobStore, this.clock).commit(input as Parameters<ExecutionCommitService['commit']>[0]);
+    } catch (error) {
+      if (error instanceof ExecutionCommitError)
+        throw new WorkerProtocolError(
+          error.code === 'external_action_unauthorized'
+            ? 'capability_denied'
+            : error.code === 'invalid_staged_artifact'
+              ? 'unauthorized_staging_reference'
+              : (error.code as WorkerErrorCode),
+          error.message,
+          error.statusCode >= 500,
+          error.statusCode,
+        );
+      throw error;
+    }
+    return {
+      protocolVersion: '1.0' as const,
+      accepted: true,
+      duplicate: handoff.duplicate,
+      handoff: 'committed_by_control_plane' as const,
+    };
   }
 
   async invokeCapability(input: AttemptIdentity & { handle: string; input: Json }) {

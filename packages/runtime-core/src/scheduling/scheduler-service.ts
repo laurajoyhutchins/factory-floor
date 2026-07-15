@@ -213,24 +213,35 @@ export class SchedulerService {
         .selectFrom('execution_attempts')
         .selectAll()
         .where('execution_id', '=', execution.id)
-        .where('attempt_number', '=', 1)
+        .where('status', '=', 'pending')
+        .where((eb) => eb.or([eb('started_at', 'is', null), eb('started_at', '<=', now)]))
+        .orderBy('attempt_number', 'asc')
+        .forUpdate()
         .executeTakeFirst();
-      if (!attempt)
-        attempt = await trx
-          .insertInto('execution_attempts')
-          .values({
-            id: createUuidV7(),
-            execution_id: execution.id,
-            attempt_number: 1,
-            status: 'leased',
-            lease_owner: options.owner,
-            lease_token: requestedLeaseToken,
-            lease_expires_at: requestedLeaseExpiresAt,
-            started_at: now,
-          } as any)
-          .returningAll()
-          .executeTakeFirstOrThrow();
-      else if (attempt.status === 'pending')
+      if (!attempt) {
+        const existing = await trx
+          .selectFrom('execution_attempts')
+          .selectAll()
+          .where('execution_id', '=', execution.id)
+          .orderBy('attempt_number', 'desc')
+          .executeTakeFirst();
+        if (!existing)
+          attempt = await trx
+            .insertInto('execution_attempts')
+            .values({
+              id: createUuidV7(),
+              execution_id: execution.id,
+              attempt_number: 1,
+              status: 'leased',
+              lease_owner: options.owner,
+              lease_token: requestedLeaseToken,
+              lease_expires_at: requestedLeaseExpiresAt,
+              started_at: now,
+            } as any)
+            .returningAll()
+            .executeTakeFirstOrThrow();
+        else return null;
+      } else
         attempt = await trx
           .updateTable('execution_attempts')
           .set({
@@ -243,10 +254,6 @@ export class SchedulerService {
           .where('id', '=', attempt.id)
           .returningAll()
           .executeTakeFirstOrThrow();
-      else
-        throw new Error(
-          `logical execution ${execution.id} already has attempt 1 in status ${attempt.status}`,
-        );
 
       await trx
         .updateTable('deliveries')
