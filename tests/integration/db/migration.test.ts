@@ -18,7 +18,7 @@ const base =
   'postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor';
 const admin = new pg.Pool({
   connectionString: base,
-  connectionTimeoutMillis: 1_000,
+  connectionTimeoutMillis: 10_000,
 });
 const dbName = `ff_test_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${dbName}$1`);
