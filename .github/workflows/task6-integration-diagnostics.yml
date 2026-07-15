@@ -1,0 +1,59 @@
+name: Task 6 Integration Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration-diagnostics:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Start development services
+        run: docker compose up -d postgres minio
+      - name: Wait for service health
+        run: |
+          for attempt in $(seq 1 60); do
+            postgres_status=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q postgres)" 2>/dev/null || true)
+            minio_status=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q minio)" 2>/dev/null || true)
+            if [ "$postgres_status" = healthy ] && [ "$minio_status" = healthy ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          exit 1
+      - name: Capture integration output
+        id: integration
+        shell: bash
+        run: |
+          set +e
+          pnpm test:integration > task6-integration.log 2>&1
+          status=$?
+          cat task6-integration.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload integration output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task6-integration-log
+          path: task6-integration.log
+          if-no-files-found: error
+      - name: Fail on integration error
+        if: steps.integration.outputs.status != '0'
+        run: exit 1
+      - name: Stop development services
+        if: always()
+        run: docker compose down -v
