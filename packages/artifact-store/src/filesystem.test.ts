@@ -93,6 +93,39 @@ describe('FilesystemArtifactBlobStore filesystem safety and atomicity', () => {
     expect(await tmpEntries(root)).toEqual([]);
   });
 
+  it('rejects same-length staged data tampering during promotion', async () => {
+    const staged = await store.stage('tampered-digest', chunks('abc'));
+    await writeFile(join(root, 'staging', staged.stagingId, 'data'), 'xyz');
+
+    await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'digest_mismatch' });
+    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await store.committedExists(staged.digest)).toBe(false);
+    expect(await tmpEntries(root)).toEqual([]);
+  });
+
+  it('rejects different-length staged data tampering during promotion', async () => {
+    const staged = await store.stage('tampered-size', chunks('abc'));
+    await writeFile(join(root, 'staging', staged.stagingId, 'data'), 'abcdef');
+
+    await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'size_mismatch' });
+    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await store.committedExists(staged.digest)).toBe(false);
+    expect(await tmpEntries(root)).toEqual([]);
+  });
+
+  it('rejects an existing committed object whose bytes do not match its metadata', async () => {
+    const first = await store.stage('first-source', chunks('abc'));
+    await store.promote(first.stagingId, first.digest, first.size);
+    const committedData = join(root, 'committed', 'sha256', first.digest.slice(0, 2), first.digest, 'data');
+    await writeFile(committedData, 'xyz');
+    const retry = await store.stage('retry-source', chunks('abc'));
+
+    await expect(store.promote(retry.stagingId, retry.digest, retry.size)).rejects.toMatchObject({ code: 'committed_conflict' });
+    expect(await store.stagedExists(retry.stagingId)).toBe(true);
+    expect(await store.committedExists(first.digest)).toBe(false);
+    expect(await tmpEntries(root)).toEqual([]);
+  });
+
   it('rejects symlinked staging namespace directories', async () => {
     await rm(join(root, 'staging'), { recursive: true, force: true });
     await mkdir(join(root, 'outside'), { recursive: true });
