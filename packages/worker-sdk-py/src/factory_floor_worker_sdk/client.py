@@ -6,7 +6,7 @@ import json
 import random
 import re
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, BinaryIO, Callable
+from typing import Any, AsyncIterator, BinaryIO, Callable, cast
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -30,6 +30,7 @@ from factory_floor_contracts.worker.stage_response_schema import WorkerStageResp
 from factory_floor_contracts.worker.upload_response_schema import WorkerUploadResponse
 
 PROTOCOL_VERSION = "1.0"
+_UPLOAD_CHUNK_SIZE = 64 * 1024
 _SECRET = re.compile(
     r"(Bearer\s+)[^\s,]+|"
     r"([?&](?:token|signature|uploadHandle|leaseToken)=)[^&\s]+|"
@@ -249,7 +250,9 @@ class WorkerClient:
             headers = self._headers(trace)
             headers["Content-Type"] = "application/octet-stream"
             response = await self._client.put(
-                upload_url, content=content, headers=headers
+                upload_url,
+                content=_as_async_content(content),
+                headers=headers,
             )
             if response.status_code >= 400:
                 try:
@@ -294,6 +297,22 @@ class WorkerClient:
             trace=trace or envelope.traceContext,
             retry_safe=retry_safe,
         )
+
+
+def _as_async_content(
+    content: bytes | BinaryIO | AsyncIterator[bytes],
+) -> bytes | AsyncIterator[bytes]:
+    if isinstance(content, bytes):
+        return content
+    if hasattr(content, "__aiter__"):
+        return cast(AsyncIterator[bytes], content)
+    return _file_chunks(content)
+
+
+async def _file_chunks(stream: BinaryIO) -> AsyncIterator[bytes]:
+    while chunk := stream.read(_UPLOAD_CHUNK_SIZE):
+        yield chunk
+        await asyncio.sleep(0)
 
 
 def digest_bytes(data: bytes) -> str:
