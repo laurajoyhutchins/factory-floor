@@ -11,6 +11,10 @@
     "test": "vitest run --root ../.. apps/control-plane/test/health.test.ts"
   },
   "dependencies": {
-    "fastify": "^5.4.0"
+    "fastify": "^5.4.0",
+    "@factory-floor/db": "workspace:*",
+    "@factory-floor/runtime-core": "workspace:*",
+    "yaml": "^2.9.0",
+    "kysely": "^0.29.3"
   }
 }

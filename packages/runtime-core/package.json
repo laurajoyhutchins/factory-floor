@@ -4,5 +4,10 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@factory-floor/db": "workspace:*",
+    "ajv": "^8.20.0",
+    "kysely": "^0.29.3"
+  }
 }
