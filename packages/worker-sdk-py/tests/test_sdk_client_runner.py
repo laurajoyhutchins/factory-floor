@@ -15,20 +15,16 @@ from factory_floor_contracts.worker.capability_request_schema import WorkerCapab
 from factory_floor_contracts.worker.cancellation_response_schema import (
     WorkerCancellationResponse,
 )
-from factory_floor_contracts.worker.claim_response_schema import WorkerClaimResponse
 from factory_floor_contracts.worker.heartbeat_response_schema import WorkerHeartbeatResponse
 from factory_floor_contracts.worker.stage_request_schema import WorkerStageRequest
-from factory_floor_contracts.worker.stage_response_schema import WorkerStageResponse
-from factory_floor_contracts.worker.upload_response_schema import WorkerUploadResponse
 from factory_floor_worker_sdk import (
     ConflictingResultError,
-    ProtocolError,
     TransportError,
     WorkerClient,
     WorkerClientConfig,
     redact,
 )
-from factory_floor_worker_sdk.artifacts import stage_json
+from factory_floor_worker_sdk.artifacts import stage_bytes, stage_json
 from factory_floor_worker_sdk.client import PROTOCOL_VERSION
 from factory_floor_worker_sdk.runner import WorkerRunner
 
@@ -39,7 +35,7 @@ def fixture(name: str) -> dict[str, Any]:
     return json.loads((ROOT / "contracts/fixtures/worker" / name).read_text())
 
 
-def client(handler: httpx.AsyncBaseTransport | Any) -> WorkerClient:
+def client(handler: Any) -> WorkerClient:
     return WorkerClient(
         WorkerClientConfig("http://test", "secret-token-value-123456", "w1"),
         http_client=httpx.AsyncClient(
@@ -148,15 +144,15 @@ async def test_transient_claim_retry() -> None:
 @pytest.mark.asyncio
 async def test_uses_invocation_endpoint_references() -> None:
     seen: list[str] = []
-    envelope_data = env().model_dump(mode="json")
-    envelope_data.update(
+    values = env().model_dump(mode="json")
+    values.update(
         {
             "artifactStagingUrl": "http://test/custom/stage",
             "resultSubmissionUrl": "http://test/custom/results",
             "capabilityInvocationUrl": "http://test/custom/capability",
         }
     )
-    envelope = InvocationEnvelope.model_validate(envelope_data)
+    envelope = InvocationEnvelope.model_validate(values)
 
     async def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.path)
@@ -210,28 +206,13 @@ async def test_uses_invocation_endpoint_references() -> None:
 
 
 @pytest.mark.asyncio
-async def test_heartbeat_cancellation_capability_and_upload() -> None:
+async def test_heartbeat_and_cancellation() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         if "heartbeat" in str(request.url):
             return httpx.Response(200, json=fixture("heartbeat-response.valid.json"))
         if "cancellation" in str(request.url):
             return httpx.Response(200, json=fixture("cancellation-response.valid.json"))
-        if "capabilities" in str(request.url):
-            return httpx.Response(
-                200,
-                json={"protocolVersion": "1.0", "output": {"ok": True}, "auditId": "a"},
-            )
-        if request.method == "PUT":
-            return httpx.Response(
-                200,
-                json={
-                    "protocolVersion": "1.0",
-                    "stagedRef": "018f6f73-8d5b-7cc8-9ed9-6b2f4e25d010",
-                    "digest": "a" * 64,
-                    "sizeBytes": 3,
-                },
-            )
-        return httpx.Response(500)
+        raise AssertionError(str(request.url))
 
     worker = client(handler)
     envelope = env()
@@ -247,8 +228,10 @@ class ChunkOnlyBytesIO(io.BytesIO):
 
 
 @pytest.mark.asyncio
-async def test_staged_json_upload_and_chunked_binary_input() -> None:
+async def test_staged_json_and_chunked_binary_upload() -> None:
     uploaded = bytearray()
+    expected = b'{"a":1,"b":2}'
+    expected_digest = "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777"
 
     async def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
@@ -259,8 +242,8 @@ async def test_staged_json_upload_and_chunked_binary_input() -> None:
             json={
                 "protocolVersion": "1.0",
                 "stagedRef": "018f6f73-8d5b-7cc8-9ed9-6b2f4e25d010",
-                "digest": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
-                "sizeBytes": 13,
+                "digest": expected_digest,
+                "sizeBytes": len(expected),
             },
         )
 
@@ -275,20 +258,21 @@ async def test_staged_json_upload_and_chunked_binary_input() -> None:
         schema_digest="b" * 64,
     )
     assert staged.portName == "verified-claims"
-    assert staged.sizeBytes == 13
-    assert uploaded == b'{"a":1,"b":2}'
+    assert staged.sizeBytes == len(expected)
+    assert uploaded == expected
 
     uploaded.clear()
-    stream = ChunkOnlyBytesIO(b'{"a":1,"b":2}')
-    staged_stream = await stage_json(
+    staged_stream = await stage_bytes(
         worker,
         envelope,
         "verified-claims",
-        json.load(stream),
+        ChunkOnlyBytesIO(expected),
+        "application/json",
         schema_id="verification-result.v1",
         schema_digest="b" * 64,
     )
-    assert staged_stream.sizeBytes == 13
+    assert staged_stream.sizeBytes == len(expected)
+    assert uploaded == expected
     assert "secret-token-value" not in redact("Bearer secret-token-value-123456")
 
 
