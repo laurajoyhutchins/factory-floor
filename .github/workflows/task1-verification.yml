@@ -103,10 +103,21 @@ jobs:
           exit 1
 
       - name: Run integration test command
+        shell: bash
         env:
           TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
           DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-        run: pnpm test:integration
+        run: |
+          set -o pipefail
+          pnpm test:integration 2>&1 | tee integration.log
+
+      - name: Upload integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr8-integration-log
+          path: integration.log
+          if-no-files-found: ignore
 
       - name: Verify migration reset against Compose PostgreSQL
         env:
