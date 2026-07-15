@@ -15,7 +15,7 @@ package = false
 [tool.pytest.ini_options]
 pythonpath = ["src", "../../workers/demo-py/src"]
 testpaths = ["tests", "../../workers/demo-py/tests"]
-addopts = "--junitxml=integration-test.log"
+addopts = "--junitxml=../../integration-test.log"
 
 [tool.uv.sources]
 factory-floor-contracts = { path = "../contracts-py", editable = true }
