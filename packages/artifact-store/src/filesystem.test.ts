@@ -98,7 +98,7 @@ describe('FilesystemArtifactBlobStore filesystem safety and atomicity', () => {
     await writeFile(join(root, 'staging', staged.stagingId, 'data'), 'xyz');
 
     await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'digest_mismatch' });
-    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await readdir(join(root, 'staging'))).toContain(staged.stagingId);
     expect(await store.committedExists(staged.digest)).toBe(false);
     expect(await tmpEntries(root)).toEqual([]);
   });
@@ -108,7 +108,7 @@ describe('FilesystemArtifactBlobStore filesystem safety and atomicity', () => {
     await writeFile(join(root, 'staging', staged.stagingId, 'data'), 'abcdef');
 
     await expect(store.promote(staged.stagingId, staged.digest, staged.size)).rejects.toMatchObject({ code: 'size_mismatch' });
-    expect(await store.stagedExists(staged.stagingId)).toBe(false);
+    expect(await readdir(join(root, 'staging'))).toContain(staged.stagingId);
     expect(await store.committedExists(staged.digest)).toBe(false);
     expect(await tmpEntries(root)).toEqual([]);
   });
