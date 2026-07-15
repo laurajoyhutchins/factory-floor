@@ -45,7 +45,7 @@ wheels = [
 [[package]]
 name = "factory-floor-contracts"
 version = "0.1.0"
-source = { editable = "../contracts-py" }
+source = { editable = "../../packages/contracts-py" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -60,12 +60,12 @@ dev = [
 ]
 
 [[package]]
-name = "factory-floor-worker-sdk"
+name = "factory-floor-demo-py"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "factory-floor-contracts" },
-    { name = "httpx" },
+    { name = "factory-floor-worker-sdk" },
 ]
 
 [package.dev-dependencies]
@@ -76,7 +76,28 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "factory-floor-contracts", editable = "../contracts-py" },
+    { name = "factory-floor-contracts", editable = "../../packages/contracts-py" },
+    { name = "factory-floor-worker-sdk", editable = "../../packages/worker-sdk-py" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4,<9" },
+    { name = "pytest-asyncio", specifier = ">=1.2,<2" },
+]
+
+[[package]]
+name = "factory-floor-worker-sdk"
+version = "0.1.0"
+source = { editable = "../../packages/worker-sdk-py" }
+dependencies = [
+    { name = "factory-floor-contracts" },
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "factory-floor-contracts", editable = "../../packages/contracts-py" },
     { name = "httpx", specifier = ">=0.28,<0.29" },
 ]
 
