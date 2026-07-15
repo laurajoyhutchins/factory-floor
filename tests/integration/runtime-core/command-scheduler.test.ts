@@ -51,14 +51,24 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     .execute();
   await db
     .insertInto('port_definitions')
-    .values({
-      id: createUuidV7(),
-      component_definition_id: definitionId,
-      name: 'objective',
-      direction: 'input',
-      schema_id: schemaId,
-      required: true,
-    })
+    .values([
+      {
+        id: createUuidV7(),
+        component_definition_id: definitionId,
+        name: 'context',
+        direction: 'input',
+        schema_id: schemaId,
+        required: true,
+      },
+      {
+        id: createUuidV7(),
+        component_definition_id: definitionId,
+        name: 'objective',
+        direction: 'input',
+        schema_id: schemaId,
+        required: true,
+      },
+    ])
     .execute();
   await db
     .insertInto('regions')
@@ -75,7 +85,10 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
         ingress: {
           commands: {
             'investigation.start': {
-              targets: [{ component: 'retrieve', port: 'objective' }],
+              targets: [
+                { component: 'retrieve', port: 'context' },
+                { component: 'retrieve', port: 'objective' },
+              ],
             },
           },
         },
@@ -156,15 +169,15 @@ describe('durable command routing and scheduler concurrency', () => {
     ]);
     expect(new Set(results.map((result) => result.commandId)).size).toBe(1);
     expect(new Set(results.map((result) => result.eventId)).size).toBe(1);
-    expect(new Set(results.flatMap((result) => result.deliveryIds)).size).toBe(1);
+    expect(new Set(results.flatMap((result) => result.deliveryIds)).size).toBe(2);
     expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(1);
     expect(await db.selectFrom('events').selectAll().execute()).toHaveLength(1);
     expect(await db.selectFrom('deliveries').selectAll().execute()).toHaveLength(
-      1,
+      2,
     );
   });
 
-  it('allows only one competing poller to create and lease a logical execution', async () => {
+  it('allows only one competing poller to lease a complete multi-input group', async () => {
     const commands = new CommandService(db);
     await commands.submit({
       region: '/investigation',
@@ -181,8 +194,10 @@ describe('durable command routing and scheduler concurrency', () => {
       scheduler.pollForExecution({ owner: 'worker-b', leaseDurationMs: 30_000 }),
     ]);
 
-    expect(results.filter((result) => result !== null)).toHaveLength(1);
+    const scheduled = results.filter((result) => result !== null);
+    expect(scheduled).toHaveLength(1);
     expect(results.filter((result) => result === null)).toHaveLength(1);
+    expect(scheduled[0]?.inputs).toHaveLength(2);
     expect(await db.selectFrom('executions').selectAll().execute()).toHaveLength(
       1,
     );
@@ -191,13 +206,20 @@ describe('durable command routing and scheduler concurrency', () => {
     ).toHaveLength(1);
     expect(
       await db.selectFrom('execution_inputs').selectAll().execute(),
-    ).toHaveLength(1);
-    const delivery = await db
-      .selectFrom('deliveries')
-      .selectAll()
-      .executeTakeFirstOrThrow();
-    expect(delivery).toMatchObject({ status: 'leased', attempts_count: 1 });
-    expect(delivery.lease_token).not.toBeNull();
+    ).toHaveLength(2);
+    const deliveries = await db.selectFrom('deliveries').selectAll().execute();
+    expect(deliveries).toHaveLength(2);
+    expect(
+      deliveries.every(
+        (delivery) =>
+          delivery.status === 'leased' &&
+          delivery.attempts_count === 1 &&
+          delivery.lease_token !== null,
+      ),
+    ).toBe(true);
+    expect(new Set(deliveries.map((delivery) => delivery.lease_token)).size).toBe(
+      1,
+    );
   });
 
   it('durably rejects an already expired command without creating deliveries', async () => {
