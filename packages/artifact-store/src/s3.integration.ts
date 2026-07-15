@@ -10,7 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { artifactBlobStoreConformance } from '../test/artifact-blob-store-conformance.js';
-import { S3ArtifactBlobStore } from './index.js';
+import { S3ArtifactBlobStore } from './public.js';
 
 const endpoint = process.env.MINIO_ENDPOINT ?? 'http://127.0.0.1:9000';
 const region = process.env.MINIO_REGION ?? 'us-east-1';
