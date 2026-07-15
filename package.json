@@ -9,7 +9,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "bash -o pipefail -c 'tsc -b --pretty false 2>&1 | tee integration-test.log'",
     "test": "vitest run --config vitest.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "dev:services": "docker compose up -d postgres minio",
