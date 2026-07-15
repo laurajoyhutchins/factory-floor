@@ -17,7 +17,8 @@
     "contracts:validate": "node scripts/validate-contracts.mjs",
     "contracts:generate": "node scripts/generate-contracts.mjs",
     "contracts:check": "bash scripts/check-contract-generation-drift.sh",
-    "dev:worker-demo-ts": "pnpm --filter @factory-floor/demo-ts-worker dev"
+    "dev:worker-demo-ts": "pnpm --filter @factory-floor/demo-ts-worker dev",
+    "demo:investigation": "tsx examples/investigation/run-demo.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

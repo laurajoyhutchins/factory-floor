@@ -186,16 +186,16 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** One command runs the static investigation graph end-to-end through TypeScript and Python workers.
 
-- [ ] Add schemas and fixtures for objective, evidence, candidate claims, verification result, final result, evidence bundle, uncertainty report, and failure artifacts.
-- [ ] Register deterministic retrieve, compare, verify, and synthesize component definitions.
-- [ ] Apply `examples/investigation-system.yaml`.
-- [ ] Submit one investigation command through the public API or CLI.
-- [ ] Fan out three retrieval executions and fan in all expected evidence.
-- [ ] Deliberately fail verifier attempt 1 and schedule a replacement attempt.
-- [ ] Preserve attempt 1 and its failure artifact.
-- [ ] Complete verification, synthesis, and publication outputs on the later attempt.
-- [ ] Verify no duplicate committed outputs or downstream deliveries.
-- [ ] Add a single command or script that runs the entire demonstration.
+- [x] Add schemas and fixtures for objective, evidence, candidate claims, verification result, final result, evidence bundle, uncertainty report, and failure artifacts.
+- [x] Register deterministic retrieve, compare, verify, and synthesize component definitions.
+- [x] Apply `examples/investigation-system.yaml`.
+- [x] Submit one investigation command through the public API or CLI.
+- [x] Fan out three retrieval executions and fan in all expected evidence.
+- [x] Deliberately fail verifier attempt 1 and schedule a replacement attempt.
+- [x] Preserve attempt 1 and its failure artifact.
+- [x] Complete verification, synthesis, and publication outputs on the later attempt.
+- [x] Verify no duplicate committed outputs or downstream deliveries.
+- [x] Add a single command or script that runs the entire demonstration.
 - [ ] Commit as `feat: run durable investigation example`.
 
 ## Task 10: Add trace, projections, recovery, and conformance tests

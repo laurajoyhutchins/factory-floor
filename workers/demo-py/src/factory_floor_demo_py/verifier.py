@@ -25,10 +25,12 @@ from factory_floor_worker_sdk.client import (
 from factory_floor_worker_sdk.runner import WorkerContext, WorkerRunner
 
 FAILURE_CODE = "DEMO_FIRST_ATTEMPT_INTENTIONAL_FAILURE"
-VERIFICATION_SCHEMA_ID = "verification-result.v1"
-VERIFICATION_SCHEMA_DIGEST = hashlib.sha256(
-    VERIFICATION_SCHEMA_ID.encode()
-).hexdigest()
+VERIFICATION_SCHEMA_KEY = "verification-result.v1"
+_SCHEMA_ENTRY = json.loads(os.environ.get("FACTORY_FLOOR_SCHEMA_DIGESTS", "{}")).get(VERIFICATION_SCHEMA_KEY, {})
+VERIFICATION_SCHEMA_ID = _SCHEMA_ENTRY.get("id", VERIFICATION_SCHEMA_KEY)
+VERIFICATION_SCHEMA_DIGEST = _SCHEMA_ENTRY.get(
+    "digest", hashlib.sha256(VERIFICATION_SCHEMA_KEY.encode()).hexdigest()
+)
 
 
 class DeterministicVerifier:

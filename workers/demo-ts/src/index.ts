@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   ComponentRegistry,
   WorkerProtocolClient,
@@ -11,10 +12,13 @@ import type {
   StagedArtifact,
 } from '@factory-floor/contracts-ts';
 
-const schemaDigestPlaceholder = '0'.repeat(64);
-
-function schemaMetadata(schemaId: string) {
-  return { schemaId, schemaDigest: schemaDigestPlaceholder };
+function schemaMetadata(schemaKey: string) {
+  const schemas = JSON.parse(process.env.FACTORY_FLOOR_SCHEMA_DIGESTS ?? '{}') as Record<string, { id: string; digest: string }>;
+  const schema = schemas[schemaKey];
+  return {
+    schemaId: schema?.id ?? schemaKey,
+    schemaDigest: schema?.digest ?? createHash('sha256').update(schemaKey).digest('hex'),
+  };
 }
 
 function completed(
