@@ -115,7 +115,7 @@ export class SystemApplicationService {
         throw new DomainError('system_conflict', 'Static system exists with different content');
       }
 
-      const definitionByInstance = new Map<string, { id: string; ports: Set<string> }>();
+      const definitionByInstance = new Map<string, { id: string; ports: Map<string, 'input'|'output'|'state'> }>();
       for (const instance of staticTopology.instances) {
         const reference = parseRef(instance.component);
         const definition = await this.definitions.findComponentDefinition(
@@ -132,8 +132,21 @@ export class SystemApplicationService {
         const ports = await this.definitions.listPorts(transaction, definition.id);
         definitionByInstance.set(instance.name, {
           id: definition.id,
-          ports: new Set(ports.map((port) => port.name)),
+          ports: new Map(ports.map((port) => [port.name, port.direction as 'input'|'output'|'state'])),
         });
+      }
+
+      for (const [commandType, rule] of Object.entries(staticTopology.ingress?.commands ?? {})) {
+        const seen = new Set<string>();
+        for (const target of (rule as any).targets ?? []) {
+          const ports = definitionByInstance.get(target.component)?.ports;
+          if (ports?.get(target.port) !== 'input') {
+            throw new DomainError('invalid_port_reference', `Invalid ingress ${commandType} target ${target.component}.${target.port}`);
+          }
+          const key = `${target.component}.${target.port}`;
+          if (seen.has(key)) throw new DomainError('duplicate_ingress_target', `Duplicate ingress target ${key}`);
+          seen.add(key);
+        }
       }
 
       for (const connection of staticTopology.connections) {
@@ -168,6 +181,19 @@ export class SystemApplicationService {
           configuration: (instance.configuration ?? {}) as Json,
         });
         instanceIds.set(instance.name, row.id);
+      }
+
+      for (const [commandType, rule] of Object.entries(staticTopology.ingress?.commands ?? {})) {
+        const seen = new Set<string>();
+        for (const target of (rule as any).targets ?? []) {
+          const ports = definitionByInstance.get(target.component)?.ports;
+          if (ports?.get(target.port) !== 'input') {
+            throw new DomainError('invalid_port_reference', `Invalid ingress ${commandType} target ${target.component}.${target.port}`);
+          }
+          const key = `${target.component}.${target.port}`;
+          if (seen.has(key)) throw new DomainError('duplicate_ingress_target', `Duplicate ingress target ${key}`);
+          seen.add(key);
+        }
       }
 
       for (const connection of staticTopology.connections) {

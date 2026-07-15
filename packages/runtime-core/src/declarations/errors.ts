@@ -3,6 +3,7 @@ export type DomainErrorCode =
   | 'registration_conflict'
   | 'referenced_schema_not_found'
   | 'duplicate_port_identity'
+  | 'duplicate_ingress_target'
   | 'duplicate_component_instance'
   | 'duplicate_region_identity'
   | 'unsupported_declaration_version'

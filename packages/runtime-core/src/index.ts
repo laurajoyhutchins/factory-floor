@@ -3,3 +3,11 @@ export * from './declarations/errors.js';
 export * from './declarations/validation.js';
 export * from './registration/registration-service.js';
 export * from './systems/system-application-service.js';
+
+export * from './commands/command-service.js';
+export * from './commands/errors.js';
+export * from './commands/identity.js';
+export * from './events/event-service.js';
+export * from './routing/routing-service.js';
+export * from './scheduling/lease.js';
+export * from './scheduling/scheduler-service.js';

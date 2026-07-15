@@ -83,6 +83,17 @@ spec:
       - name: synthesize
         component: synthesize@1
 
+    ingress:
+      commands:
+        investigation.start:
+          targets:
+            - component: retrieve-a
+              port: objective
+            - component: retrieve-b
+              port: objective
+            - component: retrieve-c
+              port: objective
+
     connections:
       - from: region.objective
         to: retrieve-a.objective
