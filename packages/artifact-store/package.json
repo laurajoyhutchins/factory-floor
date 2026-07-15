@@ -3,9 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/public.js",
-  "types": "dist/public.d.ts",
+  "main": "dist/src/public.js",
+  "types": "dist/src/public.d.ts",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1087.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/public.d.ts",
+      "import": "./dist/src/public.js"
+    },
+    "./package.json": "./package.json"
   }
 }

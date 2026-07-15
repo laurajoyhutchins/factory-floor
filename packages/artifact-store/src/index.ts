@@ -41,6 +41,7 @@ export interface StagedObject {
   readonly digest: HexSha256Digest;
   readonly size: bigint;
   readonly stagedLocator: string;
+  readonly lastModifiedAt: Date;
 }
 
 export interface StagedObjectPage {
@@ -284,8 +285,10 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     const slice = ids.slice(start < 0 ? ids.length : start, (start < 0 ? ids.length : start) + options.limit);
     const objects: StagedObject[] = [];
     for (const id of slice) {
-      const metadata = await this.readVerifiedObjectMetadata(this.stagedObjectDirectory(id), 'not_found');
-      objects.push(this.stagingReceipt(id, metadata.digest, metadata.size));
+      const directory = this.stagedObjectDirectory(id);
+      const metadata = await this.readVerifiedObjectMetadata(directory, 'not_found');
+      const stat = await lstat(directory);
+      objects.push({ ...this.stagingReceipt(id, metadata.digest, metadata.size), lastModifiedAt: stat.mtime });
     }
     const last = slice.at(-1);
     const nextCursor = last !== undefined && ids.some((id) => id > last) ? last : undefined;
@@ -536,7 +539,7 @@ export class S3ArtifactBlobStore implements ArtifactBlobStore {
       const stagingId = item.Key.slice(prefix.length);
       if (!isValidStagingId(stagingId)) continue;
       const metadata = await this.readVerifiedMetadata(item.Key, 'not_found');
-      objects.push(this.stagingReceipt(stagingId, metadata.digest, metadata.size));
+      objects.push({ ...this.stagingReceipt(stagingId, metadata.digest, metadata.size), lastModifiedAt: item.LastModified ?? new Date(0) });
     }
     return { objects, nextCursor: response.NextContinuationToken };
   }
