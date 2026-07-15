@@ -214,7 +214,9 @@ export class SchedulerService {
         .selectAll()
         .where('execution_id', '=', execution.id)
         .where('status', '=', 'pending')
-        .where((eb) => eb.or([eb('started_at', 'is', null), eb('started_at', '<=', now)]))
+        .where((eb) =>
+          eb.or([eb('started_at', 'is', null), eb('started_at', '<=', now)]),
+        )
         .orderBy('attempt_number', 'asc')
         .forUpdate()
         .executeTakeFirst();
@@ -274,7 +276,7 @@ export class SchedulerService {
       return {
         executionId: execution.id,
         attemptId: attempt.id,
-        attemptNumber: 1,
+        attemptNumber: attempt.attempt_number,
         leaseToken: attempt.lease_token!,
         leaseExpiresAt: attempt.lease_expires_at!.toISOString(),
         inputs: selected.map((delivery) => ({
