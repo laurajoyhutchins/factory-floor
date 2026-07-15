@@ -116,7 +116,12 @@ export interface WorkerResultSubmissionResponse {
   handoff: string;
 }
 
-type RequestPayload = JsonRecord | BodyInit | Readable | ArrayBufferView;
+type RequestPayload =
+  | JsonRecord
+  | WorkerHeartbeat
+  | BodyInit
+  | Readable
+  | ArrayBufferView;
 
 export class WorkerProtocolClient {
   private readonly baseUrl: URL;
@@ -209,10 +214,7 @@ export class WorkerProtocolClient {
 
   async stageArtifact(
     envelope: InvocationEnvelope,
-    request: Omit<
-      WorkerStageRequest,
-      ResultIdentity
-    >,
+    request: Omit<WorkerStageRequest, ResultIdentity>,
     options: { signal?: AbortSignal } = {},
   ): Promise<WorkerStageResponse> {
     return this.requestJson<WorkerStageResponse>(
@@ -410,10 +412,7 @@ async function parsePayload(response: Response): Promise<unknown> {
 }
 
 function validateProtocol(payload: unknown): void {
-  if (
-    !isRecord(payload) ||
-    payload.protocolVersion !== WORKER_PROTOCOL_VERSION
-  )
+  if (!isRecord(payload) || payload.protocolVersion !== WORKER_PROTOCOL_VERSION)
     throw new WorkerSdkError('unsupported worker protocol version', {
       kind: 'unsupported_protocol_version',
       retryable: false,
@@ -525,17 +524,14 @@ function mapError(status: number, payload: unknown): WorkerSdkError {
             : status >= 500
               ? 'transient'
               : 'invalid_request';
-  return new WorkerSdkError(
-    error.message ?? `worker protocol error ${status}`,
-    {
-      kind,
-      retryable: error.retryable ?? status >= 500,
-      status,
-      code,
-      requestId: error.requestId,
-      details: error.details,
-    },
-  );
+  return new WorkerSdkError(error.message ?? `worker protocol error ${status}`, {
+    kind,
+    retryable: error.retryable ?? status >= 500,
+    status,
+    code,
+    requestId: error.requestId,
+    details: error.details,
+  });
 }
 
 function defaultSleep(
