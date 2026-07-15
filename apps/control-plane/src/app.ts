@@ -30,7 +30,10 @@ export interface AppDependencies {
 export async function buildApp(
   deps: AppDependencies = {},
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    ajv: { customOptions: { removeAdditional: false } },
+  });
   app.addContentTypeParser(
     ['application/yaml', 'text/yaml', 'application/x-yaml'],
     { parseAs: 'string' },
@@ -79,16 +82,12 @@ export async function buildApp(
               process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts',
             ),
           {
-            leaseDurationMs: Number(
-              process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
-            ),
             baseUrl:
               process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
           },
         ),
       deps.workerAuthToken,
     );
-
   if (!deps.database && db)
     app.addHook('onClose', async () => {
       await db.destroy();
