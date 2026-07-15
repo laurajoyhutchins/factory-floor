@@ -30,12 +30,6 @@ export interface SubmitCommandResult {
   rejection?: unknown;
 }
 
-type CommandRow = Awaited<
-  ReturnType<
-    ReturnType<RuntimeDb['selectFrom']>['selectAll']
-  >
->;
-
 export class CommandService {
   constructor(
     private readonly db: Kysely<Database>,
