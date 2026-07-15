@@ -8,32 +8,74 @@ const processes = [
 ];
 
 const children = new Map();
+const useProcessGroups = process.platform !== 'win32';
 let shuttingDown = false;
+let forceTimer;
+
+function signalChild(child, signal) {
+  if (child.pid === undefined) return;
+  if (useProcessGroups) {
+    try {
+      process.kill(-child.pid, signal);
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+    return;
+  }
+  if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+}
 
 function stopAll(signal = 'SIGTERM') {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  for (const child of children.values()) {
-    if (!child.killed) child.kill(signal);
+  if (!shuttingDown) {
+    shuttingDown = true;
+    for (const child of children.values()) signalChild(child, signal);
+    forceTimer = setTimeout(() => {
+      for (const child of children.values()) signalChild(child, 'SIGKILL');
+    }, 3_000);
+    forceTimer.unref();
   }
 }
 
 for (const [name, command, args] of processes) {
-  const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false });
+  const child = spawn(command, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+    detached: useProcessGroups,
+  });
   children.set(name, child);
-  child.stdout.on('data', (chunk) => process.stdout.write(`[${name}] ${chunk}`));
-  child.stderr.on('data', (chunk) => process.stderr.write(`[${name}] ${chunk}`));
+  child.stdout?.on('data', (chunk) =>
+    process.stdout.write(`[${name}] ${chunk}`),
+  );
+  child.stderr?.on('data', (chunk) =>
+    process.stderr.write(`[${name}] ${chunk}`),
+  );
+  child.on('error', (error) => {
+    globalThis.console.error(`[factory-floor dev] ${name} failed: ${error.message}`);
+    process.exitCode = 1;
+    children.delete(name);
+    stopAll();
+    if (children.size === 0) process.exit(process.exitCode);
+  });
   child.on('exit', (code, signal) => {
     children.delete(name);
     if (!shuttingDown) {
-      globalThis.console.error(`[factory-floor dev] ${name} exited with ${signal ?? code}`);
-      stopAll();
+      globalThis.console.error(
+        `[factory-floor dev] ${name} exited with ${signal ?? code}`,
+      );
       process.exitCode = code ?? 1;
+      stopAll();
     }
-    if (children.size === 0) process.exit(process.exitCode ?? 0);
+    if (children.size === 0) {
+      if (forceTimer) clearTimeout(forceTimer);
+      process.exit(process.exitCode ?? 0);
+    }
   });
 }
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => stopAll(signal));
+  process.once(signal, () => {
+    process.exitCode = signal === 'SIGINT' ? 130 : 143;
+    stopAll(signal);
+    if (children.size === 0) process.exit(process.exitCode);
+  });
 }
