@@ -83,6 +83,25 @@ export class SchedulerService {
         .selectAll()
         .where('id', '=', candidate.target_component_instance_id)
         .executeTakeFirstOrThrow();
+      const revision = await trx
+        .selectFrom('topology_revisions')
+        .select('topology')
+        .where('id', '=', candidate.topology_revision_id)
+        .executeTakeFirstOrThrow();
+      const fanInExpected = new Map<string, number>();
+      const fanInRules =
+        (revision.topology as any)?.spec?.fanIn ??
+        (revision.topology as any)?.fanIn ??
+        [];
+      if (Array.isArray(fanInRules))
+        for (const rule of fanInRules) {
+          const [instance, port] = String(rule.input ?? '').split('.');
+          if (instance === component.name) {
+            const expected = Number(rule.completion?.expected);
+            if (Number.isInteger(expected) && expected > 0)
+              fanInExpected.set(port, expected);
+          }
+        }
       const ports = await trx
         .selectFrom('port_definitions')
         .selectAll()
@@ -112,10 +131,11 @@ export class SchedulerService {
         `
           .execute(trx as any)
           .then((result) => result.rows);
-        if (rows.length === 0) return null;
-        if (rows.length > 1)
+        const expected = fanInExpected.get(port.name) ?? 1;
+        if (rows.length < expected) return null;
+        if (rows.length > expected)
           throw new Error(`ambiguous duplicate deliveries for port ${port.name}`);
-        selected.push(rows[0]);
+        selected.push(...rows);
       }
 
       const optional = await sql<any>`
@@ -137,15 +157,20 @@ export class SchedulerService {
       `
         .execute(trx as any)
         .then((result) => result.rows);
-      const optionalByPort = new Map<string, any>();
+      const optionalByPort = new Map<string, any[]>();
       for (const delivery of optional) {
-        if (optionalByPort.has(delivery.target_port_name))
+        const expected = fanInExpected.get(delivery.target_port_name) ?? 1;
+        const deliveries = optionalByPort.get(delivery.target_port_name) ?? [];
+        deliveries.push(delivery);
+        if (deliveries.length > expected)
           throw new Error(
             `ambiguous duplicate deliveries for port ${delivery.target_port_name}`,
           );
-        optionalByPort.set(delivery.target_port_name, delivery);
+        optionalByPort.set(delivery.target_port_name, deliveries);
       }
-      selected.push(...optionalByPort.values());
+      for (const [port, deliveries] of optionalByPort)
+        if (deliveries.length === (fanInExpected.get(port) ?? 1))
+          selected.push(...deliveries);
       if (selected.length === 0)
         throw new Error('scheduler selected an empty input set');
       selected.sort(

@@ -1,0 +1,4 @@
+{
+  "query": "durable reactive graph demo",
+  "sources": ["primary", "secondary", "adversarial"]
+}

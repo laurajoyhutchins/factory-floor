@@ -30,7 +30,10 @@ export interface AppDependencies {
 export async function buildApp(
   deps: AppDependencies = {},
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    ajv: { customOptions: { removeAdditional: false as never } },
+  });
   app.addContentTypeParser(
     ['application/yaml', 'text/yaml', 'application/x-yaml'],
     { parseAs: 'string' },
@@ -88,7 +91,6 @@ export async function buildApp(
         ),
       deps.workerAuthToken,
     );
-
   if (!deps.database && db)
     app.addHook('onClose', async () => {
       await db.destroy();

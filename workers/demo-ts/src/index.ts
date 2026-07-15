@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import {
   ComponentRegistry,
   WorkerProtocolClient,
@@ -11,10 +13,16 @@ import type {
   StagedArtifact,
 } from '@factory-floor/contracts-ts';
 
-const schemaDigestPlaceholder = '0'.repeat(64);
-
-function schemaMetadata(schemaId: string) {
-  return { schemaId, schemaDigest: schemaDigestPlaceholder };
+function schemaMetadata(schemaKey: string) {
+  const schemas = JSON.parse(
+    process.env.FACTORY_FLOOR_SCHEMA_DIGESTS ?? '{}',
+  ) as Record<string, { id: string; digest: string }>;
+  const schema = schemas[schemaKey];
+  return {
+    schemaId: schema?.id ?? schemaKey,
+    schemaDigest:
+      schema?.digest ?? createHash('sha256').update(schemaKey).digest('hex'),
+  };
 }
 
 function completed(
@@ -57,12 +65,19 @@ function stableString(value: unknown): string {
 export const retrieveComponent: WorkerComponent = async (context) => {
   const input = firstPayload(context.envelope.inputs);
   const query = String(input.query ?? input.objective ?? 'investigation');
+  const configuration = context.envelope.component.configuration;
+  const sourceClass =
+    configuration && typeof configuration === 'object'
+      ? String(
+          (configuration as Record<string, unknown>).sourceClass ?? 'fixture',
+        )
+      : 'fixture';
   const evidence = [
     {
-      source: 'repo-fixture:demo-ts/retrieve',
+      source: `repo-fixture:demo-ts/retrieve:${sourceClass}`,
       query,
-      title: `Evidence for ${query}`,
-      claim: `Deterministic evidence about ${query}`,
+      title: `${sourceClass} evidence for ${query}`,
+      claim: `Deterministic ${sourceClass} evidence about ${query}`,
       rank: 1,
     },
   ];
@@ -168,4 +183,6 @@ export async function startDemoWorkerFromEnv(): Promise<void> {
   await runner.run();
 }
 
-if (process.argv[1]?.endsWith('/index.js')) void startDemoWorkerFromEnv();
+const entrypoint = process.argv[1];
+if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href)
+  void startDemoWorkerFromEnv();
