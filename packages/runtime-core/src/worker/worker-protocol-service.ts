@@ -11,9 +11,13 @@ import {
   ArtifactBlobStoreError,
   type ArtifactBlobStore,
 } from '@factory-floor/artifact-store';
+import { encodeCapabilityGrantHandle } from '../capabilities/capability-handle.js';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { SchedulerService } from '../scheduling/scheduler-service.js';
-import { ExecutionCommitError, ExecutionCommitService } from '../commit/execution-commit-service.js';
+import {
+  ExecutionCommitError,
+  ExecutionCommitService,
+} from '../commit/execution-commit-service.js';
 
 export type WorkerErrorCode =
   | 'invalid_request'
@@ -106,13 +110,20 @@ export class WorkerProtocolService {
   ) {}
 
   async claim(input: ClaimInput) {
-    const scheduled = await new SchedulerService(this.db, this.clock).pollForExecution({
+    const scheduled = await new SchedulerService(
+      this.db,
+      this.clock,
+    ).pollForExecution({
       owner: input.workerId,
       leaseDurationMs: this.options.leaseDurationMs,
       capabilities: input.capabilities,
     });
     if (!scheduled)
-      return { protocolVersion: '1.0' as const, claimed: false as const, retryAfterMs: 250 };
+      return {
+        protocolVersion: '1.0' as const,
+        claimed: false as const,
+        retryAfterMs: 250,
+      };
     return {
       protocolVersion: '1.0' as const,
       claimed: true as const,
@@ -155,6 +166,20 @@ export class WorkerProtocolService {
       ])
       .where('e.id', '=', scheduled.executionId)
       .executeTakeFirstOrThrow();
+    const grants = await this.db
+      .selectFrom('capability_grants as grant')
+      .innerJoin(
+        'capabilities as capability',
+        'capability.id',
+        'grant.capability_id',
+      )
+      .select('grant.id')
+      .where('grant.grantee_component_definition_id', '=', row.definition_id)
+      .where('grant.status', '=', 'active')
+      .where('grant.revoked_at', 'is', null)
+      .where('capability.retired_at', 'is', null)
+      .orderBy('grant.id')
+      .execute();
     return {
       protocolVersion: '1.0' as const,
       executionId: scheduled.executionId,
@@ -179,7 +204,9 @@ export class WorkerProtocolService {
         artifactReadUrls: [],
       })),
       state: null,
-      capabilityHandles: [],
+      capabilityHandles: grants.map((grant) =>
+        encodeCapabilityGrantHandle(grant.id),
+      ),
       heartbeatUrl: this.url('/worker/v1/heartbeat'),
       cancellationUrl: this.url('/worker/v1/cancellation'),
       resultSubmissionUrl: this.url('/worker/v1/results'),
@@ -226,7 +253,9 @@ export class WorkerProtocolService {
       ])
       .where('a.id', '=', input.attemptId)
       .where('a.execution_id', '=', input.executionId);
-    const row = await (lock ? baseQuery.forUpdate() : baseQuery).executeTakeFirst();
+    const row = await (
+      lock ? baseQuery.forUpdate() : baseQuery
+    ).executeTakeFirst();
     if (!row || !['leased', 'running'].includes(row.attempt_status))
       throw new WorkerProtocolError(
         'inactive_attempt',
@@ -308,7 +337,10 @@ export class WorkerProtocolService {
       .where('a.execution_id', '=', input.executionId)
       .executeTakeFirst();
     if (!row || !['leased', 'running'].includes(row.attempt_status))
-      return { protocolVersion: '1.0' as const, state: 'attempt_terminal' as const };
+      return {
+        protocolVersion: '1.0' as const,
+        state: 'attempt_terminal' as const,
+      };
     if (
       row.lease_token !== input.leaseToken ||
       !row.lease_expires_at ||
@@ -358,7 +390,10 @@ export class WorkerProtocolService {
         this.clock().getTime() + this.options.leaseDurationMs,
       );
       const expiresAt = new Date(
-        Math.min(active.lease_expires_at!.getTime(), policyExpiration.getTime()),
+        Math.min(
+          active.lease_expires_at!.getTime(),
+          policyExpiration.getTime(),
+        ),
       );
       await transaction
         .insertInto('worker_artifact_uploads')
@@ -433,7 +468,12 @@ export class WorkerProtocolService {
           error.code === 'invalid_digest' ||
           error.code === 'invalid_size'
         )
-          throw new WorkerProtocolError('invalid_request', error.message, false, 400);
+          throw new WorkerProtocolError(
+            'invalid_request',
+            error.message,
+            false,
+            400,
+          );
         if (error.code === 'staging_conflict')
           throw new WorkerProtocolError(
             'unauthorized_staging_reference',
@@ -602,7 +642,11 @@ export class WorkerProtocolService {
       return { duplicate: false as const };
     });
     try {
-      await new ExecutionCommitService(this.db, this.blobStore, this.clock).commit(input as Parameters<ExecutionCommitService['commit']>[0]);
+      await new ExecutionCommitService(
+        this.db,
+        this.blobStore,
+        this.clock,
+      ).commit(input as Parameters<ExecutionCommitService['commit']>[0]);
     } catch (error) {
       if (error instanceof ExecutionCommitError)
         throw new WorkerProtocolError(
@@ -625,11 +669,13 @@ export class WorkerProtocolService {
     };
   }
 
-  async invokeCapability(input: AttemptIdentity & { handle: string; input: Json }) {
+  async invokeCapability(
+    input: AttemptIdentity & { handle: string; input: Json },
+  ) {
     await this.activeAttempt(input);
     throw new WorkerProtocolError(
       'capability_denied',
-      'no capability handles are issued by the Task 7A protocol implementation',
+      'direct capability invocation is not implemented; submit an external-action proposal in the result',
       false,
       403,
     );
