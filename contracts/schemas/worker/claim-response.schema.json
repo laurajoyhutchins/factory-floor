@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/worker/claim-response.schema.json",
+  "title": "WorkerClaimResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "claimed": {
+          "const": true
+        },
+        "envelope": true
+      },
+      "required": [
+        "protocolVersion",
+        "claimed",
+        "envelope"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "claimed": {
+          "const": false
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "claimed",
+        "retryAfterMs"
+      ]
+    }
+  ]
+}

@@ -18,4 +18,9 @@ export type SourceIdentity =
       kind: 'artifact';
       artifactId: string;
       digest: string;
+    }
+  | {
+      kind: 'execution';
+      executionId: string;
+      attemptId: string;
     };

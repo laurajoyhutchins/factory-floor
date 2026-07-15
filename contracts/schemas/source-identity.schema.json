@@ -8,31 +8,88 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "command" },
-        "commandId": { "type": "string", "format": "uuid" },
-        "submittedBy": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "command"
+        },
+        "commandId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "submittedBy": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["kind", "commandId", "submittedBy"]
+      "required": [
+        "kind",
+        "commandId",
+        "submittedBy"
+      ]
     },
     {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "event" },
-        "eventId": { "type": "string", "format": "uuid" },
-        "producerComponentId": { "type": "string", "format": "uuid" }
+        "kind": {
+          "const": "event"
+        },
+        "eventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "producerComponentId": {
+          "type": "string",
+          "format": "uuid"
+        }
       },
-      "required": ["kind", "eventId", "producerComponentId"]
+      "required": [
+        "kind",
+        "eventId",
+        "producerComponentId"
+      ]
     },
     {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "artifact" },
-        "artifactId": { "type": "string", "format": "uuid" },
-        "digest": { "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest" }
+        "kind": {
+          "const": "artifact"
+        },
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "digest": {
+          "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest"
+        }
       },
-      "required": ["kind", "artifactId", "digest"]
+      "required": [
+        "kind",
+        "artifactId",
+        "digest"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "execution"
+        },
+        "executionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "attemptId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "kind",
+        "executionId",
+        "attemptId"
+      ]
     }
   ]
 }

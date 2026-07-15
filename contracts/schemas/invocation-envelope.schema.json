@@ -8,6 +8,7 @@
     "protocolVersion": { "const": "1.0" },
     "executionId": { "type": "string", "format": "uuid" },
     "attemptId": { "type": "string", "format": "uuid" },
+    "attemptNumber": { "type": "integer", "minimum": 1 },
     "leaseToken": { "type": "string", "minLength": 1 },
     "leaseExpiresAt": { "type": "string", "format": "date-time" },
     "lifecycleEpoch": { "type": "integer", "minimum": 0 },
@@ -16,18 +17,25 @@
       "additionalProperties": false,
       "properties": {
         "componentId": { "type": "string", "format": "uuid" },
-        "definitionId": { "type": "string", "minLength": 1 },
+        "definitionId": { "type": "string", "format": "uuid" },
+        "definitionName": { "type": "string", "minLength": 1 },
+        "definitionVersion": { "type": "string", "minLength": 1 },
+        "definition": true,
         "configuration": true
       },
-      "required": ["componentId", "definitionId", "configuration"]
+      "required": ["componentId", "definitionId", "definitionName", "definitionVersion", "definition", "configuration"]
     },
-    "inputs": { "type": "array", "items": { "$ref": "artifact-descriptor.schema.json" } },
+    "inputs": { "type": "array", "items": { "type":"object", "additionalProperties": false, "properties": { "portName":{"type":"string"}, "deliveryId":{"type":"string","format":"uuid"}, "payload": true, "artifacts":{"type":"array","items":{"$ref":"artifact-descriptor.schema.json"}}, "artifactReadUrls":{"type":"array","items":{"type":"string","format":"uri"}} }, "required":["portName","deliveryId","payload","artifacts","artifactReadUrls"] } },
     "state": { "anyOf": [{ "$ref": "artifact-descriptor.schema.json" }, { "type": "null" }] },
     "capabilityHandles": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "cancellationUrl": { "type": "string", "format": "uri" },
     "heartbeatUrl": { "type": "string", "format": "uri" },
+    "resultSubmissionUrl": { "type": "string", "format": "uri" },
+    "artifactStagingUrl": { "type": "string", "format": "uri" },
+    "capabilityInvocationUrl": { "type": "string", "format": "uri" },
     "traceContext": { "type": "object", "additionalProperties": { "type": "string" } },
+    "limits": { "type":"object", "additionalProperties": false, "properties":{"heartbeatIntervalMs":{"type":"integer","minimum":1},"maxArtifactBytes":{"type":"integer","minimum":1}}, "required":["heartbeatIntervalMs","maxArtifactBytes"] },
     "source": { "$ref": "source-identity.schema.json" }
   },
-  "required": ["protocolVersion", "executionId", "attemptId", "leaseToken", "leaseExpiresAt", "lifecycleEpoch", "component", "inputs", "state", "capabilityHandles", "cancellationUrl", "heartbeatUrl", "traceContext", "source"]
+  "required": ["protocolVersion", "executionId", "attemptId", "attemptNumber", "leaseToken", "leaseExpiresAt", "lifecycleEpoch", "component", "inputs", "state", "capabilityHandles", "cancellationUrl", "heartbeatUrl", "resultSubmissionUrl", "artifactStagingUrl", "capabilityInvocationUrl", "traceContext", "limits", "source"]
 }

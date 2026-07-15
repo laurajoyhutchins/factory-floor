@@ -22,27 +22,49 @@ export type SourceIdentity =
        * via the `definition` "sha256Digest".
        */
       digest: string;
+    }
+  | {
+      kind: 'execution';
+      executionId: string;
+      attemptId: string;
     };
 
 export interface InvocationEnvelope {
   protocolVersion: '1.0';
   executionId: string;
   attemptId: string;
+  attemptNumber: number;
   leaseToken: string;
   leaseExpiresAt: string;
   lifecycleEpoch: number;
   component: {
     componentId: string;
     definitionId: string;
+    definitionName: string;
+    definitionVersion: string;
+    definition: unknown;
     configuration: unknown;
   };
-  inputs: ArtifactDescriptor[];
+  inputs: {
+    portName: string;
+    deliveryId: string;
+    payload: unknown;
+    artifacts: ArtifactDescriptor[];
+    artifactReadUrls: string[];
+  }[];
   state: ArtifactDescriptor | null;
   capabilityHandles: string[];
   cancellationUrl: string;
   heartbeatUrl: string;
+  resultSubmissionUrl: string;
+  artifactStagingUrl: string;
+  capabilityInvocationUrl: string;
   traceContext: {
     [k: string]: string;
+  };
+  limits: {
+    heartbeatIntervalMs: number;
+    maxArtifactBytes: number;
   };
   source: SourceIdentity;
 }

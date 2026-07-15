@@ -1,4 +1,9 @@
 """Generated Factory Floor Pydantic contract models."""
+from .admin.artifact_schema_registration_schema import *  # noqa: F401,F403
+from .admin.component_definition_registration_schema import *  # noqa: F401,F403
+from .admin.policy_registration_schema import *  # noqa: F401,F403
+from .admin.system_registration_schema import *  # noqa: F401,F403
+from .admin.template_registration_schema import *  # noqa: F401,F403
 from .artifact_descriptor_schema import *  # noqa: F401,F403
 from .external_action_proposal_schema import *  # noqa: F401,F403
 from .failure_descriptor_schema import *  # noqa: F401,F403
@@ -8,3 +13,14 @@ from .proposed_result_schema import *  # noqa: F401,F403
 from .resource_usage_schema import *  # noqa: F401,F403
 from .source_identity_schema import *  # noqa: F401,F403
 from .staged_artifact_schema import *  # noqa: F401,F403
+from .worker.cancellation_response_schema import *  # noqa: F401,F403
+from .worker.capability_request_schema import *  # noqa: F401,F403
+from .worker.capability_response_schema import *  # noqa: F401,F403
+from .worker.claim_request_schema import *  # noqa: F401,F403
+from .worker.claim_response_schema import *  # noqa: F401,F403
+from .worker.error_schema import *  # noqa: F401,F403
+from .worker.heartbeat_response_schema import *  # noqa: F401,F403
+from .worker.heartbeat_schema import *  # noqa: F401,F403
+from .worker.stage_request_schema import *  # noqa: F401,F403
+from .worker.stage_response_schema import *  # noqa: F401,F403
+from .worker.upload_response_schema import *  # noqa: F401,F403

@@ -16,8 +16,30 @@ class Component(BaseModel):
         extra='forbid',
     )
     componentId: UUID
-    definitionId: constr(min_length=1)
+    definitionId: UUID
+    definitionName: constr(min_length=1)
+    definitionVersion: constr(min_length=1)
+    definition: Any
     configuration: Any
+
+
+class Limits(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    heartbeatIntervalMs: conint(ge=1)
+    maxArtifactBytes: conint(ge=1)
+
+
+class Input(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    portName: str
+    deliveryId: UUID
+    payload: Any
+    artifacts: list[ArtifactDescriptor]
+    artifactReadUrls: list[AnyUrl]
 
 
 class InvocationEnvelope(BaseModel):
@@ -27,14 +49,19 @@ class InvocationEnvelope(BaseModel):
     protocolVersion: Literal['1.0']
     executionId: UUID
     attemptId: UUID
+    attemptNumber: conint(ge=1)
     leaseToken: constr(min_length=1)
     leaseExpiresAt: AwareDatetime
     lifecycleEpoch: conint(ge=0)
     component: Component
-    inputs: list[ArtifactDescriptor]
+    inputs: list[Input]
     state: ArtifactDescriptor | None
     capabilityHandles: list[constr(min_length=1)]
     cancellationUrl: AnyUrl
     heartbeatUrl: AnyUrl
+    resultSubmissionUrl: AnyUrl
+    artifactStagingUrl: AnyUrl
+    capabilityInvocationUrl: AnyUrl
     traceContext: dict[str, str]
+    limits: Limits
     source: SourceIdentity
