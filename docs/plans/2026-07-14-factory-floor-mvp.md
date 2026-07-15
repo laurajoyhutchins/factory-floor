@@ -218,12 +218,12 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** A new Codespace can reproduce the milestone and its acceptance evidence from documented commands.
 
-- [ ] Ensure `pnpm install` and uv sync are deterministic.
-- [ ] Add root commands for services, migrations, workers, demo, tests, and cleanup.
-- [ ] Add health checks and dependency readiness waits to Docker Compose.
-- [ ] Keep PostgreSQL and MinIO ports private by default outside local development.
-- [ ] Add CI for lint, typecheck, unit tests, Python tests, integration tests, generation drift, and conformance tests.
-- [ ] Document architecture boundaries and local troubleshooting.
+- [x] Ensure `pnpm install` and uv sync are deterministic.
+- [x] Add root commands for services, migrations, workers, demo, tests, and cleanup.
+- [x] Add health checks and dependency readiness waits to Docker Compose.
+- [x] Keep PostgreSQL and MinIO ports private by default outside local development.
+- [x] Add CI for lint, typecheck, unit tests, Python tests, integration tests, generation drift, and conformance tests.
+- [x] Document architecture boundaries and local troubleshooting.
 - [ ] Record acceptance evidence in `docs/evidence/m1-durable-reactive-graph.md`.
 - [ ] Commit as `docs: record milestone one acceptance evidence`.
 
