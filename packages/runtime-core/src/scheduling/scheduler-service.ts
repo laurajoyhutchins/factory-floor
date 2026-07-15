@@ -38,9 +38,9 @@ export class SchedulerService {
     const capabilityPredicate =
       options.capabilities === undefined
         ? sql<boolean>`true`
-        : sql<boolean>`concat(cd.name, '@', cd.version) = any(${[
-            ...options.capabilities,
-          ]}::text[])`;
+        : sql<boolean>`concat(cd.name, '@', cd.version) in (${sql.join(
+            options.capabilities.map((capability) => sql`${capability}`),
+          )})`;
 
     return this.db.transaction().execute(async (trx) => {
       const candidate = await sql<any>`
