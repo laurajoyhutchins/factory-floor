@@ -93,14 +93,14 @@ jobs:
           set -o pipefail
           pnpm test:integration 2>&1 | tee integration-test.log
 
-      - name: Upload failed integration log
-        if: failure()
+      - name: Upload integration log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-log
+          name: integration-test-log-${{ github.run_number }}
           path: integration-test.log
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 30
 
       - name: Run conformance-focused tests
         env:
