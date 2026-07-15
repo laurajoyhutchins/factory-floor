@@ -1,0 +1,143 @@
+name: Apply PR 8 integrity fix
+
+on:
+  push:
+    branches:
+      - codex/implement-s3-compatible-artifactblobstore-adapter
+    paths:
+      - .github/workflows/pr8-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/implement-s3-compatible-artifactblobstore-adapter
+      - name: Patch S3 promotion integrity path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/artifact-store/src/index.ts')
+          text = path.read_text()
+          old = '''  async promote(stagingId: StagingId, digest: HexSha256Digest, size: bigint): Promise<CommittedReceipt> {
+            validateStagingId(stagingId);
+            validateDigest(digest);
+            if (size < 0n) throw new ArtifactBlobStoreError('size must be non-negative', 'invalid_size');
+            const stagedKey = this.stagingKey(stagingId);
+            const committedKey = this.committedKey(digest);
+            const committedLocator = this.locator(committedKey);
+
+            if (await this.validObjectExists(committedKey, digest, size, 'committed_conflict')) {
+              await this.removeStaged(stagingId);
+              return { digest, size, committedLocator };
+            }
+            if (!(await this.objectExists(stagedKey))) {
+              throw new ArtifactBlobStoreError(`staged object ${stagingId} was not found`, 'not_found');
+            }
+            const staged = await this.readVerifiedMetadata(stagedKey, 'staging_conflict');
+            if (staged.size !== size) throw new ArtifactBlobStoreError('staged content size does not match promotion size', 'size_mismatch');
+            if (staged.digest !== digest) throw new ArtifactBlobStoreError('staged content digest does not match promotion digest', 'digest_mismatch');
+
+            try {
+              await this.putObject(committedKey, await this.getReadable(stagedKey, 'staging_conflict'), { digest, size }, true);
+            } catch (error) {
+              if (!isS3PreconditionFailed(error)) throw error;
+              if (!(await this.validObjectExists(committedKey, digest, size, 'committed_conflict'))) {
+                throw new ArtifactBlobStoreError('committed object conflicts with requested digest or size', 'committed_conflict');
+              }
+            }
+            await this.removeStaged(stagingId);
+            return { digest, size, committedLocator };
+          }
+'''
+          new = '''  async promote(stagingId: StagingId, digest: HexSha256Digest, size: bigint): Promise<CommittedReceipt> {
+            validateStagingId(stagingId);
+            validateDigest(digest);
+            if (size < 0n) throw new ArtifactBlobStoreError('size must be non-negative', 'invalid_size');
+            const stagedKey = this.stagingKey(stagingId);
+            const committedKey = this.committedKey(digest);
+            const committedLocator = this.locator(committedKey);
+
+            if (await this.validObjectExists(committedKey, digest, size, 'committed_conflict')) {
+              await this.removeStaged(stagingId);
+              return { digest, size, committedLocator };
+            }
+            if (!(await this.objectExists(stagedKey))) {
+              throw new ArtifactBlobStoreError(`staged object ${stagingId} was not found`, 'not_found');
+            }
+
+            const staged = await this.readObjectMetadata(stagedKey, 'staging_conflict');
+            if (staged.size !== size) {
+              throw new ArtifactBlobStoreError('staged metadata size does not match promotion size', 'size_mismatch');
+            }
+            if (staged.digest !== digest) {
+              throw new ArtifactBlobStoreError('staged metadata digest does not match promotion digest', 'digest_mismatch');
+            }
+
+            const tmpKey = this.tmpKey(`promote-${randomUUID()}`);
+            const meter = createDigestMeter();
+            try {
+              const upload = this.putObject(tmpKey, meter.stream, undefined);
+              await pipeline(await this.getReadable(stagedKey, 'staging_conflict'), meter.stream);
+              await upload;
+              const measured = meter.result();
+              if (measured.size !== size) {
+                throw new ArtifactBlobStoreError('staged content size does not match promotion size', 'size_mismatch');
+              }
+              if (measured.digest !== digest) {
+                throw new ArtifactBlobStoreError('staged content digest does not match promotion digest', 'digest_mismatch');
+              }
+
+              try {
+                await this.putObject(committedKey, await this.getReadable(tmpKey, 'staging_conflict'), measured, true);
+              } catch (error) {
+                if (!isS3PreconditionFailed(error)) throw error;
+                if (!(await this.validObjectExists(committedKey, digest, size, 'committed_conflict'))) {
+                  throw new ArtifactBlobStoreError('committed object conflicts with requested digest or size', 'committed_conflict');
+                }
+              }
+              await this.removeStaged(stagingId);
+              return { digest, size, committedLocator };
+            } finally {
+              await this.deleteObject(tmpKey);
+            }
+          }
+'''
+          if old not in text:
+              raise SystemExit('promote method did not match expected source')
+          text = text.replace(old, new, 1)
+
+          old_helper = '''  private async readVerifiedMetadata(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+            const head = await this.headObject(key, missingCode);
+            const metadata = parseS3Metadata(head.Metadata ?? {}, missingCode);
+            const measured = await this.measureObject(key, missingCode);
+'''
+          new_helper = '''  private async readObjectMetadata(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+            const head = await this.headObject(key, missingCode);
+            return parseS3Metadata(head.Metadata ?? {}, missingCode);
+          }
+
+          private async readVerifiedMetadata(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+            const metadata = await this.readObjectMetadata(key, missingCode);
+            const measured = await this.measureObject(key, missingCode);
+'''
+          if old_helper not in text:
+              raise SystemExit('metadata helper did not match expected source')
+          path.write_text(text.replace(old_helper, new_helper, 1))
+          PY
+          git diff --check
+      - name: Commit focused fix
+        shell: bash
+        run: |
+          git config user.name "OpenAI"
+          git config user.email "noreply@openai.com"
+          git rm .github/workflows/pr8-fix.yml
+          git add packages/artifact-store/src/index.ts
+          git commit -m "fix: verify S3 promotion bytes atomically"
+          git push origin HEAD:codex/implement-s3-compatible-artifactblobstore-adapter
