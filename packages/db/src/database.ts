@@ -8,7 +8,12 @@ import {
 import pg from 'pg';
 
 export type Json =
-  null | boolean | number | string | Json[] | { [key: string]: Json };
+  | null
+  | boolean
+  | number
+  | string
+  | Json[]
+  | { [key: string]: Json };
 export type RuntimeDb = Kysely<Database> | Transaction<Database>;
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
@@ -184,7 +189,10 @@ export interface Database {
     promoted_at: Timestamp | null;
     abandoned_at: Timestamp | null;
   };
-  capabilities: Versioned & { capability_type: string; configuration: Jsonb };
+  capabilities: Versioned & {
+    capability_type: string;
+    configuration: Jsonb;
+  };
   capability_grants: Row & {
     capability_id: string;
     grantee_component_definition_id: string;
@@ -240,6 +248,21 @@ export interface Database {
     quantity: BigIntString;
     unit: string;
     attributes: Jsonb;
+  };
+  worker_artifact_uploads: Row & {
+    staged_ref: string;
+    execution_id: string;
+    attempt_id: string;
+    lifecycle_epoch: number;
+    port_name: string;
+    schema_id: string;
+    media_type: string;
+    expected_digest: string;
+    expected_size_bytes: BigIntString;
+    metadata: Jsonb;
+    expires_at: Timestamp;
+    uploaded_at: Timestamp | null;
+    artifact_staging_id: string | null;
   };
   worker_result_submissions: Row & {
     execution_id: string;
