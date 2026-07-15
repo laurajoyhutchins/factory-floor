@@ -21,7 +21,23 @@ export const WORKER_PROTOCOL_VERSION = '1.0' as const;
 
 type JsonRecord = Record<string, unknown>;
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
-export type BinaryContent = string | ArrayBuffer | ArrayBufferView | Blob;
+type ResultIdentity =
+  | 'protocolVersion'
+  | 'executionId'
+  | 'attemptId'
+  | 'leaseToken'
+  | 'lifecycleEpoch';
+type ProposedResultBody = ProposedResult extends infer Result
+  ? Result extends ProposedResult
+    ? Omit<Result, ResultIdentity>
+    : never
+  : never;
+
+export type BinaryContent =
+  | string
+  | ArrayBuffer
+  | ArrayBufferView
+  | Blob;
 
 export interface WorkerClientOptions {
   baseUrl: string;
@@ -30,7 +46,7 @@ export interface WorkerClientOptions {
   fetch?: FetchLike;
   requestTimeoutMs?: number;
   connectTimeoutMs?: number;
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
   jitter?: (attempt: number) => number;
   maxRetryDelayMs?: number;
 }
@@ -100,13 +116,18 @@ export interface WorkerResultSubmissionResponse {
   handoff: string;
 }
 
+type RequestPayload = JsonRecord | BodyInit | Readable | ArrayBufferView;
+
 export class WorkerProtocolClient {
   private readonly baseUrl: URL;
   private readonly token: string;
   private readonly workerId: string;
   private readonly fetchImpl: FetchLike;
   private readonly requestTimeoutMs: number;
-  private readonly sleepImpl: (ms: number, signal?: AbortSignal) => Promise<void>;
+  private readonly sleepImpl: (
+    milliseconds: number,
+    signal?: AbortSignal,
+  ) => Promise<void>;
   private readonly jitter: (attempt: number) => number;
   private readonly maxRetryDelayMs: number;
 
@@ -156,13 +177,12 @@ export class WorkerProtocolClient {
     envelope: InvocationEnvelope,
     options: { signal?: AbortSignal; retries?: number } = {},
   ): Promise<WorkerHeartbeatResponse> {
-    const body = leaseBody(envelope) satisfies WorkerHeartbeat;
     return this.withRetry(
       () =>
         this.requestJson<WorkerHeartbeatResponse>(
           'POST',
           envelope.heartbeatUrl,
-          body,
+          leaseBody(envelope),
           options,
         ),
       options.retries ?? 2,
@@ -191,11 +211,7 @@ export class WorkerProtocolClient {
     envelope: InvocationEnvelope,
     request: Omit<
       WorkerStageRequest,
-      | 'protocolVersion'
-      | 'executionId'
-      | 'attemptId'
-      | 'leaseToken'
-      | 'lifecycleEpoch'
+      ResultIdentity
     >,
     options: { signal?: AbortSignal } = {},
   ): Promise<WorkerStageResponse> {
@@ -209,7 +225,7 @@ export class WorkerProtocolClient {
 
   async uploadStagedContent(
     uploadUrl: string,
-    content: BodyInit | Readable,
+    content: BodyInit | Readable | ArrayBufferView,
     options: { signal?: AbortSignal; retries?: number } = {},
   ): Promise<WorkerUploadResponse> {
     const retries = isOneShotBody(content) ? 0 : (options.retries ?? 1);
@@ -234,7 +250,7 @@ export class WorkerProtocolClient {
         this.requestJson<WorkerResultSubmissionResponse>(
           'POST',
           url,
-          result,
+          result as unknown as JsonRecord,
           options,
         ),
       options.retries ?? 2,
@@ -253,30 +269,22 @@ export class WorkerProtocolClient {
       handle,
       input,
     };
+    const invoke = () =>
+      this.requestJson<WorkerCapabilityResponse>(
+        'POST',
+        envelope.capabilityInvocationUrl,
+        body as unknown as JsonRecord,
+        options,
+      );
     return options.retry === true
-      ? this.withRetry(
-          () =>
-            this.requestJson<WorkerCapabilityResponse>(
-              'POST',
-              envelope.capabilityInvocationUrl,
-              body as unknown as JsonRecord,
-              options,
-            ),
-          1,
-          options.signal,
-        )
-      : this.requestJson<WorkerCapabilityResponse>(
-          'POST',
-          envelope.capabilityInvocationUrl,
-          body as unknown as JsonRecord,
-          options,
-        );
+      ? this.withRetry(invoke, 1, options.signal)
+      : invoke();
   }
 
   private async requestJson<T>(
     method: string,
     pathOrUrl: string,
-    body: BodyInit | Readable | JsonRecord,
+    body: RequestPayload,
     options: {
       signal?: AbortSignal;
       traceContext?: Record<string, string>;
@@ -291,16 +299,15 @@ export class WorkerProtocolClient {
     const headers = new Headers({
       Authorization: `Bearer ${this.token}`,
       'x-worker-id': this.workerId,
+      'content-type': isJson ? 'application/json' : 'application/octet-stream',
     });
-    headers.set(
-      'content-type',
-      isJson ? 'application/json' : 'application/octet-stream',
-    );
     for (const [key, value] of Object.entries(options.traceContext ?? {}))
       headers.set(key, value);
 
     try {
-      const requestBody = isJson ? JSON.stringify(body) : (body as BodyInit);
+      const requestBody = isJson
+        ? JSON.stringify(body)
+        : normalizeFetchBody(body);
       const init: RequestInit & { duplex?: 'half' } = {
         method,
         headers,
@@ -356,14 +363,14 @@ export class WorkerProtocolClient {
   }
 }
 
-function leaseBody(envelope: InvocationEnvelope) {
+function leaseBody(envelope: InvocationEnvelope): WorkerHeartbeat {
   return {
     protocolVersion: WORKER_PROTOCOL_VERSION,
     executionId: envelope.executionId,
     attemptId: envelope.attemptId,
     leaseToken: envelope.leaseToken,
     lifecycleEpoch: envelope.lifecycleEpoch,
-  } as const;
+  };
 }
 
 function absoluteUrl(baseUrl: URL, pathOrUrl: string): URL {
@@ -372,6 +379,20 @@ function absoluteUrl(baseUrl: URL, pathOrUrl: string): URL {
   } catch {
     return new URL(pathOrUrl.replace(/^\//, ''), baseUrl);
   }
+}
+
+function normalizeFetchBody(body: RequestPayload): BodyInit {
+  if (ArrayBuffer.isView(body)) {
+    const source = new Uint8Array(
+      body.buffer,
+      body.byteOffset,
+      body.byteLength,
+    );
+    const owned: Uint8Array<ArrayBuffer> = new Uint8Array(source.byteLength);
+    owned.set(source);
+    return owned;
+  }
+  return body as BodyInit;
 }
 
 async function parsePayload(response: Response): Promise<unknown> {
@@ -390,10 +411,8 @@ async function parsePayload(response: Response): Promise<unknown> {
 
 function validateProtocol(payload: unknown): void {
   if (
-    typeof payload !== 'object' ||
-    payload === null ||
-    (payload as { protocolVersion?: unknown }).protocolVersion !==
-      WORKER_PROTOCOL_VERSION
+    !isRecord(payload) ||
+    payload.protocolVersion !== WORKER_PROTOCOL_VERSION
   )
     throw new WorkerSdkError('unsupported worker protocol version', {
       kind: 'unsupported_protocol_version',
@@ -416,7 +435,8 @@ function validateClaimResponse(response: WorkerClaimResponse): void {
 export function parseInvocationEnvelope(value: unknown): InvocationEnvelope {
   if (!isRecord(value))
     throw invalidEnvelope('invocation envelope must be an object');
-  requireProtocolVersion(value.protocolVersion);
+  if (value.protocolVersion !== WORKER_PROTOCOL_VERSION)
+    throw invalidEnvelope('protocolVersion must be 1.0');
   requireString(value.executionId, 'executionId');
   requireString(value.attemptId, 'attemptId');
   requirePositiveInteger(value.attemptNumber, 'attemptNumber');
@@ -458,11 +478,6 @@ function invalidEnvelope(message: string): WorkerSdkError {
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function requireProtocolVersion(value: unknown): void {
-  if (value !== WORKER_PROTOCOL_VERSION)
-    throw invalidEnvelope('protocolVersion must be 1.0');
 }
 
 function requireString(value: unknown, field: string): asserts value is string {
@@ -523,7 +538,10 @@ function mapError(status: number, payload: unknown): WorkerSdkError {
   );
 }
 
-function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+function defaultSleep(
+  milliseconds: number,
+  signal?: AbortSignal,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(
@@ -534,7 +552,7 @@ function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
       );
       return;
     }
-    const timeout = setTimeout(resolve, ms);
+    const timeout = setTimeout(resolve, milliseconds);
     signal?.addEventListener(
       'abort',
       () => {
@@ -565,10 +583,11 @@ function anySignal(signals: (AbortSignal | undefined)[]): AbortSignal {
 }
 
 function isOneShotBody(value: unknown): boolean {
-  if (value instanceof Readable) return true;
-  const readableStream = globalThis.ReadableStream;
   return (
-    typeof readableStream === 'function' && value instanceof readableStream
+    value instanceof Readable ||
+    (typeof value === 'object' &&
+      value !== null &&
+      typeof (value as { getReader?: unknown }).getReader === 'function')
   );
 }
 
@@ -580,13 +599,13 @@ export interface WorkerExecutionContext {
   stageJson: (
     portName: string,
     value: unknown,
-    metadata?: JsonRecord,
+    metadata: JsonRecord,
   ) => Promise<StagedArtifact>;
   stageBinary: (
     portName: string,
     content: BinaryContent,
     mediaType: string,
-    metadata?: JsonRecord,
+    metadata: JsonRecord,
   ) => Promise<StagedArtifact>;
   invokeCapability: (
     handle: string,
@@ -597,17 +616,7 @@ export interface WorkerExecutionContext {
 
 export type WorkerComponent = (
   context: WorkerExecutionContext,
-) => Promise<
-  | ProposedResult
-  | Omit<
-      ProposedResult,
-      | 'protocolVersion'
-      | 'executionId'
-      | 'attemptId'
-      | 'leaseToken'
-      | 'lifecycleEpoch'
-    >
->;
+) => Promise<ProposedResult | ProposedResultBody>;
 
 export class ComponentRegistry {
   private readonly components = new Map<string, WorkerComponent>();
@@ -630,7 +639,7 @@ export interface WorkerRunnerOptions {
   registry: ComponentRegistry;
   concurrency?: number;
   pollDelayMs?: number;
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
   logger?: (event: string, fields?: JsonRecord) => void;
 }
 
@@ -696,8 +705,8 @@ export class WorkerRunner {
   }
 
   installSignalHandlers(): void {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const)
-      process.once(signal, () => this.stop());
+    for (const systemSignal of ['SIGINT', 'SIGTERM'] as const)
+      process.once(systemSignal, () => this.stop());
   }
 
   private async execute(
@@ -721,16 +730,7 @@ export class WorkerRunner {
           retryable: false,
         });
 
-      let partial:
-        | ProposedResult
-        | Omit<
-            ProposedResult,
-            | 'protocolVersion'
-            | 'executionId'
-            | 'attemptId'
-            | 'leaseToken'
-            | 'lifecycleEpoch'
-          >;
+      let partial: ProposedResult | ProposedResultBody;
       try {
         partial = await component(this.context(envelope, controller.signal));
       } catch (error) {
@@ -752,12 +752,8 @@ export class WorkerRunner {
         return;
       }
 
-      const result = {
-        ...partial,
-        ...leaseBody(envelope),
-      } as ProposedResult;
       await this.options.client.submitResult(
-        result,
+        normalizeResultIdentity(envelope, partial),
         envelope.resultSubmissionUrl,
         { signal: controller.signal },
       );
@@ -849,7 +845,7 @@ export class WorkerRunner {
       portName: string,
       content: BinaryContent,
       mediaType: string,
-      metadata: JsonRecord = {},
+      metadata: JsonRecord,
     ): Promise<StagedArtifact> => {
       const bytes = await binaryContentBytes(content);
       const schemaId = metadata.schemaId;
@@ -898,7 +894,7 @@ export class WorkerRunner {
           executionId: envelope.executionId,
           attemptId: envelope.attemptId,
         },
-      } satisfies StagedArtifact;
+      };
     };
 
     return {
@@ -918,6 +914,16 @@ export class WorkerRunner {
   }
 }
 
+function normalizeResultIdentity(
+  envelope: InvocationEnvelope,
+  result: ProposedResult | ProposedResultBody,
+): ProposedResult {
+  return {
+    ...result,
+    ...leaseBody(envelope),
+  } as ProposedResult;
+}
+
 function componentFailureResult(envelope: InvocationEnvelope): ProposedResult {
   return {
     ...leaseBody(envelope),
@@ -935,18 +941,24 @@ function componentFailureResult(envelope: InvocationEnvelope): ProposedResult {
         component: `${envelope.component.definitionName}@${envelope.component.definitionVersion}`,
       },
     },
-  } as ProposedResult;
+  };
 }
 
-async function binaryContentBytes(content: BinaryContent): Promise<Uint8Array> {
+async function binaryContentBytes(
+  content: BinaryContent,
+): Promise<Uint8Array<ArrayBuffer>> {
   if (typeof content === 'string') return new TextEncoder().encode(content);
   if (content instanceof ArrayBuffer) return new Uint8Array(content);
-  if (ArrayBuffer.isView(content))
-    return new Uint8Array(
+  if (ArrayBuffer.isView(content)) {
+    const source = new Uint8Array(
       content.buffer,
       content.byteOffset,
       content.byteLength,
-    ).slice();
+    );
+    const owned: Uint8Array<ArrayBuffer> = new Uint8Array(source.byteLength);
+    owned.set(source);
+    return owned;
+  }
   if (content instanceof Blob)
     return new Uint8Array(await content.arrayBuffer());
   throw new WorkerSdkError('unsupported binary artifact body', {
@@ -955,7 +967,7 @@ async function binaryContentBytes(content: BinaryContent): Promise<Uint8Array> {
   });
 }
 
-export function canonicalJson(value: unknown): Uint8Array {
+export function canonicalJson(value: unknown): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(JSON.stringify(sortJson(value)));
 }
 
