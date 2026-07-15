@@ -205,6 +205,7 @@ class WorkerRunner:
                         code="WORKER_COMPONENT_NOT_REGISTERED",
                         message="Worker component implementation is not registered.",
                         retryable=False,
+                        staged_artifacts=context.staged,
                     ),
                 )
                 return
@@ -227,6 +228,7 @@ class WorkerRunner:
                         code="WORKER_COMPONENT_ERROR",
                         message="Worker component execution failed.",
                         retryable=True,
+                        staged_artifacts=context.staged,
                     ),
                 )
                 return
@@ -321,7 +323,9 @@ def _failure_result(
     code: str,
     message: str,
     retryable: bool,
+    staged_artifacts: list[StagedArtifact] | None = None,
 ) -> ProposedResult:
+    staged = list(staged_artifacts or [])
     return ProposedResult(
         root=ProposedResult2(
             protocolVersion=PROTOCOL_VERSION,
@@ -329,14 +333,14 @@ def _failure_result(
             attemptId=envelope.attemptId,
             leaseToken=envelope.leaseToken,
             lifecycleEpoch=envelope.lifecycleEpoch,
-            stagedArtifacts=[],
+            stagedArtifacts=staged,
             proposedEvents=[],
             externalActionProposals=[],
             resourceUsage=ResourceUsage(
                 cpuMilliseconds=0,
                 wallMilliseconds=0,
                 inputBytes=0,
-                outputBytes=0,
+                outputBytes=sum(artifact.sizeBytes for artifact in staged),
                 externalCalls=0,
             ),
             status="failed",
