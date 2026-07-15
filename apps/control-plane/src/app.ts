@@ -6,7 +6,10 @@ import {
   SystemApplicationService,
   WorkerProtocolService,
 } from '@factory-floor/runtime-core';
-import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
+import {
+  FilesystemArtifactBlobStore,
+  type ArtifactBlobStore,
+} from '@factory-floor/artifact-store';
 import type { Kysely } from 'kysely';
 import { parse } from 'yaml';
 import { registerRegistrationRoutes } from './routes/registrations.js';
@@ -69,10 +72,20 @@ export async function buildApp(
     await registerWorkerRoutes(
       app,
       deps.workerProtocolService ??
-        new WorkerProtocolService(db!, deps.artifactBlobStore, {
-          leaseDurationMs: Number(process.env.WORKER_LEASE_DURATION_MS ?? 60_000),
-          baseUrl: process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
-        }),
+        new WorkerProtocolService(
+          db!,
+          deps.artifactBlobStore ??
+            new FilesystemArtifactBlobStore(
+              process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts',
+            ),
+          {
+            leaseDurationMs: Number(
+              process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
+            ),
+            baseUrl:
+              process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
+          },
+        ),
       deps.workerAuthToken,
     );
 
