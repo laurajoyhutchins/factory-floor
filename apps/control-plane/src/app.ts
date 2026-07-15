@@ -96,7 +96,9 @@ export async function buildApp(
             process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
           ),
           baseUrl:
-            process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
+            process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ??
+            process.env.CONTROL_PLANE_PUBLIC_URL ??
+            'http://127.0.0.1:3000',
         }),
       deps.workerAuthToken,
     );
