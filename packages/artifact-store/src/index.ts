@@ -1,6 +1,6 @@
+import { constants, createWriteStream } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -83,6 +83,34 @@ interface ObjectMetadata {
   readonly size: bigint;
 }
 
+class DigestAccumulator {
+  private readonly hash = createHash('sha256');
+  private size = 0n;
+
+  update(chunk: unknown): Buffer {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    this.hash.update(bytes);
+    this.size += BigInt(bytes.length);
+    return bytes;
+  }
+
+  result(): ObjectMetadata {
+    return { digest: this.hash.digest('hex'), size: this.size };
+  }
+}
+
+function createDigestMeter(): { readonly stream: Transform; readonly result: () => ObjectMetadata } {
+  const accumulator = new DigestAccumulator();
+  return {
+    stream: new Transform({
+      transform(chunk, _encoding, callback) {
+        callback(null, accumulator.update(chunk));
+      },
+    }),
+    result: () => accumulator.result(),
+  };
+}
+
 export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   private readonly root: string;
   private readonly stagingRoot: string;
@@ -99,35 +127,38 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   async stage(stagingId: StagingId, bytes: Readable, options: StageOptions = {}): Promise<StagingReceipt> {
     validateStagingId(stagingId);
     if (options.expectedDigest !== undefined) validateDigest(options.expectedDigest);
-    if (options.expectedSize !== undefined && options.expectedSize < 0n) throw new ArtifactBlobStoreError('expected size must be non-negative', 'invalid_size');
+    if (options.expectedSize !== undefined && options.expectedSize < 0n) {
+      throw new ArtifactBlobStoreError('expected size must be non-negative', 'invalid_size');
+    }
     await this.ensureRoots();
 
     const finalDirectory = this.stagedObjectDirectory(stagingId);
     const temporaryDirectory = await this.createTemporaryObjectDirectory('stage');
     const temporaryData = join(temporaryDirectory, 'data');
-
-    const hash = createHash('sha256');
-    let size = 0n;
-    const meter = new Transform({
-      transform(chunk: Buffer, _encoding, callback) {
-        hash.update(chunk);
-        size += BigInt(chunk.length);
-        callback(null, chunk);
-      },
-    });
+    const meter = createDigestMeter();
 
     try {
-      await pipeline(bytes, meter, createWriteStream(temporaryData, { flags: 'wx' }));
-      const digest = hash.digest('hex');
-      if (options.expectedDigest !== undefined && options.expectedDigest !== digest) throw new ArtifactBlobStoreError('staged content digest did not match expected digest', 'digest_mismatch');
-      if (options.expectedSize !== undefined && options.expectedSize !== size) throw new ArtifactBlobStoreError('staged content size did not match expected size', 'size_mismatch');
-      await writeObjectMetadata(temporaryDirectory, digest, size);
-      await this.publishObjectDirectory(temporaryDirectory, finalDirectory, 'staging_conflict', digest, size);
-      return this.stagingReceipt(stagingId, digest, size);
+      await pipeline(bytes, meter.stream, createWriteStream(temporaryData, { flags: 'wx' }));
+      const measured = meter.result();
+      if (options.expectedSize !== undefined && options.expectedSize !== measured.size) {
+        throw new ArtifactBlobStoreError('staged content size did not match expected size', 'size_mismatch');
+      }
+      if (options.expectedDigest !== undefined && options.expectedDigest !== measured.digest) {
+        throw new ArtifactBlobStoreError('staged content digest did not match expected digest', 'digest_mismatch');
+      }
+      await writeObjectMetadata(temporaryDirectory, measured.digest, measured.size);
+      await this.publishObjectDirectory(
+        temporaryDirectory,
+        finalDirectory,
+        'staging_conflict',
+        measured.digest,
+        measured.size,
+      );
+      return this.stagingReceipt(stagingId, measured.digest, measured.size);
     } catch (error) {
       await rm(temporaryDirectory, { recursive: true, force: true });
       if (isAlreadyPublished(error, 'staging_conflict')) {
-        const existing = await this.readValidObjectMetadata(finalDirectory, 'staging_conflict');
+        const existing = await this.readVerifiedObjectMetadata(finalDirectory, 'staging_conflict');
         return this.stagingReceipt(stagingId, existing.digest, existing.size);
       }
       throw error;
@@ -137,8 +168,8 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   async readStaged(stagingId: StagingId): Promise<Readable> {
     validateStagingId(stagingId);
     const directory = this.stagedObjectDirectory(stagingId);
-    await this.assertValidObject(directory, 'not_found');
-    return createReadStream(join(directory, 'data'));
+    await this.readVerifiedObjectMetadata(directory, 'not_found');
+    return openReadableNoFollow(join(directory, 'data'), 'not_found');
   }
 
   async promote(stagingId: StagingId, digest: HexSha256Digest, size: bigint): Promise<CommittedReceipt> {
@@ -147,27 +178,52 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     if (size < 0n) throw new ArtifactBlobStoreError('size must be non-negative', 'invalid_size');
     await this.ensureRoots();
     await this.ensureCommittedPrefix(digest);
+
     const committedDirectory = this.committedObjectDirectory(digest);
     const committedLocator = this.committedLocator(digest);
-
-    if (await this.validObjectExists(committedDirectory, digest, size)) {
+    if (await directoryExists(committedDirectory)) {
+      const existing = await this.readVerifiedObjectMetadata(committedDirectory, 'committed_conflict');
+      if (existing.size !== size || existing.digest !== digest) {
+        throw new ArtifactBlobStoreError('committed object conflicts with requested digest or size', 'committed_conflict');
+      }
       await this.removeStaged(stagingId);
       return { digest, size, committedLocator };
     }
-    if (await directoryExists(committedDirectory)) throw new ArtifactBlobStoreError('committed object exists but is incomplete or conflicting', 'committed_conflict');
 
     const stagedDirectory = this.stagedObjectDirectory(stagingId);
-    if (!(await this.validObjectExists(stagedDirectory, digest, size))) {
-      if (await this.validObjectExists(committedDirectory, digest, size)) return { digest, size, committedLocator };
-      if (await directoryExists(stagedDirectory)) throw new ArtifactBlobStoreError('staged object exists but is incomplete or conflicting', 'staging_conflict');
+    if (!(await directoryExists(stagedDirectory))) {
       throw new ArtifactBlobStoreError(`staged object ${stagingId} was not found`, 'not_found');
+    }
+
+    const stagedMetadata = await this.readObjectMetadata(stagedDirectory, 'staging_conflict');
+    if (stagedMetadata.size !== size) {
+      throw new ArtifactBlobStoreError('staged metadata size does not match promotion size', 'size_mismatch');
+    }
+    if (stagedMetadata.digest !== digest) {
+      throw new ArtifactBlobStoreError('staged metadata digest does not match promotion digest', 'digest_mismatch');
     }
 
     const temporaryDirectory = await this.createTemporaryObjectDirectory('commit');
     try {
-      await pipeline(createReadStream(join(stagedDirectory, 'data')), createWriteStream(join(temporaryDirectory, 'data'), { flags: 'wx' }));
-      await writeObjectMetadata(temporaryDirectory, digest, size);
-      await this.publishObjectDirectory(temporaryDirectory, committedDirectory, 'committed_conflict', digest, size);
+      const measured = await copyAndMeasureNoFollow(
+        join(stagedDirectory, 'data'),
+        join(temporaryDirectory, 'data'),
+        'staging_conflict',
+      );
+      if (measured.size !== size) {
+        throw new ArtifactBlobStoreError('staged content size does not match promotion size', 'size_mismatch');
+      }
+      if (measured.digest !== digest) {
+        throw new ArtifactBlobStoreError('staged content digest does not match promotion digest', 'digest_mismatch');
+      }
+      await writeObjectMetadata(temporaryDirectory, measured.digest, measured.size);
+      await this.publishObjectDirectory(
+        temporaryDirectory,
+        committedDirectory,
+        'committed_conflict',
+        measured.digest,
+        measured.size,
+      );
       await this.removeStaged(stagingId);
       return { digest, size, committedLocator };
     } catch (error) {
@@ -183,8 +239,8 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   async readCommitted(digest: HexSha256Digest): Promise<Readable> {
     validateDigest(digest);
     const directory = this.committedObjectDirectory(digest);
-    await this.assertValidObject(directory, 'not_found');
-    return createReadStream(join(directory, 'data'));
+    await this.readVerifiedObjectMetadata(directory, 'not_found');
+    return openReadableNoFollow(join(directory, 'data'), 'not_found');
   }
 
   async removeStaged(stagingId: StagingId): Promise<void> {
@@ -203,7 +259,9 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   }
 
   async listStaged(options: ListStagedOptions): Promise<StagedObjectPage> {
-    if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 1000) throw new RangeError('limit must be an integer from 1 to 1000');
+    if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 1000) {
+      throw new RangeError('limit must be an integer from 1 to 1000');
+    }
     await this.ensureRootDirectory(this.root);
     await this.ensureRootDirectory(this.stagingRoot);
     const entries = await readdirSafe(this.stagingRoot);
@@ -213,7 +271,7 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     const slice = ids.slice(start < 0 ? ids.length : start, (start < 0 ? ids.length : start) + options.limit);
     const objects: StagedObject[] = [];
     for (const id of slice) {
-      const metadata = await this.readValidObjectMetadata(this.stagedObjectDirectory(id), 'not_found');
+      const metadata = await this.readVerifiedObjectMetadata(this.stagedObjectDirectory(id), 'not_found');
       objects.push(this.stagingReceipt(id, metadata.digest, metadata.size));
     }
     const last = slice.at(-1);
@@ -221,22 +279,33 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     return { objects, nextCursor };
   }
 
-  private async publishObjectDirectory(temporaryDirectory: string, finalDirectory: string, conflictCode: 'staging_conflict' | 'committed_conflict', digest: string, size: bigint): Promise<void> {
-    await this.assertValidObject(temporaryDirectory, conflictCode);
+  private async publishObjectDirectory(
+    temporaryDirectory: string,
+    finalDirectory: string,
+    conflictCode: 'staging_conflict' | 'committed_conflict',
+    digest: string,
+    size: bigint,
+  ): Promise<void> {
+    const temporary = await this.readVerifiedObjectMetadata(temporaryDirectory, conflictCode);
+    if (temporary.digest !== digest || temporary.size !== size) {
+      throw new ArtifactBlobStoreError('temporary object identity does not match requested content', conflictCode);
+    }
     try {
       await rename(temporaryDirectory, finalDirectory);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EEXIST' && code !== 'ENOTEMPTY') throw error;
-      const existing = await this.readValidObjectMetadata(finalDirectory, conflictCode);
-      if (existing.digest !== digest || existing.size !== size) throw new ArtifactBlobStoreError('object identity conflicts with existing content', conflictCode);
+      const existing = await this.readVerifiedObjectMetadata(finalDirectory, conflictCode);
+      if (existing.digest !== digest || existing.size !== size) {
+        throw new ArtifactBlobStoreError('object identity conflicts with existing content', conflictCode);
+      }
       throw new AlreadyPublishedError(conflictCode);
     }
   }
 
   private async validObjectExists(directory: string, expectedDigest?: string, expectedSize?: bigint): Promise<boolean> {
     try {
-      const metadata = await this.readValidObjectMetadata(directory, 'not_found');
+      const metadata = await this.readVerifiedObjectMetadata(directory, 'not_found');
       if (expectedDigest !== undefined && metadata.digest !== expectedDigest) return false;
       if (expectedSize !== undefined && metadata.size !== expectedSize) return false;
       return true;
@@ -246,15 +315,25 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     }
   }
 
-  private async assertValidObject(directory: string, missingCode: ArtifactBlobStoreError['code']): Promise<void> {
+  private async readObjectMetadata(
+    directory: string,
+    missingCode: ArtifactBlobStoreError['code'],
+  ): Promise<ObjectMetadata> {
     await assertDirectoryNoFollow(directory, missingCode);
     await assertRegularNoFollow(join(directory, 'data'), missingCode);
-    await readMetadata(join(directory, 'metadata.json'), missingCode);
+    return readMetadata(join(directory, 'metadata.json'), missingCode);
   }
 
-  private async readValidObjectMetadata(directory: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
-    await this.assertValidObject(directory, missingCode);
-    return readMetadata(join(directory, 'metadata.json'), missingCode);
+  private async readVerifiedObjectMetadata(
+    directory: string,
+    missingCode: ArtifactBlobStoreError['code'],
+  ): Promise<ObjectMetadata> {
+    const metadata = await this.readObjectMetadata(directory, missingCode);
+    const measured = await measureFileNoFollow(join(directory, 'data'), missingCode);
+    if (measured.size !== metadata.size || measured.digest !== metadata.digest) {
+      throw new ArtifactBlobStoreError('object content does not match its metadata', missingCode);
+    }
+    return metadata;
   }
 
   private async ensureRoots(): Promise<void> {
@@ -276,7 +355,9 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
     await assertDirectoryNoFollow(path, 'unsafe_path');
     const actualRoot = await realpath(this.root);
     const actualDirectory = await realpath(path);
-    if (!isWithin(actualRoot, actualDirectory)) throw new ArtifactBlobStoreError('storage directory escapes configured root', 'unsafe_path');
+    if (!isWithin(actualRoot, actualDirectory)) {
+      throw new ArtifactBlobStoreError('storage directory escapes configured root', 'unsafe_path');
+    }
   }
 
   private async createTemporaryObjectDirectory(kind: string): Promise<string> {
@@ -308,12 +389,17 @@ class AlreadyPublishedError extends Error {
   }
 }
 
-function isAlreadyPublished(error: unknown, conflictCode: 'staging_conflict' | 'committed_conflict'): error is AlreadyPublishedError {
+function isAlreadyPublished(
+  error: unknown,
+  conflictCode: 'staging_conflict' | 'committed_conflict',
+): error is AlreadyPublishedError {
   return error instanceof AlreadyPublishedError && error.conflictCode === conflictCode;
 }
 
 export function validateStagingId(stagingId: string): void {
-  if (!isValidStagingId(stagingId)) throw new ArtifactBlobStoreError('invalid staging id', 'invalid_staging_id');
+  if (!isValidStagingId(stagingId)) {
+    throw new ArtifactBlobStoreError('invalid staging id', 'invalid_staging_id');
+  }
 }
 
 function isValidStagingId(stagingId: string): boolean {
@@ -321,12 +407,16 @@ function isValidStagingId(stagingId: string): boolean {
 }
 
 export function validateDigest(digest: string): void {
-  if (!/^[a-f0-9]{64}$/.test(digest)) throw new ArtifactBlobStoreError('invalid SHA-256 digest', 'invalid_digest');
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new ArtifactBlobStoreError('invalid SHA-256 digest', 'invalid_digest');
+  }
 }
 
 function safeJoin(root: string, ...parts: string[]): string {
   const path = resolve(root, ...parts);
-  if (!isWithin(root, path)) throw new ArtifactBlobStoreError('resolved path escaped storage root', 'unsafe_path');
+  if (!isWithin(root, path)) {
+    throw new ArtifactBlobStoreError('resolved path escaped storage root', 'unsafe_path');
+  }
   return path;
 }
 
@@ -347,9 +437,13 @@ async function directoryExists(path: string): Promise<boolean> {
 async function assertDirectoryNoFollow(path: string, missingCode: ArtifactBlobStoreError['code']): Promise<void> {
   try {
     const stats = await lstat(path);
-    if (!stats.isDirectory()) throw new ArtifactBlobStoreError('expected directory without symlink', missingCode);
+    if (!stats.isDirectory()) {
+      throw new ArtifactBlobStoreError('expected directory without symlink', missingCode);
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ArtifactBlobStoreError('directory not found', missingCode);
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new ArtifactBlobStoreError('directory not found', missingCode);
+    }
     throw error;
   }
 }
@@ -357,28 +451,78 @@ async function assertDirectoryNoFollow(path: string, missingCode: ArtifactBlobSt
 async function assertRegularNoFollow(path: string, missingCode: ArtifactBlobStoreError['code']): Promise<void> {
   try {
     const stats = await lstat(path);
-    if (!stats.isFile()) throw new ArtifactBlobStoreError('expected regular file without symlink', missingCode);
+    if (!stats.isFile()) {
+      throw new ArtifactBlobStoreError('expected regular file without symlink', missingCode);
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ArtifactBlobStoreError('file not found', missingCode);
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new ArtifactBlobStoreError('file not found', missingCode);
+    }
     throw error;
   }
 }
 
+async function openReadableNoFollow(path: string, missingCode: ArtifactBlobStoreError['code']): Promise<Readable> {
+  try {
+    const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    return handle.createReadStream({ autoClose: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ELOOP' || code === 'ENOTDIR') {
+      throw new ArtifactBlobStoreError('file could not be opened safely', missingCode);
+    }
+    throw error;
+  }
+}
+
+async function copyAndMeasureNoFollow(
+  sourcePath: string,
+  targetPath: string,
+  missingCode: ArtifactBlobStoreError['code'],
+): Promise<ObjectMetadata> {
+  const source = await openReadableNoFollow(sourcePath, missingCode);
+  const meter = createDigestMeter();
+  await pipeline(source, meter.stream, createWriteStream(targetPath, { flags: 'wx' }));
+  return meter.result();
+}
+
+async function measureFileNoFollow(
+  path: string,
+  missingCode: ArtifactBlobStoreError['code'],
+): Promise<ObjectMetadata> {
+  const source = await openReadableNoFollow(path, missingCode);
+  const accumulator = new DigestAccumulator();
+  for await (const chunk of source) accumulator.update(chunk);
+  return accumulator.result();
+}
+
 async function writeObjectMetadata(directory: string, digest: string, size: bigint): Promise<void> {
-  await writeFile(join(directory, 'metadata.json'), JSON.stringify({ digest, size: size.toString() }) + '\n', { flag: 'wx' });
+  await writeFile(
+    join(directory, 'metadata.json'),
+    JSON.stringify({ digest, size: size.toString() }) + '\n',
+    { flag: 'wx' },
+  );
   await readMetadata(join(directory, 'metadata.json'), 'not_found');
 }
 
 async function readMetadata(path: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+  let handle;
   try {
-    await assertRegularNoFollow(path, missingCode);
-    const data = JSON.parse(await readFile(path, 'utf8')) as SidecarMetadata;
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const data = JSON.parse(await handle.readFile({ encoding: 'utf8' })) as SidecarMetadata;
     validateDigest(data.digest);
-    if (!/^(0|[1-9][0-9]*)$/.test(data.size)) throw new ArtifactBlobStoreError('invalid metadata size', missingCode);
+    if (!/^(0|[1-9][0-9]*)$/.test(data.size)) {
+      throw new ArtifactBlobStoreError('invalid metadata size', missingCode);
+    }
     return { digest: data.digest, size: BigInt(data.size) };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ArtifactBlobStoreError('object metadata not found', missingCode);
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'ELOOP' || code === 'ENOTDIR') {
+      throw new ArtifactBlobStoreError('object metadata not found or unsafe', missingCode);
+    }
     throw error;
+  } finally {
+    await handle?.close();
   }
 }
 
