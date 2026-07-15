@@ -131,7 +131,11 @@ export async function registerWorkerRoutes(
               error.retryable,
             ),
           );
-        if (error.validation)
+        if (error.validation) {
+          request.log.warn(
+            { validation: error.validation },
+            'worker request validation failed',
+          );
           return reply.code(400).send(
             workerError(
               request.id,
@@ -140,6 +144,7 @@ export async function registerWorkerRoutes(
               false,
             ),
           );
+        }
         request.log.error({ err: error }, 'worker route failed');
         return reply.code(500).send(
           workerError(
