@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Kysely } from 'kysely';
+import Ajv2020Import from 'ajv/dist/2020.js';
+import type { ErrorObject } from 'ajv';
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
 import {
   ArtifactRepository,
@@ -9,6 +11,7 @@ import {
   type RuntimeDb,
 } from '@factory-floor/db';
 import { ArtifactValidationService } from '../artifacts/artifact-validation-service.js';
+import { decodeCapabilityGrantHandle } from '../capabilities/capability-handle.js';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { EventService } from '../events/event-service.js';
 import { RoutingService } from '../routing/routing-service.js';
@@ -21,6 +24,14 @@ const RESOURCE_UNITS = {
   outputBytes: 'bytes',
   externalCalls: 'count',
 } as const;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EXTERNAL_ACTION_RISKS = new Set([
+  'low',
+  'medium',
+  'high',
+  'irreversible',
+]);
 
 type ResourceType = keyof typeof RESOURCE_UNITS;
 type Staged = {
@@ -42,6 +53,14 @@ type ProposedEvent = {
   occurredAt: string;
   source: Json;
 };
+type ExternalActionProposal = {
+  proposalId: string;
+  actionType: string;
+  idempotencyKey: string;
+  capabilityHandle: string;
+  requestArtifact: Staged;
+  risk: 'low' | 'medium' | 'high' | 'irreversible';
+};
 export type ProposedExecutionResult = {
   protocolVersion: '1.0';
   executionId: string;
@@ -52,7 +71,7 @@ export type ProposedExecutionResult = {
   stagedArtifacts: Staged[];
   proposedState?: Staged;
   proposedEvents: ProposedEvent[];
-  externalActionProposals: Json[];
+  externalActionProposals: ExternalActionProposal[];
   resourceUsage: Record<ResourceType, number>;
   failure?: Json;
 };
@@ -136,7 +155,10 @@ export class ExecutionCommitService {
           .forUpdate()
           .executeTakeFirst();
         if (!attempt || !execution)
-          throw new ExecutionCommitError('inactive_attempt', 'attempt is not active');
+          throw new ExecutionCommitError(
+            'inactive_attempt',
+            'attempt is not active',
+          );
 
         const submission = await trx
           .selectFrom('worker_result_submissions')
@@ -151,11 +173,17 @@ export class ExecutionCommitService {
           );
         if (!['leased', 'running'].includes(attempt.status)) {
           if (submission) return { disposition: 'duplicate' as const };
-          throw new ExecutionCommitError('inactive_attempt', 'attempt is already terminal');
+          throw new ExecutionCommitError(
+            'inactive_attempt',
+            'attempt is already terminal',
+          );
         }
         if (execution.status !== 'running') {
           if (submission) return { disposition: 'duplicate' as const };
-          throw new ExecutionCommitError('inactive_attempt', 'execution is already terminal');
+          throw new ExecutionCommitError(
+            'inactive_attempt',
+            'execution is already terminal',
+          );
         }
 
         const region = await trx
@@ -190,16 +218,22 @@ export class ExecutionCommitService {
           .forUpdate()
           .execute();
         if (deliveries.length === 0)
-          throw new ExecutionCommitError('inactive_attempt', 'execution has no inputs');
+          throw new ExecutionCommitError(
+            'inactive_attempt',
+            'execution has no inputs',
+          );
 
         this.assertAuthority(input, attempt, execution, region, deliveries);
         this.validateResourceUsage(input.resourceUsage);
-        this.validateProposedEvents(input);
-        if (input.externalActionProposals.length > 0)
+        await this.validateProposedEvents(trx, input);
+        if (
+          input.status !== 'completed' &&
+          input.externalActionProposals.length > 0
+        )
           throw new ExecutionCommitError(
             'external_action_unauthorized',
-            'no capability handles were issued for this invocation',
-            403,
+            'external actions may only be proposed by a completed attempt',
+            400,
           );
         if (!submission)
           await trx
@@ -221,13 +255,19 @@ export class ExecutionCommitService {
         const artifactIds = new Map<string, string>();
         const seen = new Set<string>();
         for (const staged of input.stagedArtifacts) {
+          if (seen.has(staged.stagingId))
+            throw new ExecutionCommitError(
+              'invalid_staged_artifact',
+              'staged artifact is referenced more than once as an output',
+              400,
+            );
+          seen.add(staged.stagingId);
           const row = await this.validateStaged(
             trx,
             input,
             staged,
             ports,
             'output',
-            seen,
           );
           if (input.status === 'completed')
             artifactIds.set(
@@ -243,13 +283,19 @@ export class ExecutionCommitService {
             );
         }
         if (input.proposedState) {
+          if (seen.has(input.proposedState.stagingId))
+            throw new ExecutionCommitError(
+              'invalid_staged_artifact',
+              'state artifact is also referenced as an output',
+              400,
+            );
+          seen.add(input.proposedState.stagingId);
           const row = await this.validateStaged(
             trx,
             input,
             input.proposedState,
             ports,
             'state',
-            seen,
           );
           if (input.status === 'completed')
             artifactIds.set(
@@ -265,6 +311,15 @@ export class ExecutionCommitService {
             );
         }
 
+        if (input.status === 'completed')
+          await this.publishExternalActions(
+            trx,
+            input,
+            component,
+            ports,
+            artifactIds,
+            promotions,
+          );
         await this.writeResourceUsage(trx, region.id, input);
         if (input.status === 'completed')
           return this.complete(
@@ -316,7 +371,10 @@ export class ExecutionCommitService {
     deliveries: any[],
   ) {
     if (attempt.lease_token !== input.leaseToken)
-      throw new ExecutionCommitError('stale_lease_token', 'lease token is not current');
+      throw new ExecutionCommitError(
+        'stale_lease_token',
+        'lease token is not current',
+      );
     if (!attempt.lease_expires_at || attempt.lease_expires_at <= this.clock())
       throw new ExecutionCommitError('lease_expired', 'lease has expired');
     if (
@@ -331,7 +389,8 @@ export class ExecutionCommitService {
     if (
       deliveries.some(
         (delivery) =>
-          delivery.status !== 'leased' || delivery.lease_token !== input.leaseToken,
+          delivery.status !== 'leased' ||
+          delivery.lease_token !== input.leaseToken,
       )
     )
       throw new ExecutionCommitError(
@@ -366,8 +425,13 @@ export class ExecutionCommitService {
         );
   }
 
-  private validateProposedEvents(input: ProposedExecutionResult) {
-    for (const event of input.proposedEvents)
+  private async validateProposedEvents(
+    trx: RuntimeDb,
+    input: ProposedExecutionResult,
+  ) {
+    const Ajv2020 = Ajv2020Import.default ?? Ajv2020Import;
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    for (const event of input.proposedEvents) {
       if (
         !event.eventType?.trim() ||
         !event.subject?.trim() ||
@@ -381,6 +445,29 @@ export class ExecutionCommitService {
           'proposed event metadata or source is invalid',
           400,
         );
+      const schema = await trx
+        .selectFrom('artifact_schemas')
+        .select(['schema', 'content_digest', 'retired_at'])
+        .where('id', '=', event.schemaId)
+        .executeTakeFirst();
+      if (
+        !schema ||
+        schema.retired_at ||
+        schema.content_digest !== event.schemaDigest
+      )
+        throw new ExecutionCommitError(
+          'invalid_proposed_event',
+          'proposed event schema is not authoritative',
+          400,
+        );
+      const validate = ajv.compile(schema.schema as object);
+      if (!validate(event.payload))
+        throw new ExecutionCommitError(
+          'invalid_proposed_event',
+          'proposed event payload failed schema validation',
+          400,
+        );
+    }
   }
 
   private async validateStaged(
@@ -389,15 +476,7 @@ export class ExecutionCommitService {
     staged: Staged,
     ports: any[],
     direction: 'output' | 'state',
-    seen: Set<string>,
   ) {
-    if (seen.has(staged.stagingId))
-      throw new ExecutionCommitError(
-        'invalid_staged_artifact',
-        'staged artifact is referenced more than once',
-        400,
-      );
-    seen.add(staged.stagingId);
     const port = ports.find(
       (candidate) =>
         candidate.direction === direction && candidate.name === staged.portName,
@@ -411,6 +490,11 @@ export class ExecutionCommitService {
     const row = await trx
       .selectFrom('artifact_staging as staging')
       .innerJoin('artifact_schemas as schema', 'schema.id', 'staging.schema_id')
+      .innerJoin(
+        'worker_artifact_uploads as upload',
+        'upload.artifact_staging_id',
+        'staging.id',
+      )
       .select([
         'staging.id',
         'staging.staged_ref',
@@ -421,6 +505,7 @@ export class ExecutionCommitService {
         'staging.media_type',
         'staging.status',
         'schema.content_digest as schema_digest',
+        'upload.port_name as authorized_port_name',
       ])
       .where('staging.staged_ref', '=', staged.stagingId)
       .forUpdate()
@@ -435,6 +520,7 @@ export class ExecutionCommitService {
       port.schema_id !== staged.schemaId ||
       row.media_type !== staged.mediaType ||
       row.schema_digest !== staged.schemaDigest ||
+      row.authorized_port_name !== staged.portName ||
       !isExecutionSource(staged.provenance, input.executionId, input.attemptId)
     )
       throw new ExecutionCommitError(
@@ -522,6 +608,137 @@ export class ExecutionCommitService {
       size: BigInt(row.size_bytes),
     });
     return artifact.id;
+  }
+
+  private validateExternalActionProposal(proposal: ExternalActionProposal) {
+    if (
+      !UUID_PATTERN.test(proposal.proposalId) ||
+      !proposal.actionType?.trim() ||
+      !proposal.idempotencyKey?.trim() ||
+      !proposal.capabilityHandle?.trim() ||
+      !EXTERNAL_ACTION_RISKS.has(proposal.risk) ||
+      !proposal.requestArtifact
+    )
+      throw new ExecutionCommitError(
+        'invalid_external_action_proposal',
+        'external action proposal metadata is invalid',
+        400,
+      );
+  }
+
+  private async publishExternalActions(
+    trx: RuntimeDb,
+    input: ProposedExecutionResult,
+    component: any,
+    ports: any[],
+    artifactIds: Map<string, string>,
+    promotions: Promotion[],
+  ) {
+    for (const proposal of input.externalActionProposals) {
+      this.validateExternalActionProposal(proposal);
+      const grantId = decodeCapabilityGrantHandle(proposal.capabilityHandle);
+      if (!grantId)
+        throw new ExecutionCommitError(
+          'external_action_unauthorized',
+          'capability handle is invalid',
+          403,
+        );
+      const grant = await trx
+        .selectFrom('capability_grants as grant')
+        .innerJoin('capabilities as capability', 'capability.id', 'grant.capability_id')
+        .select(['grant.id'])
+        .where('grant.id', '=', grantId)
+        .where(
+          'grant.grantee_component_definition_id',
+          '=',
+          component.component_definition_id,
+        )
+        .where('grant.status', '=', 'active')
+        .where('capability.retired_at', 'is', null)
+        .forUpdate()
+        .executeTakeFirst();
+      if (!grant)
+        throw new ExecutionCommitError(
+          'external_action_unauthorized',
+          'capability handle is not authorized for this component',
+          403,
+        );
+
+      let requestArtifactId = artifactIds.get(
+        proposal.requestArtifact.stagingId,
+      );
+      if (!requestArtifactId) {
+        const row = await this.validateStaged(
+          trx,
+          input,
+          proposal.requestArtifact,
+          ports,
+          'output',
+        );
+        requestArtifactId = await this.publishArtifact(
+          trx,
+          input,
+          proposal.requestArtifact,
+          row,
+          'external_action_request',
+          promotions,
+        );
+        artifactIds.set(proposal.requestArtifact.stagingId, requestArtifactId);
+      } else
+        await this.validateStaged(
+          trx,
+          input,
+          proposal.requestArtifact,
+          ports,
+          'output',
+        );
+
+      await trx
+        .insertInto('external_actions')
+        .values({
+          id: createUuidV7(),
+          execution_id: input.executionId,
+          attempt_id: input.attemptId,
+          proposal_id: proposal.proposalId,
+          capability_grant_id: grant.id,
+          outbound_request_artifact_id: requestArtifactId,
+          policy_decision_id: null,
+          approval_id: null,
+          action_type: proposal.actionType,
+          risk: proposal.risk,
+          status: 'proposed',
+          idempotency_key: proposal.idempotencyKey,
+        })
+        .onConflict((conflict) => conflict.doNothing())
+        .execute();
+      const action = await trx
+        .selectFrom('external_actions')
+        .selectAll()
+        .where('attempt_id', '=', input.attemptId)
+        .where('proposal_id', '=', proposal.proposalId)
+        .executeTakeFirst();
+      const idempotentAction =
+        action ??
+        (await trx
+          .selectFrom('external_actions')
+          .selectAll()
+          .where('capability_grant_id', '=', grant.id)
+          .where('action_type', '=', proposal.actionType)
+          .where('idempotency_key', '=', proposal.idempotencyKey)
+          .executeTakeFirst());
+      if (
+        !idempotentAction ||
+        idempotentAction.execution_id !== input.executionId ||
+        idempotentAction.attempt_id !== input.attemptId ||
+        idempotentAction.proposal_id !== proposal.proposalId ||
+        idempotentAction.outbound_request_artifact_id !== requestArtifactId ||
+        idempotentAction.risk !== proposal.risk
+      )
+        throw new ExecutionCommitError(
+          'duplicate_conflicting_external_action',
+          'external action proposal conflicts with an existing action',
+        );
+    }
   }
 
   private async writeResourceUsage(
@@ -628,7 +845,12 @@ export class ExecutionCommitService {
       .execute();
     await trx
       .updateTable('executions')
-      .set({ status: 'completed', completed_at: now, failed_at: null, failure: null })
+      .set({
+        status: 'completed',
+        completed_at: now,
+        failed_at: null,
+        failure: null,
+      })
       .where('id', '=', input.executionId)
       .execute();
     await trx
@@ -680,7 +902,9 @@ export class ExecutionCommitService {
       .execute();
 
     const retryable =
-      input.status === 'failed' && isRecord(failure) && failure.retryable === true;
+      input.status === 'failed' &&
+      isRecord(failure) &&
+      failure.retryable === true;
     const delay = RETRY_BACKOFF_MS[attempt.attempt_number - 1];
     const deliveryIds = deliveries.map((delivery) => delivery.id);
     if (retryable && delay !== undefined) {
