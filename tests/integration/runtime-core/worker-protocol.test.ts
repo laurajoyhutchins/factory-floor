@@ -4,7 +4,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import pg from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
 import { FilesystemArtifactBlobStore } from '../../../packages/artifact-store/src/index.js';
 import {
   createDatabase,
@@ -167,7 +175,7 @@ describe('worker protocol lifecycle and idempotency', () => {
     ).toBeUndefined();
     seeded = await seedRuntime(db);
     artifactRoot = await mkdtemp(join(tmpdir(), 'factory-floor-worker-'));
-    now = new Date('2026-07-15T12:00:00.000Z');
+    now = new Date(Date.now() + 60_000);
     service = new WorkerProtocolService(
       db,
       new FilesystemArtifactBlobStore(artifactRoot),
@@ -216,17 +224,25 @@ describe('worker protocol lifecycle and idempotency', () => {
       service.claim({ workerId: 'python-worker', capabilities: ['verify@1'] }),
     ).resolves.toMatchObject({ claimed: false });
     await expect(
-      service.claim({ workerId: 'typescript-worker', capabilities: ['retrieve@1'] }),
+      service.claim({
+        workerId: 'typescript-worker',
+        capabilities: ['retrieve@1'],
+      }),
     ).resolves.toMatchObject({ claimed: true });
   });
 
   it('extends a heartbeat atomically and fences the current region epoch', async () => {
     const envelope = await submitAndClaim();
-    now = new Date('2026-07-15T12:00:20.000Z');
+    now = new Date(now.getTime() + 20_000);
+    const expectedLeaseExpiresAt = new Date(
+      now.getTime() + 60_000,
+    ).toISOString();
 
-    await expect(service.heartbeat(attemptIdentity(envelope))).resolves.toMatchObject({
+    await expect(
+      service.heartbeat(attemptIdentity(envelope)),
+    ).resolves.toMatchObject({
       leaseValid: true,
-      leaseExpiresAt: '2026-07-15T12:01:20.000Z',
+      leaseExpiresAt: expectedLeaseExpiresAt,
     });
     await db
       .updateTable('regions')
@@ -234,7 +250,9 @@ describe('worker protocol lifecycle and idempotency', () => {
       .where('id', '=', seeded.regionId)
       .execute();
 
-    await expect(service.heartbeat(attemptIdentity(envelope))).rejects.toMatchObject({
+    await expect(
+      service.heartbeat(attemptIdentity(envelope)),
+    ).rejects.toMatchObject({
       code: 'stale_lifecycle_epoch',
     });
   });
@@ -250,7 +268,9 @@ describe('worker protocol lifecycle and idempotency', () => {
       .where('id', '=', seeded.regionId)
       .execute();
 
-    await expect(service.cancellation(attemptIdentity(envelope))).resolves.toEqual({
+    await expect(
+      service.cancellation(attemptIdentity(envelope)),
+    ).resolves.toEqual({
       protocolVersion: '1.0',
       state: 'cancellation_requested',
     });
@@ -281,7 +301,11 @@ describe('worker protocol lifecycle and idempotency', () => {
       expected_size_bytes: '4',
     });
     await expect(
-      service.upload(createUuidV7(), identity, Readable.from(Buffer.from('data'))),
+      service.upload(
+        createUuidV7(),
+        identity,
+        Readable.from(Buffer.from('data')),
+      ),
     ).rejects.toMatchObject({ code: 'unauthorized_staging_reference' });
   });
 
@@ -322,9 +346,9 @@ describe('worker protocol lifecycle and idempotency', () => {
   it('records concurrent identical results once and rejects a conflicting retry', async () => {
     const envelope = await submitAndClaim();
     const result = {
-      protocolVersion: '1.0',
+      protocolVersion: '1.0' as const,
       ...attemptIdentity(envelope),
-      status: 'completed',
+      status: 'completed' as const,
       stagedArtifacts: [],
       proposedEvents: [],
       externalActionProposals: [],
