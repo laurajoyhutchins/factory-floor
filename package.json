@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts && pnpm demo:investigation",
     "dev:services": "docker compose up -d postgres minio",
     "dev:control-plane": "pnpm --filter @factory-floor/control-plane dev",
     "contracts:validate": "node scripts/validate-contracts.mjs",
