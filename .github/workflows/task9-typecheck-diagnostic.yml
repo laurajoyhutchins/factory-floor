@@ -1,0 +1,41 @@
+name: Task 9 Typecheck Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/task9-typecheck-diagnostic.yml'
+      - 'apps/**/*.ts'
+      - 'packages/**/*.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck-diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Activate pnpm
+        run: corepack enable && corepack prepare pnpm@10.12.1 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Capture compiler output
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > typecheck.log 2>&1
+          status=$?
+          cat typecheck.log
+          echo "TYPECHECK_EXIT_CODE=$status" >> "$GITHUB_ENV"
+          exit 0
+      - name: Upload compiler output
+        uses: actions/upload-artifact@v4
+        with:
+          name: task9-typecheck-log
+          path: typecheck.log
+          if-no-files-found: error
+      - name: Preserve failure status
+        run: exit "$TYPECHECK_EXIT_CODE"
