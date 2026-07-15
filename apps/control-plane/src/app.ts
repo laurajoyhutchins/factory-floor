@@ -32,7 +32,7 @@ export async function buildApp(
 ): Promise<FastifyInstance> {
   const app = Fastify({
     logger: true,
-    ajv: { customOptions: { removeAdditional: false } },
+    ajv: { customOptions: { removeAdditional: false as never } },
   });
   app.addContentTypeParser(
     ['application/yaml', 'text/yaml', 'application/x-yaml'],
