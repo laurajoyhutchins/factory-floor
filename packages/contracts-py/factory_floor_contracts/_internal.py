@@ -66,8 +66,23 @@ class SourceIdentity3(BaseModel):
     digest: Sha256Digest
 
 
-class SourceIdentity(RootModel[SourceIdentity1 | SourceIdentity2 | SourceIdentity3]):
-    root: SourceIdentity1 | SourceIdentity2 | SourceIdentity3 = Field(
+class SourceIdentity4(BaseModel):
+    """
+    Identity of the runtime object or actor that caused an invocation, proposal, or artifact.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['execution']
+    executionId: UUID
+    attemptId: UUID
+
+
+class SourceIdentity(
+    RootModel[SourceIdentity1 | SourceIdentity2 | SourceIdentity3 | SourceIdentity4]
+):
+    root: SourceIdentity1 | SourceIdentity2 | SourceIdentity3 | SourceIdentity4 = Field(
         ...,
         description='Identity of the runtime object or actor that caused an invocation, proposal, or artifact.',
         title='SourceIdentity',

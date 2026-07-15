@@ -6,7 +6,7 @@ import { basename, join, relative } from 'node:path';
 
 const root = fileURLToPath(new globalThis.URL('..', import.meta.url));
 const schemaDir = join(root, 'contracts', 'schemas');
-const schemaPaths = readdirSync(schemaDir).filter((name) => name.endsWith('.schema.json')).sort().map((name) => join(schemaDir, name));
+const schemaPaths = readdirSync(schemaDir, { recursive: true }).filter((name) => String(name).endsWith('.schema.json')).sort().map((name) => join(schemaDir, String(name)));
 
 const tsOut = join(root, 'packages', 'contracts-ts', 'src', 'generated');
 rmSync(tsOut, { recursive: true, force: true });
@@ -20,11 +20,11 @@ for (const schemaPath of schemaPaths) {
     style: { singleQuote: true, semi: true },
     unreachableDefinitions: true,
   });
-  const outName = `${base}.ts`;
+  const outName = `${base.replaceAll('/', '-')}.ts`;
   writeFileSync(join(tsOut, outName), ts);
   const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
   if (typeof schema.title === 'string') {
-    exports.push(`export type { ${schema.title} } from './generated/${base}.js';`);
+    exports.push(`export type { ${schema.title} } from './generated/${base.replaceAll('/', '-')}.js';`);
   }
 }
 writeFileSync(join(root, 'packages', 'contracts-ts', 'src', 'index.ts'), `${exports.join('\n')}\n`);
@@ -44,7 +44,7 @@ execFileSync('uv', [
   '--formatters', 'black', 'isort',
 ], { stdio: 'inherit' });
 
-const pyModules = schemaPaths.map((schemaPath) => basename(schemaPath, '.schema.json').replaceAll('-', '_') + '_schema');
+const pyModules = schemaPaths.map((schemaPath) => relative(schemaDir, schemaPath).replace(/\.schema\.json$/, '').replaceAll('/', '.').replaceAll('-', '_') + '_schema');
 writeFileSync(join(pyOut, '__init__.py'), `"""Generated Factory Floor Pydantic contract models."""
 ${pyModules.map((moduleName) => `from .${moduleName} import *  # noqa: F401,F403`).join('\n')}
 `);

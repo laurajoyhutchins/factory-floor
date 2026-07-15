@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
 const root = fileURLToPath(new globalThis.URL('..', import.meta.url));
 const schemaDir = join(root, 'contracts', 'schemas');
-const paths = readdirSync(schemaDir).filter((name) => name.endsWith('.schema.json')).sort().map((name) => join(schemaDir, name));
+const paths = readdirSync(schemaDir, { recursive: true }).filter((name) => String(name).endsWith('.schema.json')).sort().map((name) => join(schemaDir, String(name)));
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 addFormats(ajv);
 const schemas = paths.map((path) => JSON.parse(readFileSync(path, 'utf8')));

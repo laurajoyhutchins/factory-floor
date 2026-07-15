@@ -155,10 +155,10 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** TypeScript and Python worker processes can claim, heartbeat, observe cancellation, stage artifacts, and submit proposed results through one protocol.
 
-- [ ] Add separately authenticated `/worker/v1` endpoints.
-- [ ] Implement claim, heartbeat, cancellation, artifact stage, staged-content upload, result submission, and capability invocation endpoints.
-- [ ] Generate immutable invocation envelopes with short-lived artifact URLs and opaque capability handles.
-- [ ] Reject inactive attempts, stale lease tokens, and stale lifecycle epochs.
+- [x] Add separately authenticated `/worker/v1` endpoints.
+- [x] Implement claim, heartbeat, cancellation, artifact stage, staged-content upload, result submission, and capability invocation endpoints.
+- [x] Generate immutable invocation envelopes with endpoint references and opaque capability handle slots.
+- [x] Reject inactive attempts, stale lease tokens, and stale lifecycle epochs.
 - [ ] Build TypeScript and Python SDK clients and runners.
 - [ ] Add deterministic demo worker components for retrieve, compare, verify, and synthesize.
 - [ ] Implement `failFirstAttemptForDemo` in the Python verifier without mutating prior history.

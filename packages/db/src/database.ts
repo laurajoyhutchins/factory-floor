@@ -241,6 +241,12 @@ export interface Database {
     unit: string;
     attributes: Jsonb;
   };
+  worker_result_submissions: Row & {
+    execution_id: string;
+    attempt_id: string;
+    submission_digest: string;
+    result: Jsonb;
+  };
   projection_checkpoints: Row & {
     projection_name: string;
     stream_key: string;
