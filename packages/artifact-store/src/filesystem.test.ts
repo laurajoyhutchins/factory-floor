@@ -11,7 +11,16 @@ const digestOf = (text: string) => createHash('sha256').update(text).digest('hex
 const chunks = (...parts: string[]) => Readable.from(parts.map((part) => Buffer.from(part)));
 
 describe('FilesystemArtifactBlobStore conformance', () => {
-  artifactBlobStoreConformance((root) => new FilesystemArtifactBlobStore(root));
+  artifactBlobStoreConformance((root) => ({
+    createStore: async () => new FilesystemArtifactBlobStore(root),
+    corruptStaged: async (stagingId, bytes) => {
+      await writeFile(join(root, 'staging', stagingId, 'data'), bytes);
+    },
+    corruptCommitted: async (digest, bytes) => {
+      await writeFile(join(root, 'committed', 'sha256', digest.slice(0, 2), digest, 'data'), bytes);
+    },
+    cleanup: async () => undefined,
+  }));
 });
 
 describe('FilesystemArtifactBlobStore filesystem safety and atomicity', () => {

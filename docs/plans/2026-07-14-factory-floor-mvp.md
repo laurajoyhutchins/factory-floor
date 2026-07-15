@@ -113,7 +113,7 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 - [x] Define the `ArtifactBlobStore` interface with stage, read-staged, promote, read-committed, remove-staged, and existence checks.
 - [x] Implement a filesystem adapter first.
-- [ ] Implement an S3-compatible adapter against MinIO.
+- [x] Implement an S3-compatible adapter against MinIO.
 - [x] Compute SHA-256 while streaming and verify claimed digest and size.
 - [x] Store staged locators separately from committed locators.
 - [ ] Add schema validation by artifact schema identity before commit.

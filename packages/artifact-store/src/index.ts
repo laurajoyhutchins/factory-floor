@@ -4,6 +4,16 @@ import { lstat, mkdir, open, readdir, realpath, rename, rm, writeFile } from 'no
 import { join, resolve } from 'node:path';
 import { Transform, type Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  NoSuchKey,
+  PutObjectCommand,
+  S3Client,
+  type S3ClientConfig,
+} from '@aws-sdk/client-s3';
 
 export type HexSha256Digest = string;
 export type StagingId = string;
@@ -82,6 +92,9 @@ interface ObjectMetadata {
   readonly digest: string;
   readonly size: bigint;
 }
+
+const metadataFormat = 'factory-floor-artifact-blob';
+const metadataVersion = '1';
 
 class DigestAccumulator {
   private readonly hash = createHash('sha256');
@@ -383,6 +396,262 @@ export class FilesystemArtifactBlobStore implements ArtifactBlobStore {
   }
 }
 
+export interface S3ArtifactBlobStoreConfig {
+  readonly endpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly prefix?: string;
+  readonly forcePathStyle?: boolean;
+  readonly clientConfig?: Omit<S3ClientConfig, 'endpoint' | 'region' | 'forcePathStyle'>;
+}
+
+export class S3ArtifactBlobStore implements ArtifactBlobStore {
+  private readonly client: S3Client;
+  private readonly bucket: string;
+  private readonly prefix: string;
+
+  constructor(config: S3ArtifactBlobStoreConfig) {
+    this.bucket = config.bucket;
+    this.prefix = normalizeS3Prefix(config.prefix ?? '');
+    this.client = new S3Client({
+      endpoint: config.endpoint,
+      region: config.region,
+      forcePathStyle: config.forcePathStyle,
+      ...config.clientConfig,
+    });
+  }
+
+  async stage(stagingId: StagingId, bytes: Readable, options: StageOptions = {}): Promise<StagingReceipt> {
+    validateStagingId(stagingId);
+    if (options.expectedDigest !== undefined) validateDigest(options.expectedDigest);
+    if (options.expectedSize !== undefined && options.expectedSize < 0n) {
+      throw new ArtifactBlobStoreError('expected size must be non-negative', 'invalid_size');
+    }
+
+    const tmpKey = this.tmpKey(`stage-${randomUUID()}`);
+    const finalKey = this.stagingKey(stagingId);
+    const meter = createDigestMeter();
+    let measured: ObjectMetadata | undefined;
+    try {
+      const upload = this.putObject(tmpKey, meter.stream, undefined);
+      await pipeline(bytes, meter.stream);
+      await upload;
+      measured = meter.result();
+      if (options.expectedSize !== undefined && options.expectedSize !== measured.size) {
+        throw new ArtifactBlobStoreError('staged content size did not match expected size', 'size_mismatch');
+      }
+      if (options.expectedDigest !== undefined && options.expectedDigest !== measured.digest) {
+        throw new ArtifactBlobStoreError('staged content digest did not match expected digest', 'digest_mismatch');
+      }
+      await this.putObject(finalKey, await this.getReadable(tmpKey, 'staging_conflict'), measured, true);
+      return this.stagingReceipt(stagingId, measured.digest, measured.size);
+    } catch (error) {
+      if (isS3PreconditionFailed(error)) {
+        const existing = await this.readVerifiedMetadata(finalKey, 'staging_conflict');
+        if (measured !== undefined && existing.digest === measured.digest && existing.size === measured.size) {
+          return this.stagingReceipt(stagingId, existing.digest, existing.size);
+        }
+        throw new ArtifactBlobStoreError('staging object conflicts with existing content', 'staging_conflict');
+      }
+      throw error;
+    } finally {
+      await this.deleteObject(tmpKey);
+    }
+  }
+
+  async readStaged(stagingId: StagingId): Promise<Readable> {
+    validateStagingId(stagingId);
+    const key = this.stagingKey(stagingId);
+    await this.readVerifiedMetadata(key, 'not_found');
+    return this.getReadable(key, 'not_found');
+  }
+
+  async promote(stagingId: StagingId, digest: HexSha256Digest, size: bigint): Promise<CommittedReceipt> {
+    validateStagingId(stagingId);
+    validateDigest(digest);
+    if (size < 0n) throw new ArtifactBlobStoreError('size must be non-negative', 'invalid_size');
+    const stagedKey = this.stagingKey(stagingId);
+    const committedKey = this.committedKey(digest);
+    const committedLocator = this.locator(committedKey);
+
+    if (await this.validObjectExists(committedKey, digest, size, 'committed_conflict')) {
+      await this.removeStaged(stagingId);
+      return { digest, size, committedLocator };
+    }
+    if (!(await this.objectExists(stagedKey))) {
+      throw new ArtifactBlobStoreError(`staged object ${stagingId} was not found`, 'not_found');
+    }
+    const staged = await this.readVerifiedMetadata(stagedKey, 'staging_conflict');
+    if (staged.size !== size) throw new ArtifactBlobStoreError('staged content size does not match promotion size', 'size_mismatch');
+    if (staged.digest !== digest) throw new ArtifactBlobStoreError('staged content digest does not match promotion digest', 'digest_mismatch');
+
+    try {
+      await this.putObject(committedKey, await this.getReadable(stagedKey, 'staging_conflict'), { digest, size }, true);
+    } catch (error) {
+      if (!isS3PreconditionFailed(error)) throw error;
+      if (!(await this.validObjectExists(committedKey, digest, size, 'committed_conflict'))) {
+        throw new ArtifactBlobStoreError('committed object conflicts with requested digest or size', 'committed_conflict');
+      }
+    }
+    await this.removeStaged(stagingId);
+    return { digest, size, committedLocator };
+  }
+
+  async readCommitted(digest: HexSha256Digest): Promise<Readable> {
+    validateDigest(digest);
+    const key = this.committedKey(digest);
+    await this.readVerifiedMetadata(key, 'not_found');
+    return this.getReadable(key, 'not_found');
+  }
+
+  async removeStaged(stagingId: StagingId): Promise<void> {
+    validateStagingId(stagingId);
+    await this.deleteObject(this.stagingKey(stagingId));
+  }
+
+  async stagedExists(stagingId: StagingId): Promise<boolean> {
+    validateStagingId(stagingId);
+    return this.validObjectExists(this.stagingKey(stagingId), undefined, undefined, 'not_found');
+  }
+
+  async committedExists(digest: HexSha256Digest): Promise<boolean> {
+    validateDigest(digest);
+    return this.validObjectExists(this.committedKey(digest), digest, undefined, 'not_found');
+  }
+
+  async listStaged(options: ListStagedOptions): Promise<StagedObjectPage> {
+    if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 1000) {
+      throw new RangeError('limit must be an integer from 1 to 1000');
+    }
+    const prefix = this.key('staging/');
+    const response = await this.client.send(new ListObjectsV2Command({
+      Bucket: this.bucket,
+      Prefix: prefix,
+      ContinuationToken: options.cursor,
+      MaxKeys: options.limit,
+    }));
+    const objects: StagedObject[] = [];
+    for (const item of response.Contents ?? []) {
+      if (item.Key === undefined || item.Key.endsWith('/')) continue;
+      const stagingId = item.Key.slice(prefix.length);
+      if (!isValidStagingId(stagingId)) continue;
+      const metadata = await this.readVerifiedMetadata(item.Key, 'not_found');
+      objects.push(this.stagingReceipt(stagingId, metadata.digest, metadata.size));
+    }
+    return { objects, nextCursor: response.NextContinuationToken };
+  }
+
+  private async putObject(
+    key: string,
+    body: Readable,
+    metadata: ObjectMetadata | undefined,
+    ifNoneMatch = false,
+  ): Promise<void> {
+    await this.client.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: body,
+      Metadata: metadata === undefined ? undefined : s3Metadata(metadata),
+      ...(ifNoneMatch ? { IfNoneMatch: '*' } : {}),
+    }));
+  }
+
+  private async readVerifiedMetadata(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+    const head = await this.headObject(key, missingCode);
+    const metadata = parseS3Metadata(head.Metadata ?? {}, missingCode);
+    const measured = await this.measureObject(key, missingCode);
+    if (measured.digest !== metadata.digest || measured.size !== metadata.size) {
+      throw new ArtifactBlobStoreError('object content does not match its metadata', missingCode);
+    }
+    return metadata;
+  }
+
+  private async measureObject(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<ObjectMetadata> {
+    const source = await this.getReadable(key, missingCode);
+    const accumulator = new DigestAccumulator();
+    for await (const chunk of source) accumulator.update(chunk);
+    return accumulator.result();
+  }
+
+  private async getReadable(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<Readable> {
+    try {
+      const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (response.Body === undefined || !('pipe' in response.Body)) {
+        throw new ArtifactBlobStoreError('object body is not readable', missingCode);
+      }
+      return response.Body as Readable;
+    } catch (error) {
+      if (isS3NotFound(error)) throw new ArtifactBlobStoreError('object not found', missingCode);
+      throw error;
+    }
+  }
+
+  private async headObject(key: string, missingCode: ArtifactBlobStoreError['code']) {
+    try {
+      return await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+    } catch (error) {
+      if (isS3NotFound(error)) throw new ArtifactBlobStoreError('object not found', missingCode);
+      throw error;
+    }
+  }
+
+  private async objectExists(key: string): Promise<boolean> {
+    try {
+      await this.headObject(key, 'not_found');
+      return true;
+    } catch (error) {
+      if (error instanceof ArtifactBlobStoreError && error.code === 'not_found') return false;
+      throw error;
+    }
+  }
+
+  private async validObjectExists(
+    key: string,
+    expectedDigest: string | undefined,
+    expectedSize: bigint | undefined,
+    conflictCode: ArtifactBlobStoreError['code'],
+  ): Promise<boolean> {
+    try {
+      const metadata = await this.readVerifiedMetadata(key, conflictCode);
+      if (expectedDigest !== undefined && metadata.digest !== expectedDigest) return false;
+      if (expectedSize !== undefined && metadata.size !== expectedSize) return false;
+      return true;
+    } catch (error) {
+      if (error instanceof ArtifactBlobStoreError && error.code === 'not_found') return false;
+      if (conflictCode === 'not_found' && error instanceof ArtifactBlobStoreError && error.code === 'not_found') return false;
+      throw error;
+    }
+  }
+
+  private async deleteObject(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  private stagingReceipt(stagingId: string, digest: string, size: bigint): StagingReceipt {
+    return { stagingId, digest, size, stagedLocator: this.locator(this.stagingKey(stagingId)) };
+  }
+
+  private stagingKey(stagingId: string): string {
+    return this.key(`staging/${stagingId}`);
+  }
+
+  private committedKey(digest: string): string {
+    return this.key(`committed/sha256/${digest.slice(0, 2)}/${digest}`);
+  }
+
+  private tmpKey(operationId: string): string {
+    return this.key(`tmp/${operationId}`);
+  }
+
+  private key(path: string): string {
+    return `${this.prefix}${path}`;
+  }
+
+  private locator(key: string): string {
+    return `s3://${this.bucket}/${key}`;
+  }
+}
+
 class AlreadyPublishedError extends Error {
   constructor(readonly conflictCode: 'staging_conflict' | 'committed_conflict') {
     super('object was already published');
@@ -533,4 +802,47 @@ async function readdirSafe(path: string): Promise<string[]> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw error;
   }
+}
+
+function s3Metadata(metadata: ObjectMetadata): Record<string, string> {
+  return {
+    digest: metadata.digest,
+    size: metadata.size.toString(),
+    format: metadataFormat,
+    version: metadataVersion,
+  };
+}
+
+function parseS3Metadata(
+  metadata: Record<string, string>,
+  missingCode: ArtifactBlobStoreError['code'],
+): ObjectMetadata {
+  if (metadata.format !== metadataFormat || metadata.version !== metadataVersion) {
+    throw new ArtifactBlobStoreError('object metadata format is missing or unsupported', missingCode);
+  }
+  validateDigest(metadata.digest ?? '');
+  const size = metadata.size;
+  if (size === undefined || !/^(0|[1-9][0-9]*)$/.test(size)) {
+    throw new ArtifactBlobStoreError('invalid metadata size', missingCode);
+  }
+  return { digest: metadata.digest, size: BigInt(size) };
+}
+
+function normalizeS3Prefix(prefix: string): string {
+  const trimmed = prefix.replace(/^\/+/, '').replace(/\/+$/, '');
+  if (trimmed === '') return '';
+  if (trimmed.split('/').some((part) => part === '' || part === '.' || part === '..')) {
+    throw new ArtifactBlobStoreError('invalid S3 key prefix', 'unsafe_path');
+  }
+  return `${trimmed}/`;
+}
+
+function isS3NotFound(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return error instanceof NoSuchKey || candidate.name === 'NotFound' || candidate.$metadata?.httpStatusCode === 404;
+}
+
+function isS3PreconditionFailed(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
 }
