@@ -21,6 +21,7 @@ import {
   migrateToLatest,
   resetDatabaseForDevelopment,
 } from '../../../packages/db/src/index.js';
+import { encodeCapabilityGrantHandle } from '../../../packages/runtime-core/src/capabilities/capability-handle.js';
 import {
   CommandService,
   WorkerProtocolError,
@@ -59,6 +60,8 @@ async function seed(db: ReturnType<typeof createDatabase>) {
   const topologyId = createUuidV7();
   const producer = createUuidV7();
   const consumer = createUuidV7();
+  const capabilityId = createUuidV7();
+  const grantId = createUuidV7();
   await db
     .insertInto('artifact_schemas')
     .values({
@@ -117,7 +120,30 @@ async function seed(db: ReturnType<typeof createDatabase>) {
       },
     ])
     .execute();
-  await db.insertInto('regions').values({ id: regionId, name: 'investigation' }).execute();
+  await db
+    .insertInto('capabilities')
+    .values({
+      id: capabilityId,
+      name: 'demo-action',
+      version: '1',
+      content_digest: 'e'.repeat(64),
+      capability_type: 'demo.action',
+      configuration: {},
+    })
+    .execute();
+  await db
+    .insertInto('capability_grants')
+    .values({
+      id: grantId,
+      capability_id: capabilityId,
+      grantee_component_definition_id: producerDef,
+      status: 'active',
+    })
+    .execute();
+  await db
+    .insertInto('regions')
+    .values({ id: regionId, name: 'investigation' })
+    .execute();
   await db
     .insertInto('topology_revisions')
     .values({
@@ -177,7 +203,7 @@ async function seed(db: ReturnType<typeof createDatabase>) {
     })
     .where('id', '=', regionId)
     .execute();
-  return { schemaId };
+  return { schemaId, grantId };
 }
 
 describe('atomic execution commit and retry', () => {
@@ -186,6 +212,7 @@ describe('atomic execution commit and retry', () => {
   let service: WorkerProtocolService;
   let blobStore: FilesystemArtifactBlobStore;
   let schemaId = '';
+  let grantId = '';
   let now = new Date();
 
   beforeAll(async () => {
@@ -195,7 +222,7 @@ describe('atomic execution commit and retry', () => {
 
   beforeEach(async () => {
     expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
-    ({ schemaId } = await seed(db));
+    ({ schemaId, grantId } = await seed(db));
     root = await mkdtemp(join(tmpdir(), 'ff-atomic-'));
     blobStore = new FilesystemArtifactBlobStore(root);
     now = new Date(Date.now() + 60_000);
@@ -274,7 +301,11 @@ describe('atomic execution commit and retry', () => {
     };
   }
 
-  function result(env: any, artifact: any, overrides: Record<string, unknown> = {}) {
+  function result(
+    env: any,
+    artifact: any,
+    overrides: Record<string, unknown> = {},
+  ) {
     return {
       protocolVersion: '1.0',
       executionId: env.executionId,
@@ -304,8 +335,12 @@ describe('atomic execution commit and retry', () => {
       accepted: true,
       duplicate: true,
     });
-    await expect(db.selectFrom('artifacts').selectAll().execute()).resolves.toHaveLength(1);
-    await expect(db.selectFrom('execution_outputs').selectAll().execute()).resolves.toHaveLength(1);
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(1);
+    await expect(
+      db.selectFrom('execution_outputs').selectAll().execute(),
+    ).resolves.toHaveLength(1);
     await expect(
       db
         .selectFrom('events')
@@ -320,7 +355,9 @@ describe('atomic execution commit and retry', () => {
         .where('source_event_id', 'is not', null)
         .execute(),
     ).resolves.toHaveLength(1);
-    await expect(db.selectFrom('resource_ledger').selectAll().execute()).resolves.toHaveLength(4);
+    await expect(
+      db.selectFrom('resource_ledger').selectAll().execute(),
+    ).resolves.toHaveLength(4);
     await expect(
       db
         .selectFrom('executions')
@@ -341,18 +378,26 @@ describe('atomic execution commit and retry', () => {
   it('rolls back validation failures and permits a corrected result', async () => {
     const env = await claim();
     const invalid = await stage(env, '{"ok":"no"}');
-    await expect(service.submitResult(result(env, invalid))).rejects.toBeInstanceOf(
-      WorkerProtocolError,
-    );
-    await expect(db.selectFrom('artifacts').selectAll().execute()).resolves.toHaveLength(0);
-    await expect(db.selectFrom('execution_outputs').selectAll().execute()).resolves.toHaveLength(0);
-    await expect(db.selectFrom('resource_ledger').selectAll().execute()).resolves.toHaveLength(0);
+    await expect(
+      service.submitResult(result(env, invalid)),
+    ).rejects.toBeInstanceOf(WorkerProtocolError);
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('execution_outputs').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('resource_ledger').selectAll().execute(),
+    ).resolves.toHaveLength(0);
     await expect(
       db.selectFrom('worker_result_submissions').selectAll().execute(),
     ).resolves.toHaveLength(0);
 
     const corrected = await stage(env);
-    await expect(service.submitResult(result(env, corrected))).resolves.toMatchObject({
+    await expect(
+      service.submitResult(result(env, corrected)),
+    ).resolves.toMatchObject({
       accepted: true,
       duplicate: false,
     });
@@ -380,7 +425,9 @@ describe('atomic execution commit and retry', () => {
         .where('execution_id', '=', env.executionId)
         .execute(),
     ).resolves.toHaveLength(2);
-    await expect(db.selectFrom('artifacts').selectAll().execute()).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(0);
     await expect(
       db
         .selectFrom('artifact_staging')
@@ -394,7 +441,10 @@ describe('atomic execution commit and retry', () => {
     now = new Date(now.getTime() + 1_000);
     await expect(
       service.claim({ workerId: 'w2', capabilities: ['producer@1'] }),
-    ).resolves.toMatchObject({ claimed: true });
+    ).resolves.toMatchObject({
+      claimed: true,
+      envelope: { attemptNumber: 2 },
+    });
   });
 
   it('rejects stale authority and undeclared output without partial effects', async () => {
@@ -403,22 +453,28 @@ describe('atomic execution commit and retry', () => {
     await expect(
       service.submitResult(result(env, artifact, { leaseToken: 'stale' })),
     ).rejects.toBeInstanceOf(WorkerProtocolError);
-    await expect(db.selectFrom('artifacts').selectAll().execute()).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(0);
 
     await db.updateTable('regions').set({ lifecycle_epoch: 1 }).execute();
-    await expect(service.submitResult(result(env, artifact))).rejects.toBeInstanceOf(
-      WorkerProtocolError,
-    );
+    await expect(
+      service.submitResult(result(env, artifact)),
+    ).rejects.toBeInstanceOf(WorkerProtocolError);
     await db.updateTable('regions').set({ lifecycle_epoch: 0 }).execute();
 
     await expect(
       service.submitResult(result(env, { ...artifact, portName: 'missing' })),
     ).rejects.toBeInstanceOf(WorkerProtocolError);
-    await expect(db.selectFrom('artifacts').selectAll().execute()).resolves.toHaveLength(0);
-    await expect(db.selectFrom('resource_ledger').selectAll().execute()).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('resource_ledger').selectAll().execute(),
+    ).resolves.toHaveLength(0);
   });
 
-  it('rejects external actions when the invocation issued no capability handles', async () => {
+  it('rejects an unissued external-action capability handle atomically', async () => {
     const env = await claim();
     await expect(
       service.submitResult(
@@ -427,7 +483,7 @@ describe('atomic execution commit and retry', () => {
             {
               proposalId: createUuidV7(),
               actionType: 'demo.action',
-              idempotencyKey: 'demo-action',
+              idempotencyKey: 'demo-action-denied',
               capabilityHandle: 'not-issued',
               requestArtifact: {},
               risk: 'low',
@@ -436,7 +492,67 @@ describe('atomic execution commit and retry', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: 'capability_denied' });
-    await expect(db.selectFrom('external_actions').selectAll().execute()).resolves.toHaveLength(0);
-    await expect(db.selectFrom('resource_ledger').selectAll().execute()).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('external_actions').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('resource_ledger').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+  });
+
+  it('publishes an authorized external action and its request artifact atomically', async () => {
+    const env = await claim();
+    const requestArtifact = await stage(env);
+    const proposalId = createUuidV7();
+
+    await expect(
+      service.submitResult(
+        result(env, undefined, {
+          externalActionProposals: [
+            {
+              proposalId,
+              actionType: 'demo.action',
+              idempotencyKey: 'demo-action-authorized',
+              capabilityHandle: encodeCapabilityGrantHandle(grantId),
+              requestArtifact,
+              risk: 'medium',
+            },
+          ],
+          resourceUsage: { ...usage, externalCalls: 1 },
+        }),
+      ),
+    ).resolves.toMatchObject({ accepted: true, duplicate: false });
+
+    await expect(
+      db
+        .selectFrom('external_actions')
+        .selectAll()
+        .executeTakeFirstOrThrow(),
+    ).resolves.toMatchObject({
+      proposal_id: proposalId,
+      capability_grant_id: grantId,
+      action_type: 'demo.action',
+      risk: 'medium',
+      status: 'proposed',
+      idempotency_key: 'demo-action-authorized',
+    });
+    await expect(
+      db
+        .selectFrom('artifact_derivations')
+        .select('derivation_type')
+        .executeTakeFirstOrThrow(),
+    ).resolves.toMatchObject({ derivation_type: 'external_action_request' });
+    await expect(
+      db.selectFrom('artifacts').selectAll().execute(),
+    ).resolves.toHaveLength(1);
+    await expect(
+      db.selectFrom('execution_outputs').selectAll().execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.selectFrom('resource_ledger').selectAll().execute(),
+    ).resolves.toHaveLength(5);
+    await expect(blobStore.committedExists(requestArtifact.digest)).resolves.toBe(
+      true,
+    );
   });
 });
