@@ -103,8 +103,6 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     })
     .where('id', '=', regionId)
     .execute();
-
-  return { regionId, topologyId, instanceId };
 }
 
 describe('durable command routing and scheduler concurrency', () => {
@@ -156,11 +154,9 @@ describe('durable command routing and scheduler concurrency', () => {
       'accepted',
       'replayed',
     ]);
-    expect(new Set(results.map((result) => result.commandId))).toHaveLength(1);
-    expect(new Set(results.map((result) => result.eventId))).toHaveLength(1);
-    expect(new Set(results.flatMap((result) => result.deliveryIds))).toHaveLength(
-      1,
-    );
+    expect(new Set(results.map((result) => result.commandId)).size).toBe(1);
+    expect(new Set(results.map((result) => result.eventId)).size).toBe(1);
+    expect(new Set(results.flatMap((result) => result.deliveryIds)).size).toBe(1);
     expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(1);
     expect(await db.selectFrom('events').selectAll().execute()).toHaveLength(1);
     expect(await db.selectFrom('deliveries').selectAll().execute()).toHaveLength(
