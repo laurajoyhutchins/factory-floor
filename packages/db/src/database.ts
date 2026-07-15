@@ -70,7 +70,7 @@ export interface Database {
     payload: Jsonb;
     status: Generated<string>;
     source: Jsonb;
-    request_digest: string | null;
+    request_digest: string;
     rejection: Jsonb | null;
     accepted_at: Timestamp | null;
     rejected_at: Timestamp | null;
@@ -84,7 +84,7 @@ export interface Database {
     payload: Jsonb;
     stream_key: string;
     sequence_number: BigIntString;
-    correlation_id: string | null;
+    correlation_id: string;
     source_kind: string;
     source_command_id: string | null;
     source_event_id: string | null;
@@ -93,7 +93,6 @@ export interface Database {
     source_component_instance_id: string | null;
     source_port_name: string | null;
   };
-
   event_stream_sequences: {
     stream_key: string;
     next_sequence_number: BigIntString;
@@ -181,6 +180,9 @@ export interface Database {
     locator: string;
     status: string;
     metadata: Jsonb;
+    artifact_id: string | null;
+    promoted_at: Timestamp | null;
+    abandoned_at: Timestamp | null;
   };
   capabilities: Versioned & { capability_type: string; configuration: Jsonb };
   capability_grants: Row & {
