@@ -16,7 +16,7 @@ const response = await globalThis.fetch(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ batchSize }),
-    signal: AbortSignal.timeout(30_000),
+    signal: globalThis.AbortSignal.timeout(30_000),
   },
 );
 const json = await response
