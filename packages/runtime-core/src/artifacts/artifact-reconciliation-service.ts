@@ -129,7 +129,7 @@ export class ArtifactReconciliationService {
         continue;
       }
       await this.deps.blobStore.promote(
-        staging.id,
+        staging.staged_ref,
         artifact.digest,
         BigInt(artifact.size_bytes),
       );
@@ -147,7 +147,7 @@ export class ArtifactReconciliationService {
       { status: 'staged', before: cutoff, limit: input.limit },
     );
     for (const row of staged) {
-      if (await this.deps.blobStore.stagedExists(row.id)) continue;
+      if (await this.deps.blobStore.stagedExists(row.staged_ref)) continue;
       if (dryRun) report.wouldAbandonMetadataRows++;
       else {
         await this.deps.repository.markStagingAbandoned(
