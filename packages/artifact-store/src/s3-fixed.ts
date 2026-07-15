@@ -105,7 +105,13 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
     const committedKey = store.committedKey(digest);
     const committedLocator = store.locator(committedKey);
 
-    if (await store.validObjectExists(committedKey, digest, size, 'committed_conflict')) {
+    if (await store.objectExists(committedKey)) {
+      if (!(await store.validObjectExists(committedKey, digest, size, 'committed_conflict'))) {
+        throw new ArtifactBlobStoreError(
+          'committed object conflicts with requested digest or size',
+          'committed_conflict',
+        );
+      }
       await this.removeStaged(stagingId);
       return { digest, size, committedLocator };
     }
