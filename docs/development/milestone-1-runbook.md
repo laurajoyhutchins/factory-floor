@@ -12,12 +12,13 @@ This runbook is the copyable command map for a clean Codespace checkout. Run com
 
 ```bash
 bash scripts/bootstrap-workspace.sh
+cp .env.example .env
 pnpm services:up
 pnpm services:wait
 pnpm db:migrate
 ```
 
-Bootstrap uses Node 22, Corepack-managed `pnpm@10.12.1`, Python 3.12, and uv locked environments. If a frozen install fails, update the manifest and lockfile together in one reviewed change.
+Bootstrap uses Node 22, Corepack-managed `pnpm@10.12.1`, Python 3.12, and uv locked environments. Root development and maintenance commands load an optional repository-root `.env`; Docker Compose uses the same file automatically. If a frozen install fails, update the manifest and lockfile together in one reviewed change.
 
 ## Root command map
 
@@ -38,8 +39,8 @@ Bootstrap uses Node 22, Corepack-managed `pnpm@10.12.1`, Python 3.12, and uv loc
 | Run TypeScript unit tests | `pnpm test` |
 | Run Python tests | `pnpm test:python` |
 | Run integration tests | `pnpm test:integration` |
-| Run conformance-focused tests | `pnpm test:conformance` |
-| Full verification | `pnpm verify` |
+| Run recovery/replay conformance tests | `pnpm test:conformance` |
+| Full service-backed verification | `pnpm verify` |
 | Contract validation | `pnpm contracts:validate` |
 | Generated contract drift check | `pnpm contracts:check` |
 | Lint | `pnpm lint` |
@@ -51,7 +52,9 @@ Bootstrap uses Node 22, Corepack-managed `pnpm@10.12.1`, Python 3.12, and uv loc
 | Stop services | `pnpm services:down` |
 | Remove service volumes | `pnpm services:clean` |
 
-Long-running combined development orchestration (`pnpm dev:workers`) forwards termination signals to child processes and returns a non-zero exit code if any child exits unexpectedly.
+`pnpm verify` validates contracts, generated-code drift, formatting, lint, types, TypeScript and Python tests, Compose configuration, service readiness, migrations, the Docker-backed integration/demo path, and recovery/replay tests. It starts and stops PostgreSQL and MinIO while preserving volumes by default. Set `FACTORY_FLOOR_VERIFY_CLEAN=1` to remove existing volumes before the run.
+
+Long-running combined development orchestration (`pnpm dev:workers`) starts each process in a dedicated process group, forwards termination signals to the complete child trees, escalates to `SIGKILL` after three seconds, and returns a non-zero exit code if any child exits unexpectedly.
 
 ## Investigation demo and inspection
 
@@ -76,7 +79,7 @@ The investigation graph deliberately makes verifier attempt 1 fail, keeps that f
 Run reconciliation before claiming artifact health:
 
 ```bash
-DATABASE_URL=postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor pnpm artifacts:reconcile
+pnpm artifacts:reconcile
 ```
 
 Rebuild projections through the control-plane inspection API:
@@ -85,17 +88,17 @@ Rebuild projections through the control-plane inspection API:
 pnpm projections:rebuild
 ```
 
-Projection rebuild must be derived from history only; it must not dispatch workers or perform external actions.
+Set `FACTORY_FLOOR_PROJECTION_BATCH_SIZE` to an integer from 1 through 10000 to change the rebuild batch size. Projection rebuild is derived from history only; it must not dispatch workers or perform external actions.
 
 ## Cancellation and restart checks
 
-Cancellation acceptance requires evidence that lifecycle epoch fencing rejects stale normal commits while preserving diagnostic late results. Restart acceptance requires evidence that a control-plane restart abandons or resumes work without lost executions or duplicate committed outputs.
+Cancellation acceptance requires evidence that lifecycle epoch fencing rejects stale normal commits while preserving diagnostic late results. Restart acceptance requires evidence that an actual control-plane process restart during an investigation abandons or resumes work without lost executions or duplicate committed outputs.
 
-Until the Task 9 and Task 10 branches are merged and their acceptance tests pass, leave final evidence incomplete rather than recording expected behavior as fact.
+The current recovery/replay integration tests cover repeated recovery idempotency, cancellation settlement, stale-result fencing, and side-effect-free projection replay. They do not yet replace the still-open acceptance item for restarting the live control-plane process during the investigation demo, nor the broader requirement for conformance coverage of every reference-specification invariant. Keep those evidence rows explicitly incomplete until those scenarios exist and pass from a clean Codespace checkout.
 
 ## Security and ports
 
-`.env.example` contains local-only credentials. Copy it to an ignored `.env` for personal overrides; never commit real credentials, worker tokens, signed URLs, or production endpoints.
+`.env.example` contains local-only credentials. Copy it to the ignored `.env` for personal overrides; never commit real credentials, worker tokens, signed URLs, or production endpoints.
 
 Docker Compose binds PostgreSQL, MinIO API, and MinIO console to `127.0.0.1` by default. Override `FACTORY_FLOOR_POSTGRES_BIND`, `FACTORY_FLOOR_MINIO_BIND`, and port variables only on trusted development hosts. Codespaces may forward selected loopback ports for the current user, but database and object-storage ports should not be made public.
 
@@ -103,7 +106,7 @@ Docker Compose binds PostgreSQL, MinIO API, and MinIO console to `127.0.0.1` by 
 
 - `pnpm install --frozen-lockfile` fails: manifest and lockfile drifted; regenerate only for the intentional manifest change.
 - `uv sync --locked` fails: the Python project lock is stale; update that project lock with the manifest change.
-- `pnpm services:wait` times out: run `pnpm services:status` and `pnpm services:logs`; the wait script checks container health and live MinIO/PostgreSQL readiness rather than sleeping a fixed duration.
+- `pnpm services:wait` times out: run `pnpm services:status` and `pnpm services:logs`; the wait script requires healthy containers and live MinIO/PostgreSQL readiness rather than sleeping a fixed duration.
 - Docker works in Codespaces/CI but not Codex Cloud: Codex Cloud may have Docker CLI and Compose without a reachable daemon. Use Codespaces or CI for service-backed verification.
 - `pnpm db:reset` fails: it is intentionally restricted to development/test through `NODE_ENV=development` in the root command.
-- Worker authentication fails: set `FACTORY_FLOOR_WORKER_TOKEN` to the same local-only token expected by the control plane; do not log or commit real tokens.
+- Worker authentication fails: verify that `.env` defines the same local value for `WORKER_API_BEARER_TOKEN` and `FACTORY_FLOOR_WORKER_TOKEN` and that the worker base URL matches the control-plane URL.
