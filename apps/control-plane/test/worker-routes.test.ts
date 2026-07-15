@@ -139,6 +139,49 @@ describe('worker routes', () => {
     expect(service.heartbeat).not.toHaveBeenCalled();
   });
 
+  it('accepts the retryable failed-result contract emitted by Python workers', async () => {
+    const service = createService();
+    const app = await buildApp({
+      workerProtocolService: service as never,
+      workerAuthToken: 'worker-token',
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/worker/v1/results',
+      headers: workerHeaders,
+      payload: {
+        protocolVersion: '1.0',
+        executionId: uuid,
+        attemptId: uuid,
+        leaseToken: 'lease',
+        lifecycleEpoch: 0,
+        stagedArtifacts: [],
+        proposedEvents: [],
+        externalActionProposals: [],
+        resourceUsage: {
+          cpuMilliseconds: 0,
+          wallMilliseconds: 0,
+          inputBytes: 1,
+          outputBytes: 0,
+          externalCalls: 0,
+        },
+        status: 'failed',
+        failure: {
+          code: 'DEMO_FIRST_ATTEMPT_INTENTIONAL_FAILURE',
+          message: 'Intentional deterministic first-attempt verifier failure for the demo.',
+          category: 'model',
+          retryable: true,
+          details: {
+            attemptNumber: 1,
+            derivedFrom: 'invocation.attemptNumber',
+          },
+        },
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(service.submitResult).toHaveBeenCalledOnce();
+  });
+
   it('streams application/octet-stream uploads to the service', async () => {
     const service = createService();
     const app = await buildApp({
