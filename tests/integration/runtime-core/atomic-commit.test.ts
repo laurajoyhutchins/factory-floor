@@ -241,7 +241,7 @@ describe('atomic execution commit and retry', () => {
   afterAll(async () => {
     await db.destroy();
     await admin
-      .query(`drop database if exists ${databaseName} with (force)`)
+      .query(`drop database if exists ${databaseName}`)
       .catch(() => undefined);
     await admin.end();
   });
