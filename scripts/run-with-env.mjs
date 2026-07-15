@@ -9,7 +9,9 @@ try {
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) {
-  globalThis.console.error('Usage: node scripts/run-with-env.mjs <command> [args...]');
+  globalThis.console.error(
+    'Usage: node scripts/run-with-env.mjs <command> [args...]',
+  );
   process.exit(2);
 }
 
@@ -41,7 +43,7 @@ child.on('error', (error) => {
 });
 
 child.on('exit', (code, signal) => {
-  if (forceTimer) clearTimeout(forceTimer);
+  if (forceTimer) globalThis.clearTimeout(forceTimer);
   if (signal) {
     process.kill(process.pid, signal);
     return;
@@ -52,7 +54,7 @@ child.on('exit', (code, signal) => {
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
     signalChild(signal);
-    forceTimer = setTimeout(() => signalChild('SIGKILL'), 3_000);
+    forceTimer = globalThis.setTimeout(() => signalChild('SIGKILL'), 3_000);
     forceTimer.unref();
   });
 }
