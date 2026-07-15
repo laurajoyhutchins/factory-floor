@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts"
+  "main": "dist/public.js",
+  "types": "dist/public.d.ts",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1087.0"
+  }
 }
