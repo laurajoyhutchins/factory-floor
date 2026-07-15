@@ -4,5 +4,14 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@factory-floor/worker-sdk-ts": "workspace:*",
+    "@factory-floor/contracts-ts": "workspace:*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  }
 }

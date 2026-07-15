@@ -4,5 +4,11 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@factory-floor/contracts-ts": "workspace:*"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
 }
