@@ -29,7 +29,12 @@ function protocolSchemas(): Record<string, unknown>[] {
         typeof schema === 'object' &&
         schema !== null &&
         typeof schema.$id === 'string',
-    );
+    )
+    .map((schema) => {
+      const runtimeSchema = { ...schema };
+      delete runtimeSchema.$schema;
+      return runtimeSchema;
+    });
 }
 
 function authError(requestId: string, message: string) {
@@ -93,7 +98,7 @@ export async function registerWorkerRoutes(
         (_request, payload, done) => done(null, payload),
       );
 
-      workerApp.addHook('preHandler', async (request, reply) => {
+      workerApp.addHook('onRequest', async (request, reply) => {
         const value = bearer(request);
         if (!value)
           return reply
