@@ -7,6 +7,7 @@ import { generateLeaseToken, validateLeaseDuration } from './lease.js';
 export interface PollForExecutionOptions {
   owner: string;
   leaseDurationMs: number;
+  capabilities?: readonly string[];
 }
 export interface ScheduledAttempt {
   executionId: string;
@@ -27,18 +28,30 @@ export class SchedulerService {
     options: PollForExecutionOptions,
   ): Promise<ScheduledAttempt | null> {
     validateLeaseDuration(options.leaseDurationMs);
+    if (options.capabilities !== undefined && options.capabilities.length === 0)
+      return null;
     const now = this.clock();
     const requestedLeaseExpiresAt = new Date(
       now.getTime() + options.leaseDurationMs,
     );
     const requestedLeaseToken = generateLeaseToken();
+    const capabilityPredicate =
+      options.capabilities === undefined
+        ? sql<boolean>`true`
+        : sql<boolean>`concat(cd.name, '@', cd.version) = any(${[
+            ...options.capabilities,
+          ]}::text[])`;
 
     return this.db.transaction().execute(async (trx) => {
       const candidate = await sql<any>`
-        select *
-        from deliveries
-        where status = 'ready' and available_at <= ${now}
-        order by available_at, created_at, id
+        select d.*
+        from deliveries d
+        join component_instances ci on ci.id = d.target_component_instance_id
+        join component_definitions cd on cd.id = ci.component_definition_id
+        where d.status = 'ready'
+          and d.available_at <= ${now}
+          and ${capabilityPredicate}
+        order by d.available_at, d.created_at, d.id
         limit 1
       `
         .execute(trx as any)
