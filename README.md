@@ -43,6 +43,8 @@ The script validates Node 22 and Python 3.12, activates pnpm 10.12.1, installs `
 
 See [`docs/development/environments.md`](docs/development/environments.md) for the full environment contract and troubleshooting guidance.
 
+For the Milestone 1 clean-checkout command map, service startup, demo, inspection, artifact reconciliation, projection rebuild, and troubleshooting workflow, see [`docs/development/milestone-1-runbook.md`](docs/development/milestone-1-runbook.md).
+
 ### Workspace maintenance
 
 Routine inspection is non-destructive:

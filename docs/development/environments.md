@@ -27,6 +27,8 @@ The shared command is:
 bash scripts/bootstrap-workspace.sh
 ```
 
+After bootstrap, use the Milestone 1 runbook for the root command map that starts services, waits for readiness, runs migrations, workers, demos, reconciliation, projection rebuilds, and verification: [`docs/development/milestone-1-runbook.md`](milestone-1-runbook.md).
+
 It is designed to be idempotent. A second run should validate or synchronize the same environment rather than create a parallel toolchain.
 
 ## GitHub Codespaces
