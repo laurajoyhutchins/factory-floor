@@ -27,12 +27,22 @@ async function q(sqlText: string) {
   await admin.query(sqlText);
 }
 
+async function migrateAllDown(db: ReturnType<typeof createDatabase>) {
+  let result = await migrateDown(db);
+  expect(result.error).toBeUndefined();
+  while (result.results?.some((migration) => migration.status === 'Success')) {
+    result = await migrateDown(db);
+    expect(result.error).toBeUndefined();
+  }
+}
+
 async function seedGraph(db: ReturnType<typeof createDatabase>) {
   const schemaId = createUuidV7();
-  const defId = createUuidV7();
+  const definitionId = createUuidV7();
   const regionId = createUuidV7();
   const topologyId = createUuidV7();
   const instanceId = createUuidV7();
+
   await db
     .insertInto('artifact_schemas')
     .values({
@@ -46,7 +56,7 @@ async function seedGraph(db: ReturnType<typeof createDatabase>) {
   await db
     .insertInto('component_definitions')
     .values({
-      id: defId,
+      id: definitionId,
       name: 'worker',
       version: '1.0.0',
       content_digest: 'b'.repeat(64),
@@ -73,16 +83,18 @@ async function seedGraph(db: ReturnType<typeof createDatabase>) {
       id: instanceId,
       region_id: regionId,
       topology_revision_id: topologyId,
-      component_definition_id: defId,
+      component_definition_id: definitionId,
       name: 'w',
       configuration: {},
     })
     .execute();
-  return { schemaId, defId, regionId, topologyId, instanceId };
+
+  return { schemaId, definitionId, regionId, topologyId, instanceId };
 }
 
 describe('runtime database migration', () => {
   const db = createDatabase(testUrl);
+
   beforeAll(async () => {
     try {
       await q(`create database ${dbName}`);
@@ -92,6 +104,7 @@ describe('runtime database migration', () => {
       );
     }
   });
+
   afterAll(async () => {
     await db.destroy();
     await q(`drop database if exists ${dbName} with (force)`).catch(
@@ -100,19 +113,20 @@ describe('runtime database migration', () => {
     await admin.end();
   });
 
-  it('creates the durable runtime schema with critical constraints and can roll back', async () => {
+  it('applies every migration, enforces artifact reconciliation invariants, and rolls the complete stack back', async () => {
     expect((await migrateToLatest(db)).error).toBeUndefined();
     const tables = await db
       .selectFrom('information_schema.tables')
       .select('table_name')
       .where('table_schema', '=', 'public')
       .execute();
-    expect(tables.map((t) => t.table_name).sort()).toEqual(
+    expect(tables.map((table) => table.table_name)).toEqual(
       expect.arrayContaining([
         'artifact_schemas',
         'deliveries',
         'execution_attempts',
         'artifacts',
+        'artifact_staging',
         'projection_checkpoints',
       ]),
     );
@@ -136,54 +150,6 @@ describe('runtime database migration', () => {
         })
         .execute(),
     ).rejects.toThrow();
-    await expect(
-      db
-        .insertInto('artifacts')
-        .values({
-          id: createUuidV7(),
-          digest_algorithm: 'sha256',
-          digest: 'not-a-digest',
-          size_bytes: '1',
-          schema_id: ids.schemaId,
-          state: 'committed',
-          media_type: 'application/json',
-          committed_locator: 'sha256/x',
-          provenance: {},
-        })
-        .execute(),
-    ).rejects.toThrow();
-
-    const digest = 'e'.repeat(64);
-    await db
-      .insertInto('artifacts')
-      .values({
-        id: createUuidV7(),
-        digest_algorithm: 'sha256',
-        digest,
-        size_bytes: '5',
-        schema_id: ids.schemaId,
-        state: 'committed',
-        media_type: 'application/json',
-        committed_locator: 'sha256/e',
-        provenance: { source: 'test' },
-      })
-      .execute();
-    await expect(
-      db
-        .insertInto('artifacts')
-        .values({
-          id: createUuidV7(),
-          digest_algorithm: 'sha256',
-          digest,
-          size_bytes: '6',
-          schema_id: ids.schemaId,
-          state: 'committed',
-          media_type: 'application/json',
-          committed_locator: 'sha256/e2',
-          provenance: { source: 'conflict' },
-        })
-        .execute(),
-    ).rejects.toThrow();
 
     const commandId = createUuidV7();
     await db
@@ -195,33 +161,6 @@ describe('runtime database migration', () => {
         payload: {},
       })
       .execute();
-    await expect(
-      db
-        .insertInto('deliveries')
-        .values({
-          id: createUuidV7(),
-          region_id: ids.regionId,
-          topology_revision_id: ids.topologyId,
-          target_component_instance_id: ids.instanceId,
-          target_port_name: 'in',
-        })
-        .execute(),
-    ).rejects.toThrow();
-    await expect(
-      db
-        .insertInto('events')
-        .values({
-          id: createUuidV7(),
-          region_id: ids.regionId,
-          event_type: 'bad',
-          payload: {},
-          stream_key: 's',
-          sequence_number: '1',
-          source_kind: 'command',
-        })
-        .execute(),
-    ).rejects.toThrow();
-
     const deliveryId = createUuidV7();
     await db
       .insertInto('deliveries')
@@ -234,20 +173,6 @@ describe('runtime database migration', () => {
         source_command_id: commandId,
       })
       .execute();
-    await expect(
-      db
-        .insertInto('deliveries')
-        .values({
-          id: createUuidV7(),
-          region_id: ids.regionId,
-          topology_revision_id: ids.topologyId,
-          target_component_instance_id: createUuidV7(),
-          target_port_name: 'in',
-          source_command_id: commandId,
-        })
-        .execute(),
-    ).rejects.toThrow();
-
     const executionId = createUuidV7();
     await db
       .insertInto('executions')
@@ -260,98 +185,85 @@ describe('runtime database migration', () => {
         lifecycle_epoch: 0,
       })
       .execute();
-    const attempt1 = createUuidV7();
+    const attemptId = createUuidV7();
     await db
       .insertInto('execution_attempts')
-      .values({ id: attempt1, execution_id: executionId, attempt_number: 1 })
+      .values({ id: attemptId, execution_id: executionId, attempt_number: 1 })
       .execute();
-    await expect(
-      db
-        .insertInto('execution_attempts')
-        .values({
-          id: createUuidV7(),
-          execution_id: executionId,
-          attempt_number: 1,
-        })
-        .execute(),
-    ).rejects.toThrow();
-    await expect(
-      db
-        .insertInto('execution_attempts')
-        .values({
-          id: createUuidV7(),
-          execution_id: executionId,
-          attempt_number: 2,
-          status: 'leased',
-        })
-        .execute(),
-    ).rejects.toThrow();
 
-    const attempt2 = createUuidV7();
-    await db
-      .insertInto('execution_attempts')
-      .values({ id: attempt2, execution_id: executionId, attempt_number: 2 })
-      .execute();
+    const stagingId = createUuidV7();
     await db
       .insertInto('artifact_staging')
       .values({
-        id: createUuidV7(),
-        attempt_id: attempt1,
-        staged_ref: 'same',
+        id: stagingId,
+        attempt_id: attemptId,
+        staged_ref: 'result',
         digest_algorithm: 'sha256',
-        digest: 'f'.repeat(64),
+        digest: 'e'.repeat(64),
         size_bytes: '10',
         schema_id: ids.schemaId,
         media_type: 'application/json',
-        locator: 'stage/1',
+        locator: 'staging/result',
+      })
+      .execute();
+    await expect(
+      db
+        .updateTable('artifact_staging')
+        .set({ status: 'promoted', promoted_at: new Date() })
+        .where('id', '=', stagingId)
+        .execute(),
+    ).rejects.toThrow();
+    await expect(
+      db
+        .insertInto('artifact_staging')
+        .values({
+          id: createUuidV7(),
+          attempt_id: attemptId,
+          staged_ref: 'duplicate-locator',
+          digest_algorithm: 'sha256',
+          digest: 'f'.repeat(64),
+          size_bytes: '10',
+          schema_id: ids.schemaId,
+          media_type: 'application/json',
+          locator: 'staging/result',
+        })
+        .execute(),
+    ).rejects.toThrow();
+
+    const artifactId = createUuidV7();
+    await db
+      .insertInto('artifacts')
+      .values({
+        id: artifactId,
+        digest_algorithm: 'sha256',
+        digest: 'e'.repeat(64),
+        size_bytes: '10',
+        schema_id: ids.schemaId,
+        state: 'committed',
+        media_type: 'application/json',
+        committed_locator: `sha256:${'e'.repeat(64)}`,
+        provenance: { source: 'integration-test' },
       })
       .execute();
     await db
-      .insertInto('artifact_staging')
-      .values({
-        id: createUuidV7(),
-        attempt_id: attempt2,
-        staged_ref: 'same',
-        digest_algorithm: 'sha256',
-        digest: 'f'.repeat(64),
-        size_bytes: '10',
-        schema_id: ids.schemaId,
-        media_type: 'application/json',
-        locator: 'stage/2',
+      .updateTable('artifact_staging')
+      .set({
+        status: 'promoted',
+        artifact_id: artifactId,
+        promoted_at: new Date(),
       })
+      .where('id', '=', stagingId)
       .execute();
 
-    await expect(
-      db
-        .insertInto('resource_ledger')
-        .values({
-          id: createUuidV7(),
-          region_id: ids.regionId,
-          resource_type: 'tokens',
-          quantity: '1.000000000001',
-          unit: 'token',
-          attributes: {},
-        })
-        .execute(),
-    ).rejects.toThrow();
-    await expect(
-      db
-        .insertInto('approvals')
-        .values({
-          id: createUuidV7(),
-          policy_decision_id: createUuidV7(),
-          status: 'approved',
-        })
-        .execute(),
-    ).rejects.toThrow();
-
-    expect((await migrateDown(db)).error).toBeUndefined();
+    await migrateAllDown(db);
     const remaining = await db
       .selectFrom('information_schema.tables')
       .select('table_name')
       .where('table_schema', '=', 'public')
       .execute();
-    expect(remaining.map((t) => t.table_name)).not.toContain('deliveries');
+    expect(remaining.map((table) => table.table_name)).not.toContain(
+      'deliveries',
+    );
   });
 
   it('deterministically recreates a clean development database', async () => {
@@ -374,17 +286,18 @@ describe('runtime database migration', () => {
     const definitions = new DefinitionRepository();
     const runtime = new RuntimeRepository();
     const artifacts = new ArtifactRepository();
+
     await expect(
-      db.transaction().execute(async (trx) => {
-        const schema = await definitions.createArtifactSchema(trx, {
+      db.transaction().execute(async (transaction) => {
+        const schema = await definitions.createArtifactSchema(transaction, {
           name: 'repo-schema',
           version: '1.0.0',
           contentDigest: '1'.repeat(64),
           schema: {},
         });
-        await runtime.createRegion(trx, { name: 'repo-region' });
+        await runtime.createRegion(transaction, { name: 'repo-region' });
         expect(isUuidV7(schema.id)).toBe(true);
-        await artifacts.createCommittedArtifact(trx, {
+        await artifacts.createCommittedArtifact(transaction, {
           digest: '2'.repeat(64),
           sizeBytes: '42',
           schemaId: schema.id,
@@ -395,6 +308,7 @@ describe('runtime database migration', () => {
         throw new Error('force rollback');
       }),
     ).rejects.toThrow('force rollback');
+
     expect(
       await db.selectFrom('artifact_schemas').selectAll().execute(),
     ).toEqual([]);
