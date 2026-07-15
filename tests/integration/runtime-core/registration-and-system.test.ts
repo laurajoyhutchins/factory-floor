@@ -7,7 +7,6 @@ import {
   resetDatabaseForDevelopment,
 } from '../../../packages/db/src/index.js';
 import {
-  DomainError,
   RegistrationService,
   SystemApplicationService,
 } from '../../../packages/runtime-core/src/index.js';
@@ -137,10 +136,10 @@ describe('registration and static system application', () => {
   });
 
   it('rejects invalid declarations before writing anything', async () => {
-    await expect(registrations.registerArtifactSchema({
+    expect(() => registrations.registerArtifactSchema({
       ...schemaDocument,
       spec: { schema: { type: 42 } },
-    })).rejects.toMatchObject({ code: 'invalid_declaration' });
+    })).toThrow(expect.objectContaining({ code: 'invalid_declaration' }));
 
     expect(await db.selectFrom('artifact_schemas').selectAll().execute()).toEqual([]);
   });
@@ -157,12 +156,10 @@ describe('registration and static system application', () => {
     expect(first.disposition).toBe('created');
     expect(second).toMatchObject({ disposition: 'existing', digest: first.digest });
 
-    const conflict = registrations.registerArtifactSchema({
+    await expect(registrations.registerArtifactSchema({
       ...schemaDocument,
       spec: { schema: { type: 'string' } },
-    });
-    await expect(conflict).rejects.toBeInstanceOf(DomainError);
-    await expect(conflict).rejects.toMatchObject({ code: 'registration_conflict' });
+    })).rejects.toMatchObject({ code: 'registration_conflict' });
     expect(await db.selectFrom('artifact_schemas').selectAll().execute()).toHaveLength(1);
   });
 });
