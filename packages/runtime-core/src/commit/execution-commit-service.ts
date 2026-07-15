@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Kysely } from 'kysely';
 import Ajv2020Import from 'ajv/dist/2020.js';
-import type { ErrorObject } from 'ajv';
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
 import {
   ArtifactRepository,
@@ -645,7 +644,11 @@ export class ExecutionCommitService {
         );
       const grant = await trx
         .selectFrom('capability_grants as grant')
-        .innerJoin('capabilities as capability', 'capability.id', 'grant.capability_id')
+        .innerJoin(
+          'capabilities as capability',
+          'capability.id',
+          'grant.capability_id',
+        )
         .select(['grant.id'])
         .where('grant.id', '=', grantId)
         .where(
