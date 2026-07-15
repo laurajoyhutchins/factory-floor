@@ -127,13 +127,13 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 
 **Outcome:** Schemas, component definitions, templates, and the Milestone 1 static investigation system can be registered and applied idempotently.
 
-- [ ] Add immutable registration services and APIs for schemas, component definitions, templates, and policies.
-- [ ] Make natural key plus digest registrations idempotent and reject conflicting content.
-- [ ] Validate all declarations before interpretation.
-- [ ] Implement static system application from `examples/investigation-system.yaml`.
-- [ ] Create the root and stable regions, component instances, ports, connections, and topology revision transactionally.
-- [ ] Ensure repeated application is a no-op or produces an explicit deterministic conflict, never silent mutation.
-- [ ] Add CLI commands for schema/component registration and system application.
+- [x] Add immutable registration services and APIs for schemas, component definitions, templates, and policies.
+- [x] Make natural key plus digest registrations idempotent and reject conflicting content.
+- [x] Validate all declarations before interpretation.
+- [x] Implement static system application from `examples/investigation-system.yaml`.
+- [x] Create the root and stable regions, component instances, ports, connections, and topology revision transactionally.
+- [x] Ensure repeated application is a no-op or produces an explicit deterministic conflict, never silent mutation.
+- [x] Add CLI commands for schema/component registration and system application.
 - [ ] Add integration tests for clean apply, repeated apply, invalid declaration, and conflicting registration.
 - [ ] Commit as `feat: register and apply static systems`.
 
