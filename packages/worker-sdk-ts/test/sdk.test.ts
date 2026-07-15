@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
+import type {
+  InvocationEnvelope,
+  ProposedResult,
+} from '@factory-floor/contracts-ts';
+import workerFixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with {
+  type: 'json',
+};
 import {
   ComponentRegistry,
   WorkerProtocolClient,
@@ -11,14 +18,6 @@ import {
   redactSensitive,
   type WorkerComponent,
 } from '../src/index.js';
-import workerFixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with {
-  type: 'json',
-};
-import type {
-  InvocationEnvelope,
-  ProposedResult,
-  StagedArtifact,
-} from '@factory-floor/contracts-ts';
 
 function response(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -28,7 +27,7 @@ function response(body: unknown, status = 200): Response {
 }
 
 const envelope = workerFixture as InvocationEnvelope;
-const activeEnvelope = {
+const activeEnvelope: InvocationEnvelope = {
   ...envelope,
   leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
 };
@@ -98,6 +97,7 @@ describe('WorkerProtocolClient', () => {
         return response({ protocolVersion: '1.0', claimed: true, envelope });
       },
     });
+
     const claim = await client.claim(['retrieve@1']);
     expect(claim.claimed).toBe(true);
     expect(auth).toBe('Bearer secret-token');
@@ -135,6 +135,7 @@ describe('WorkerProtocolClient', () => {
           409,
         ),
     });
+
     await expect(client.heartbeat(envelope)).rejects.toMatchObject({
       kind: 'lease',
       code: 'stale_lease_token',
@@ -153,30 +154,31 @@ describe('WorkerProtocolClient', () => {
       baseUrl: 'http://cp/',
       bearerToken: 't',
       workerId: 'w1',
-      sleep: async (ms) => {
-        sleeps.push(ms);
+      sleep: async (milliseconds) => {
+        sleeps.push(milliseconds);
       },
       jitter: () => 0,
       fetch: async () => {
         calls += 1;
-        return calls === 1
-          ? response(
-              {
-                protocolVersion: '1.0',
-                code: 'internal_transient_failure',
-                message: 'try again',
-                retryable: true,
-                requestId: 'r1',
-              },
-              503,
-            )
-          : response({
+        if (calls === 1)
+          return response(
+            {
               protocolVersion: '1.0',
-              claimed: false,
-              retryAfterMs: 100,
-            });
+              code: 'internal_transient_failure',
+              message: 'try again',
+              retryable: true,
+              requestId: 'r1',
+            },
+            503,
+          );
+        return response({
+          protocolVersion: '1.0',
+          claimed: false,
+          retryAfterMs: 100,
+        });
       },
     });
+
     await expect(client.claim(['retrieve@1'])).resolves.toMatchObject({
       claimed: false,
     });
@@ -193,11 +195,7 @@ describe('WorkerProtocolClient', () => {
       fetch: async (_url, init) => {
         calls += 1;
         const body = init?.body;
-        if (body instanceof Readable) {
-          for await (const _chunk of body) {
-            // Consume the one-shot stream before simulating transport failure.
-          }
-        }
+        if (body instanceof Readable) await body.toArray();
         throw new TypeError('network unavailable');
       },
     });
@@ -212,7 +210,7 @@ describe('WorkerProtocolClient', () => {
     expect(calls).toBe(1);
   });
 
-  it('covers heartbeat cancellation stage upload result and capability operations', async () => {
+  it('covers every worker protocol operation', async () => {
     const seen: string[] = [];
     const client = new WorkerProtocolClient({
       baseUrl: 'http://cp/',
@@ -256,6 +254,7 @@ describe('WorkerProtocolClient', () => {
         });
       },
     });
+
     await client.heartbeat(envelope);
     await client.observeCancellation(envelope);
     await client.stageArtifact(envelope, {
@@ -288,7 +287,7 @@ describe('WorkerProtocolClient', () => {
     expect(seen.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('supports registry lookup and canonical json byte identity', () => {
+  it('supports registry lookup and canonical JSON identity', () => {
     const registry = new ComponentRegistry();
     registry.register('retrieve', '1', async () => {
       throw new Error('unused');
@@ -316,6 +315,7 @@ describe('WorkerProtocolClient', () => {
           409,
         ),
     });
+
     await expect(
       client.submitResult(
         {
@@ -361,13 +361,6 @@ describe('WorkerRunner', () => {
     registry.register('retrieve', '1', component);
 
     const client = runnerClient({
-      stageArtifact: async () => ({
-        protocolVersion: '1.0',
-        stagedRef: '018f6f73-8d5b-7cc8-9ed9-6b2f4e25d010',
-        uploadUrl:
-          'http://cp/worker/v1/artifacts/upload/018f6f73-8d5b-7cc8-9ed9-6b2f4e25d010',
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      }),
       uploadStagedContent: async (_url: string, content: BodyInit) => {
         uploaded = new Uint8Array(await new Response(content).arrayBuffer());
         return {
@@ -392,8 +385,9 @@ describe('WorkerRunner', () => {
     await executable(runner).execute(activeEnvelope);
 
     expect([...uploaded]).toEqual([...source]);
-    expect(submitted?.status).toBe('completed');
-    expect((submitted?.stagedArtifacts[0] as StagedArtifact).sizeBytes).toBe(4);
+    if (!submitted) throw new Error('result was not submitted');
+    expect(submitted.status).toBe('completed');
+    expect(submitted.stagedArtifacts[0]?.sizeBytes).toBe(4);
   });
 
   it('submits a failed proposed result when a component throws', async () => {
