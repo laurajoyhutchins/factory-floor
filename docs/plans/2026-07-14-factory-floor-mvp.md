@@ -196,22 +196,22 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Complete verification, synthesis, and publication outputs on the later attempt.
 - [x] Verify no duplicate committed outputs or downstream deliveries.
 - [x] Add a single command or script that runs the entire demonstration.
-- [ ] Commit as `feat: run durable investigation example`.
+- [x] Commit as `feat: run durable investigation example`.
 
 ## Task 10: Add trace, projections, recovery, and conformance tests
 
 **Outcome:** Operators can reconstruct causation and the runtime recovers after restart without loss or duplication.
 
-- [ ] Add rebuildable projections for region/component status, queue depth, retry/failure counts, resource usage, approvals, topology, artifact lineage, and execution timeline.
-- [ ] Store projection checkpoints and expose staleness/checkpoint metadata.
-- [ ] Implement region, event, execution, trace, artifact, and lineage inspection APIs.
-- [ ] Implement the corresponding `ff` CLI views with human and JSON output.
-- [ ] Add SSE projection/event summaries with resumable cursor semantics.
-- [ ] On startup abandon expired attempts, expose retryable work, resume projections, reconcile blobs, resume cancellation, and emit a recovery summary.
+- [x] Add rebuildable projections for region/component status, queue depth, retry/failure counts, resource usage, approvals, topology, artifact lineage, and execution timeline.
+- [x] Store projection checkpoints and expose staleness/checkpoint metadata.
+- [x] Implement region, event, execution, trace, artifact, and lineage inspection APIs.
+- [x] Implement the corresponding `ff` CLI views with human and JSON output.
+- [x] Add SSE projection/event summaries with resumable cursor semantics.
+- [x] On startup abandon expired attempts, expose retryable work, resume projections, reconcile blobs, resume cancellation, and emit a recovery summary.
 - [ ] Add conformance tests for every invariant in the reference specification.
 - [ ] Restart the control plane during an investigation and verify no lost work or duplicate committed outputs.
-- [ ] Cancel a run, increment lifecycle epoch, and verify stale results cannot commit.
-- [ ] Rebuild projections from history without dispatching workers or external actions.
+- [x] Cancel a run, increment lifecycle epoch, and verify stale results cannot commit.
+- [x] Rebuild projections from history without dispatching workers or external actions.
 - [ ] Commit as `feat: add trace and recovery semantics`.
 
 ## Task 11: Harden the developer experience and document evidence

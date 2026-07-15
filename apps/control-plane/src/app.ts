@@ -5,6 +5,8 @@ import {
   RegistrationService,
   SystemApplicationService,
   WorkerProtocolService,
+  ObservabilityService,
+  StartupRecoveryService,
 } from '@factory-floor/runtime-core';
 import {
   FilesystemArtifactBlobStore,
@@ -16,6 +18,7 @@ import { registerRegistrationRoutes } from './routes/registrations.js';
 import { registerSystemRoutes } from './routes/systems.js';
 import { registerCommandRoutes } from './routes/commands.js';
 import { registerWorkerRoutes } from './routes/worker.js';
+import { registerInspectionRoutes } from './routes/inspection.js';
 
 export interface AppDependencies {
   database?: Kysely<Database>;
@@ -25,6 +28,9 @@ export interface AppDependencies {
   workerProtocolService?: WorkerProtocolService;
   artifactBlobStore?: ArtifactBlobStore;
   workerAuthToken?: string;
+  observabilityService?: ObservabilityService;
+  startupRecoveryService?: StartupRecoveryService;
+  runStartupRecovery?: boolean;
 }
 
 export async function buildApp(
@@ -55,6 +61,15 @@ export async function buildApp(
     (process.env.DATABASE_URL
       ? createDatabase(process.env.DATABASE_URL)
       : undefined);
+  const artifactBlobStore =
+    deps.artifactBlobStore ??
+    (db
+      ? new FilesystemArtifactBlobStore(
+          process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts',
+        )
+      : undefined);
+  const observability =
+    deps.observabilityService ?? (db ? new ObservabilityService(db) : undefined);
 
   if (db || deps.registrationService)
     await registerRegistrationRoutes(
@@ -71,26 +86,37 @@ export async function buildApp(
       app,
       deps.commandService ?? new CommandService(db!),
     );
+  if (observability) await registerInspectionRoutes(app, observability);
   if (db || deps.workerProtocolService)
     await registerWorkerRoutes(
       app,
       deps.workerProtocolService ??
-        new WorkerProtocolService(
-          db!,
-          deps.artifactBlobStore ??
-            new FilesystemArtifactBlobStore(
-              process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts',
-            ),
-          {
-            leaseDurationMs: Number(
-              process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
-            ),
-            baseUrl:
-              process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
-          },
-        ),
+        new WorkerProtocolService(db!, artifactBlobStore!, {
+          leaseDurationMs: Number(
+            process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
+          ),
+          baseUrl:
+            process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
+        }),
       deps.workerAuthToken,
     );
+
+  if (
+    deps.runStartupRecovery &&
+    (deps.startupRecoveryService || (db && observability))
+  ) {
+    const recovery =
+      deps.startupRecoveryService ??
+      new StartupRecoveryService(db!, {
+        observability,
+        blobStore: artifactBlobStore,
+      });
+    app.addHook('onReady', async () => {
+      const summary = await recovery.run();
+      app.log.info({ recovery: summary }, 'startup recovery completed');
+    });
+  }
+
   if (!deps.database && db)
     app.addHook('onClose', async () => {
       await db.destroy();
