@@ -82,6 +82,9 @@ export async function buildApp(
               process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts',
             ),
           {
+            leaseDurationMs: Number(
+              process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
+            ),
             baseUrl:
               process.env.CONTROL_PLANE_PUBLIC_URL ?? 'http://127.0.0.1:3000',
           },
