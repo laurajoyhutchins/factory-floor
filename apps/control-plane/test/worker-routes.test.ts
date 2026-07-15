@@ -24,8 +24,8 @@ function createService() {
     })),
     stage: vi.fn(async () => ({
       protocolVersion: '1.0',
-      stagedRef: 'ref',
-      uploadUrl: '/worker/v1/artifacts/upload/ref',
+      stagedRef: uuid,
+      uploadUrl: `/worker/v1/artifacts/upload/${uuid}`,
       expiresAt: new Date().toISOString(),
     })),
     upload: vi.fn(async (_stagedRef: string, _input: unknown, stream: Readable) => {
@@ -33,7 +33,7 @@ function createService() {
       for await (const chunk of stream) chunks.push(Buffer.from(chunk));
       return {
         protocolVersion: '1.0',
-        stagedRef: 'ref',
+        stagedRef: uuid,
         digest: '3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7',
         sizeBytes: Buffer.concat(chunks).length,
       };
@@ -154,12 +154,12 @@ describe('worker routes', () => {
     });
     const response = await app.inject({
       method: 'PUT',
-      url: `/worker/v1/artifacts/upload/ref?${query.toString()}`,
+      url: `/worker/v1/artifacts/upload/${uuid}?${query.toString()}`,
       headers: { ...workerHeaders, 'content-type': 'application/octet-stream' },
       payload: Buffer.from('data'),
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ stagedRef: 'ref', sizeBytes: 4 });
+    expect(response.json()).toMatchObject({ stagedRef: uuid, sizeBytes: 4 });
     expect(service.upload).toHaveBeenCalledOnce();
     expect(service.upload.mock.calls[0]?.[1]).toMatchObject({ lifecycleEpoch: 0 });
   });
