@@ -160,6 +160,7 @@ async function main() {
         await new SystemApplicationService(db).apply(doc);
     }
 
+    process.env.CONTROL_PLANE_PUBLIC_URL = baseUrl;
     app = await buildApp({
       database: db,
       artifactBlobStore: blobStore,
