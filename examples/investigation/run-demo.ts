@@ -57,6 +57,7 @@ function startProcess(
     cwd: root,
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: process.platform !== 'win32',
   });
   child.stdout?.on('data', (data) =>
     process.stdout.write(`[${command}] ${data}`),
@@ -67,17 +68,34 @@ function startProcess(
   return child;
 }
 
+function signalProcessTree(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+): void {
+  if (child.pid === undefined) return;
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      return;
+    }
+  }
+  if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+}
+
 async function stop(children: ChildProcess[]) {
   await Promise.allSettled(
     children.map(async (child) => {
-      if (child.exitCode !== null || child.signalCode !== null) return;
-      child.kill('SIGTERM');
-      await Promise.race([
-        once(child, 'exit'),
-        new Promise((resolve) => setTimeout(resolve, 3000)),
-      ]);
+      signalProcessTree(child, 'SIGTERM');
       if (child.exitCode === null && child.signalCode === null)
-        child.kill('SIGKILL');
+        await Promise.race([
+          once(child, 'exit'),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      else await new Promise((resolve) => setTimeout(resolve, 500));
+      signalProcessTree(child, 'SIGKILL');
     }),
   );
 }
