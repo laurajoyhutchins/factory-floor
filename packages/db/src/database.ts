@@ -69,6 +69,11 @@ export interface Database {
     command_type: string;
     payload: Jsonb;
     status: Generated<string>;
+    source: Jsonb;
+    request_digest: string;
+    rejection: Jsonb | null;
+    accepted_at: Timestamp | null;
+    rejected_at: Timestamp | null;
     correlation_id: string | null;
     idempotency_key: string | null;
     expires_at: Timestamp | null;
@@ -79,13 +84,18 @@ export interface Database {
     payload: Jsonb;
     stream_key: string;
     sequence_number: BigIntString;
-    command_id: string | null;
+    correlation_id: string;
     source_kind: string;
     source_command_id: string | null;
     source_event_id: string | null;
     source_execution_id: string | null;
     source_attempt_id: string | null;
     source_component_instance_id: string | null;
+    source_port_name: string | null;
+  };
+  event_stream_sequences: {
+    stream_key: string;
+    next_sequence_number: BigIntString;
   };
   deliveries: Row & {
     region_id: string;
@@ -94,6 +104,9 @@ export interface Database {
     target_port_name: string;
     source_command_id: string | null;
     source_event_id: string | null;
+    correlation_id: string;
+    input_payload: Jsonb;
+    input_payload_digest: string;
     status: Generated<string>;
     available_at: Generated<Timestamp>;
     lease_owner: string | null;
@@ -107,6 +120,7 @@ export interface Database {
     component_instance_id: string;
     topology_revision_id: string;
     lifecycle_epoch: Generated<number>;
+    input_set_digest: string;
     status: Generated<string>;
     completed_at: Timestamp | null;
     failed_at: Timestamp | null;

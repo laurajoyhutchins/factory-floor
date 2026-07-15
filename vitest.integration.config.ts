@@ -1,6 +1,17 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@factory-floor/artifact-store': fileURLToPath(
+        new URL('./packages/artifact-store/src/public.ts', import.meta.url),
+      ),
+      '@factory-floor/db': fileURLToPath(
+        new URL('./packages/db/src/index.ts', import.meta.url),
+      ),
+    },
+  },
   test: {
     include: ['tests/integration/**/*.test.ts', 'packages/**/*.integration.ts'],
     passWithNoTests: true,

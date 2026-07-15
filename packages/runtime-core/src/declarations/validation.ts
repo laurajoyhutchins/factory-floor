@@ -105,6 +105,25 @@ export function validateStaticTopology(topology: any): void {
     }
   }
 
+  const ingressCommands = topology.ingress?.commands;
+  if (ingressCommands !== undefined) {
+    if (!ingressCommands || typeof ingressCommands !== 'object' || Array.isArray(ingressCommands)) throw new DomainError('invalid_declaration', 'ingress.commands must be an object');
+    for (const [commandType, rule] of Object.entries(ingressCommands)) {
+      if (!nonEmptyString(commandType)) throw new DomainError('invalid_declaration', 'Ingress command type must be non-empty');
+      const targets = (rule as any)?.targets;
+      if (!Array.isArray(targets)) throw new DomainError('invalid_declaration', `Ingress ${commandType} requires targets`);
+      const seenTargets = new Set<string>();
+      for (const target of targets) {
+        if (!nonEmptyString((target as any)?.component) || !nonEmptyString((target as any)?.port)) throw new DomainError('invalid_declaration', `Ingress ${commandType} target requires component and port`);
+        if (!names.has((target as any).component)) throw new DomainError('invalid_declaration', `Ingress ${commandType} target component does not exist`);
+        const key = `${(target as any).component}.${(target as any).port}`;
+        if (seenTargets.has(key)) throw new DomainError('duplicate_ingress_target', `Duplicate ingress target ${key}`);
+        seenTargets.add(key);
+      }
+      (rule as any).targets = [...targets].sort((a:any,b:any)=> a.component.localeCompare(b.component) || a.port.localeCompare(b.port));
+    }
+  }
+
   for (const connection of topology.connections) {
     requireEndpoint(connection?.from, 'Connection source');
     requireEndpoint(connection?.to, 'Connection target');

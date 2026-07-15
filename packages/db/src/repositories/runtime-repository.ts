@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import type { RuntimeDb, Json } from '../database.js';
 import { createUuidV7 } from '../ids.js';
+
 export class RuntimeRepository {
   async createRegion(
     db: RuntimeDb,
@@ -15,6 +17,7 @@ export class RuntimeRepository {
       .returningAll()
       .executeTakeFirstOrThrow();
   }
+
   async createCommand(
     db: RuntimeDb,
     input: {
@@ -24,18 +27,24 @@ export class RuntimeRepository {
       idempotencyKey?: string | null;
     },
   ) {
+    const id = createUuidV7();
     return db
       .insertInto('commands')
       .values({
-        id: createUuidV7(),
+        id,
         region_id: input.regionId,
         command_type: input.commandType,
         payload: input.payload,
+        source: {},
+        request_digest: createHash('sha256').update(id).digest('hex'),
+        accepted_at: new Date(),
+        correlation_id: id,
         idempotency_key: input.idempotencyKey ?? null,
       })
       .returningAll()
       .executeTakeFirstOrThrow();
   }
+
   async createCommandDelivery(
     db: RuntimeDb,
     input: {
@@ -55,6 +64,9 @@ export class RuntimeRepository {
         target_component_instance_id: input.targetComponentInstanceId,
         target_port_name: input.targetPortName,
         source_command_id: input.commandId,
+        correlation_id: input.commandId,
+        input_payload: {},
+        input_payload_digest: createHash('sha256').update('{}').digest('hex'),
       })
       .returningAll()
       .executeTakeFirstOrThrow();
