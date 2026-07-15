@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import {
   ComponentRegistry,
   WorkerProtocolClient,
@@ -182,4 +183,6 @@ export async function startDemoWorkerFromEnv(): Promise<void> {
   await runner.run();
 }
 
-if (process.argv[1]?.endsWith('/index.js')) void startDemoWorkerFromEnv();
+const entrypoint = process.argv[1];
+if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href)
+  void startDemoWorkerFromEnv();
