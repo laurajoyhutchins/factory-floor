@@ -25,11 +25,11 @@ export async function down(db: Kysely<unknown>): Promise<void> {
 
     alter table execution_attempts
       add constraint execution_attempts_check2
-        check ((status = 'completed') = (completed_at is not null)),
+        check ((status = 'completed') = (completed_at is not null)) not valid,
       add constraint execution_attempts_check3
         check (
           (status = 'failed') =
           (completed_at is not null and failure is not null)
-        );
+        ) not valid;
   `.execute(db);
 }
