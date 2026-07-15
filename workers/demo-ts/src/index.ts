@@ -73,7 +73,7 @@ export const retrieveComponent: WorkerComponent = async (context) => {
       : 'fixture';
   const evidence = [
     {
-      source: `repo-fixture:${sourceClass}`,
+      source: `repo-fixture:demo-ts/retrieve:${sourceClass}`,
       query,
       title: `${sourceClass} evidence for ${query}`,
       claim: `Deterministic ${sourceClass} evidence about ${query}`,
