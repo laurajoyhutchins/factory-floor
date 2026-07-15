@@ -17,3 +17,5 @@ export * from './artifacts/artifact-reconciliation-service.js';
 export * from './artifacts/artifact-tombstone-service.js';
 export * from './worker/worker-protocol-service.js';
 export * from './commit/execution-commit-service.js';
+export * from './observability/observability-service.js';
+export * from './observability/recovery-service.js';

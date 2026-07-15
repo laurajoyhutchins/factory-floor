@@ -13,6 +13,22 @@ interface CommandRoute {
   readonly kind: string;
 }
 
+
+const inspectRoutes: Record<string, string> = {
+  'inspect regions': '/api/v1/inspect/regions',
+  'inspect events': '/api/v1/inspect/events',
+  'inspect deliveries': '/api/v1/inspect/deliveries',
+  'inspect executions': '/api/v1/inspect/executions',
+  'inspect attempts': '/api/v1/inspect/attempts',
+  'inspect artifacts': '/api/v1/inspect/artifacts',
+  'inspect projections': '/api/v1/inspect/projections',
+};
+
+function human(value: any): string {
+  if (Array.isArray(value?.items)) return value.items.map((item: any) => Object.entries(item).filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object').map(([k, v]) => `${k}=${v}`).join(' ')).join('\n') || '(empty)';
+  return JSON.stringify(value, null, 2);
+}
+
 const routes: Record<string, CommandRoute> = {
   'schema register': { endpoint: '/api/v1/registrations/artifact-schemas', kind: 'ArtifactSchema' },
   'component register': { endpoint: '/api/v1/registrations/component-definitions', kind: 'ComponentDefinition' },
@@ -46,13 +62,29 @@ function load(file: string, expectedKind: string): any {
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const key = `${argv[0] ?? ''} ${argv[1] ?? ''}`;
+  const inspectRoute = inspectRoutes[key];
   const route = routes[key];
   const file = argv[2];
   const server = arg(argv, '--server', 'http://127.0.0.1:3000')!;
   const asJson = argv.includes('--json');
 
+  if (inspectRoute) {
+    try {
+      const id = argv[2] && !argv[2].startsWith('--') ? argv[2] : undefined;
+      const endpoint = key === 'inspect executions' && id ? `/api/v1/inspect/executions/${id}` : key === 'inspect artifacts' && id ? `/api/v1/inspect/artifacts/${id}/lineage` : inspectRoute;
+      const url = new URL(endpoint, server);
+      const cursor = arg(argv, '--cursor'); const lim = arg(argv, '--limit');
+      if (cursor) url.searchParams.set('cursor', cursor); if (lim) url.searchParams.set('limit', lim);
+      const response = await fetch(url);
+      const json = await response.json();
+      if (!response.ok) { console.error(asJson ? JSON.stringify(json) : `${json.error?.code ?? 'error'}: ${json.error?.message ?? response.statusText}`); return 1; }
+      console.log(asJson ? JSON.stringify(json) : human(json));
+      return 0;
+    } catch (error) { const message = (error as Error).message; console.error(asJson ? JSON.stringify({ error: { code: 'transport_error', message } }) : message); return 1; }
+  }
+
   if (route === undefined || file === undefined) {
-    console.error('Usage: ff <schema|component|template|policy> register <file> [--server URL] [--json]\n       ff system apply <file> [--server URL] [--json]\n       ff command submit <file> [--server URL] [--json] [--idempotency-key KEY] [--correlation-id ID]');
+    console.error('Usage: ff <schema|component|template|policy> register <file> [--server URL] [--json]\n       ff system apply <file> [--server URL] [--json]\n       ff command submit <file> [--server URL] [--json] [--idempotency-key KEY] [--correlation-id ID]\n       ff inspect <regions|events|deliveries|executions|attempts|artifacts|projections> [id] [--server URL] [--json] [--cursor CURSOR] [--limit N]');
     return 2;
   }
 
