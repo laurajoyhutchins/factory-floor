@@ -39,12 +39,26 @@ export class SchedulerService {
         from deliveries
         where status = 'ready' and available_at <= ${now}
         order by available_at, created_at, id
-        for update skip locked
         limit 1
       `
         .execute(trx as any)
         .then((result) => result.rows[0]);
       if (!candidate) return null;
+
+      const groupKey = [
+        candidate.region_id,
+        candidate.topology_revision_id,
+        candidate.target_component_instance_id,
+        candidate.correlation_id,
+      ].join(':');
+      const groupLock = await sql<{ acquired: boolean }>`
+        select pg_try_advisory_xact_lock(
+          hashtextextended(${groupKey}, 0)
+        ) as acquired
+      `
+        .execute(trx as any)
+        .then((result) => result.rows[0]);
+      if (!groupLock.acquired) return null;
 
       const region = await trx
         .selectFrom('regions')
@@ -81,7 +95,7 @@ export class SchedulerService {
             and target_port_name = ${port.name}
             and available_at <= ${now}
           order by created_at, id
-          for update skip locked
+          for update
         `
           .execute(trx as any)
           .then((result) => result.rows);
@@ -106,7 +120,7 @@ export class SchedulerService {
           and d.correlation_id = ${candidate.correlation_id}
           and d.available_at <= ${now}
         order by d.target_port_name, d.created_at, d.id
-        for update of d skip locked
+        for update of d
       `
         .execute(trx as any)
         .then((result) => result.rows);
