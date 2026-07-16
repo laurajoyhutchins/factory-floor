@@ -96,6 +96,34 @@ jobs:
       - name: Run Python tests
         run: pnpm test:python
 
+      - name: Capture pinned formatter output
+        run: |
+          pnpm prettier --write \
+            apps/console/src/api/client.ts \
+            apps/console/src/components/ui.tsx \
+            apps/console/src/hooks/liveEvents.ts \
+            apps/console/src/hooks/liveEvents.test.ts \
+            apps/console/src/main.tsx \
+            apps/console/src/pages/pages.tsx \
+            apps/console/src/pages/pages.test.tsx \
+            apps/console/src/styles.css
+
+      - name: Upload pinned formatter output
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-console-${{ github.run_number }}
+          path: |
+            apps/console/src/api/client.ts
+            apps/console/src/components/ui.tsx
+            apps/console/src/hooks/liveEvents.ts
+            apps/console/src/hooks/liveEvents.test.ts
+            apps/console/src/main.tsx
+            apps/console/src/pages/pages.tsx
+            apps/console/src/pages/pages.test.tsx
+            apps/console/src/styles.css
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Check formatting
         run: pnpm format:check
 
