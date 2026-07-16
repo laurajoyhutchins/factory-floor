@@ -107,7 +107,18 @@ jobs:
         run: pnpm test:python
 
       - name: Check formatting
-        run: pnpm format:check
+        run: |
+          set -o pipefail
+          pnpm format:check 2>&1 | tee format.log
+
+      - name: Upload formatting log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: format-log-${{ github.run_number }}
+          path: format.log
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Validate Compose configuration
         run: docker compose config
