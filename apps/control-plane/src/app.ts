@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createDatabase, createUuidV7, type Database } from '@factory-floor/db';
 import {
+  ArtifactDomainError,
   CommandService,
   RegistrationService,
   SystemApplicationService,
@@ -52,7 +53,7 @@ export interface AppDependencies {
   controlPlaneSecurity?: ControlPlaneSecurity;
 }
 
-function withResultPrevalidation(
+export function withResultPrevalidation(
   service: WorkerProtocolService,
   prevalidation: ProposedResultPrevalidationService,
 ): WorkerProtocolService {
@@ -67,14 +68,14 @@ function withResultPrevalidation(
             try {
               await prevalidation.prevalidate(input);
             } catch (error) {
-              throw new WorkerProtocolError(
-                'unauthorized_staging_reference',
-                error instanceof Error
-                  ? error.message
-                  : 'staged artifact validation failed',
-                false,
-                400,
-              );
+              if (error instanceof ArtifactDomainError)
+                throw new WorkerProtocolError(
+                  'unauthorized_staging_reference',
+                  error.message,
+                  false,
+                  400,
+                );
+              throw error;
             }
           }
           return target.submitResult(input);
@@ -170,28 +171,31 @@ export async function assertStartupRecoveryWithinBounds(
   db: Kysely<Database>,
   now = new Date(),
 ): Promise<void> {
-  const [expiredRow, cancellingRow, stagingRow] = await Promise.all([
+  const [expiredAttempts, cancellingRegions, stagedArtifacts] = await Promise.all([
     db
       .selectFrom('execution_attempts')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .select('id')
       .where('status', 'in', ['leased', 'running'])
       .where('lease_expires_at', '<=', now)
-      .executeTakeFirstOrThrow(),
+      .limit(STARTUP_RECOVERY_BOUNDS.expiredAttempts + 1)
+      .execute(),
     db
       .selectFrom('regions')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .select('id')
       .where('lifecycle_status', '=', 'cancelling')
-      .executeTakeFirstOrThrow(),
+      .limit(STARTUP_RECOVERY_BOUNDS.cancellingRegions + 1)
+      .execute(),
     db
       .selectFrom('artifact_staging')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .select('id')
       .where('status', '=', 'staged')
-      .executeTakeFirstOrThrow(),
+      .limit(STARTUP_RECOVERY_BOUNDS.stagedArtifacts + 1)
+      .execute(),
   ]);
   const observed = {
-    expiredAttempts: Number(expiredRow.count),
-    cancellingRegions: Number(cancellingRow.count),
-    stagedArtifacts: Number(stagingRow.count),
+    expiredAttempts: expiredAttempts.length,
+    cancellingRegions: cancellingRegions.length,
+    stagedArtifacts: stagedArtifacts.length,
   };
   for (const [name, limit] of Object.entries(STARTUP_RECOVERY_BOUNDS))
     if (observed[name as keyof typeof observed] > limit)
