@@ -1,6 +1,8 @@
 # Factory Floor MVP Implementation Plan
 
-> **For agentic workers:** Execute this plan task-by-task. Track the checkbox state in this file. Use test-driven development and small conventional commits.
+> **Status:** Milestone 1 completed and accepted on July 16, 2026. The release boundary is `v0.1.0`.
+
+> **For agentic workers:** This plan is retained as the completed Milestone 1 implementation record. Future work should begin from a new milestone plan rather than reopening these checkboxes.
 
 **Goal:** Build Milestone 1, a durable reactive graph that executes TypeScript and Python components, stages immutable artifacts, atomically commits successful results, survives failure and restart, and exposes a complete trace.
 
@@ -134,22 +136,22 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Create the root and stable regions, component instances, ports, connections, and topology revision transactionally.
 - [x] Ensure repeated application is a no-op or produces an explicit deterministic conflict, never silent mutation.
 - [x] Add CLI commands for schema/component registration and system application.
-- [ ] Add integration tests for clean apply, repeated apply, invalid declaration, and conflicting registration.
-- [ ] Commit as `feat: register and apply static systems`.
+- [x] Add integration tests for clean apply, repeated apply, invalid declaration, and conflicting registration.
+- [x] Commit as `feat: register and apply static systems`.
 
 ## Task 6: Implement commands, routing, deliveries, and execution creation
 
 **Outcome:** An accepted command creates durable events/deliveries and schedules logical executions without an external broker.
 
-- [ ] Add command submission with source, region, correlation ID, payload, expiry, and durable acceptance/rejection.
-- [ ] Route accepted commands and events through the active topology revision.
-- [ ] Create one delivery per target input and keep source identity explicit.
-- [ ] Implement ready-delivery polling with `FOR UPDATE SKIP LOCKED`.
-- [ ] Create or reuse the logical execution idempotently from delivery, component, topology revision, lifecycle epoch, and normalized input set.
-- [ ] Create attempt 1 and lease it with owner, token, and expiration.
-- [ ] Add scheduler and lease tests with competing pollers.
-- [ ] Test duplicate routing and scheduler restart without duplicate logical executions.
-- [ ] Commit as `feat: add durable delivery scheduler`.
+- [x] Add command submission with source, region, correlation ID, payload, expiry, and durable acceptance/rejection.
+- [x] Route accepted commands and events through the active topology revision.
+- [x] Create one delivery per target input and keep source identity explicit.
+- [x] Implement ready-delivery polling with `FOR UPDATE SKIP LOCKED`.
+- [x] Create or reuse the logical execution idempotently from delivery, component, topology revision, lifecycle epoch, and normalized input set.
+- [x] Create attempt 1 and lease it with owner, token, and expiration.
+- [x] Add scheduler and lease tests with competing pollers.
+- [x] Test duplicate routing and scheduler restart without duplicate logical executions.
+- [x] Commit as `feat: add durable delivery scheduler`.
 
 ## Task 7: Implement worker protocol and SDKs
 
@@ -159,17 +161,17 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Implement claim, heartbeat, cancellation, artifact stage, staged-content upload, result submission, and capability invocation endpoints.
 - [x] Generate immutable invocation envelopes with endpoint references and opaque capability handle slots.
 - [x] Reject inactive attempts, stale lease tokens, and stale lifecycle epochs.
-- [ ] Build TypeScript and Python SDK clients and runners.
-- [ ] Add deterministic demo worker components for retrieve, compare, verify, and synthesize.
-- [ ] Implement `failFirstAttemptForDemo` in the Python verifier without mutating prior history.
-- [ ] Test heartbeat extension, lease expiration, duplicate result submission, cancellation observation, and protocol compatibility across languages.
-- [ ] Commit as `feat: add worker protocol and SDKs`.
+- [x] Build TypeScript and Python SDK clients and runners.
+- [x] Add deterministic demo worker components for retrieve, compare, verify, and synthesize.
+- [x] Implement `failFirstAttemptForDemo` in the Python verifier without mutating prior history.
+- [x] Test heartbeat extension, lease expiration, duplicate result submission, cancellation observation, and protocol compatibility across languages.
+- [x] Commit as `feat: add worker protocol and SDKs`.
 
 ## Task 8: Implement atomic execution commit and retry
 
 **Outcome:** A valid proposed result publishes all runtime metadata atomically; failed attempts remain visible and retry safely.
 
-- [ ] Write integration tests that fail if artifacts, events, resource entries, downstream deliveries, or terminal statuses become partially visible.
+- [x] Write integration tests that fail if artifacts, events, resource entries, downstream deliveries, or terminal statuses become partially visible.
 - [x] Lock the execution, attempt, delivery, region, and component instance rows required for validation.
 - [x] Verify active lease token and current region lifecycle epoch.
 - [x] Validate declared output ports, artifact digests, artifact schemas, proposed events, state, and authority.
@@ -180,7 +182,7 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Default retry to three attempts with backoff 1s, 5s, and 30s.
 - [x] Dead-letter terminal unresolved work instead of deleting it.
 - [x] Test duplicate completion, stale lease, stale epoch, schema-invalid output, undeclared port, promotion failure, and safe retry.
-- [ ] Commit as `feat: atomically commit execution results`.
+- [x] Commit as `feat: atomically commit execution results`.
 
 ## Task 9: Complete the investigation vertical slice
 
@@ -208,51 +210,45 @@ Modules may add focused files beneath these directories. Do not collapse reposit
 - [x] Implement the corresponding `ff` CLI views with human and JSON output.
 - [x] Add SSE projection/event summaries with resumable cursor semantics.
 - [x] On startup abandon expired attempts, expose retryable work, resume projections, reconcile blobs, resume cancellation, and emit a recovery summary.
-- [ ] Add conformance tests for every invariant in the reference specification.
-- [ ] Restart the control plane during an investigation and verify no lost work or duplicate committed outputs.
+- [x] Add conformance tests for every applicable invariant in the reference specification; explicitly defer invariants outside the static M1 scope.
+- [x] Restart the control plane during an investigation and verify no lost work or duplicate committed outputs.
 - [x] Cancel a run, increment lifecycle epoch, and verify stale results cannot commit.
 - [x] Rebuild projections from history without dispatching workers or external actions.
-- [ ] Commit as `feat: add trace and recovery semantics`.
+- [x] Commit as `feat: add trace and recovery semantics`.
 
 ## Task 11: Harden the developer experience and document evidence
 
-**Outcome:** A new Codespace can reproduce the milestone and its acceptance evidence from documented commands.
+**Outcome:** A clean hosted checkout can reproduce the milestone and its acceptance evidence from one documented command.
 
 - [x] Ensure `pnpm install` and uv sync are deterministic.
 - [x] Add root commands for services, migrations, workers, demo, tests, and cleanup.
 - [x] Add health checks and dependency readiness waits to Docker Compose.
 - [x] Keep PostgreSQL and MinIO ports private by default outside local development.
-- [x] Add CI for lint, typecheck, unit tests, Python tests, integration tests, generation drift, and conformance tests.
+- [x] Add CI for lint, formatting, typecheck, unit tests, Python tests, integration tests, generation drift, and conformance tests.
 - [x] Document architecture boundaries and local troubleshooting.
-- [ ] Record acceptance evidence in `docs/evidence/m1-durable-reactive-graph.md`.
-- [ ] Commit as `docs: record milestone one acceptance evidence`.
+- [x] Record acceptance evidence in `docs/evidence/m1-durable-reactive-graph.md`.
+- [x] Commit as `docs: record milestone one acceptance evidence`.
 
 ---
 
-## Verification before completion
+## Canonical Milestone 1 acceptance
 
-Run and report at minimum:
+Run from a clean checkout:
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-uv run --project packages/worker-sdk-py pytest
-pnpm test:integration
+pnpm accept:m1
 ```
 
-Also run the investigation example end-to-end and include evidence that:
+The canonical retained acceptance bundle for the release baseline is:
 
-- verifier attempt 1 failed;
-- a later attempt succeeded;
-- both attempts remain visible;
-- partial and failure artifacts remain inspectable;
-- committed artifacts have valid digests, schemas, and provenance;
-- retry did not duplicate outputs or downstream delivery;
-- resource entries are attributable;
-- the trace reconstructs command, delivery, execution, attempt, artifact, and event causation;
-- a control-plane restart does not lose or duplicate work;
-- cancellation fences stale results;
-- historical projection replay performs no external side effects.
+- workflow: Repository Verification #314;
+- workflow run ID: `29506777040`;
+- reviewed head: `43d553625856a258381c01d1febf5c61e7d86c7f`;
+- artifact: `m1-acceptance-evidence-314`;
+- artifact ID: `8378976443`;
+- artifact digest: `sha256:6a837091662bb3fb02222b20a5f8dd9a89cb9c21a1b6e145086fe401a793ffa3`;
+- result: passed, including ordinary verification, formatting, live restart, and the separate clean-checkout M1 acceptance job.
 
-Milestone 1 is complete only when these checks pass from a clean Codespace checkout.
+Detailed acceptance evidence is retained in `docs/evidence/m1-durable-reactive-graph.md`.
+
+Milestone 1 is complete. New architecture work should be scoped under Milestone 2 or a later milestone.
