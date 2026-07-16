@@ -19,16 +19,21 @@ describe('Milestone 1 live restart acceptance harness', () => {
         },
       },
     );
-    const jsonStart = stdout.lastIndexOf('\n{\n  "status": "completed"');
+    const marker = '\n{\n  "status": "completed"';
+    const jsonStart = stdout.lastIndexOf(marker);
+    expect(jsonStart).toBeGreaterThanOrEqual(0);
     const summary = JSON.parse(stdout.slice(jsonStart + 1));
+    expect(summary.status).toBe('completed');
     expect(summary.executions).toBe(6);
     expect(summary.completedExecutions).toBe(6);
     expect(summary.failedAttempts).toBe(1);
     expect(summary.abandonedAttempts).toBeGreaterThanOrEqual(1);
     expect(summary.replacementAttempts).toBeGreaterThanOrEqual(1);
+    expect(summary.incompleteDeliveries).toEqual([]);
     expect(summary.duplicateOutputs).toEqual([]);
     expect(summary.duplicateDeliveries).toEqual([]);
     expect(summary.staleAttemptCommitted).toBe(false);
+    expect(summary.staleResultCode).toBe('inactive_attempt');
     expect(summary.recoveryEvent).toBeTruthy();
     expect(summary.projectionsCaughtUp).toBe(true);
   }, 190_000);
