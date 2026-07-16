@@ -1,10 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
-import {
-  createDatabase,
-  createUuidV7,
-} from '../packages/db/src/index.js';
+import { createDatabase, createUuidV7 } from '../packages/db/src/index.js';
 import {
   CommandService,
   ExecutionCommitService,
@@ -119,7 +116,8 @@ try {
     owner: 'm1-cancellation-worker',
     leaseDurationMs: 60_000,
   });
-  if (!scheduled) throw new Error('cancellation scenario did not schedule work');
+  if (!scheduled)
+    throw new Error('cancellation scenario did not schedule work');
 
   await db
     .updateTable('regions')
@@ -191,7 +189,9 @@ try {
     staleResultCode !== 'inactive_attempt' ||
     outputs.length !== 0
   )
-    throw new Error(`cancellation acceptance failed: ${JSON.stringify(evidence)}`);
+    throw new Error(
+      `cancellation acceptance failed: ${JSON.stringify(evidence)}`,
+    );
 
   await mkdir(evidenceDir, { recursive: true });
   await writeFile(

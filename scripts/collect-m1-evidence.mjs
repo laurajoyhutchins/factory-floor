@@ -185,8 +185,7 @@ async function main() {
     codespaces: process.env.CODESPACES === 'true',
     runnerOs: process.env.RUNNER_OS ?? null,
     runnerName: process.env.RUNNER_NAME ?? null,
-    cleanCheckoutAttested:
-      process.env.FACTORY_FLOOR_CLEAN_CHECKOUT === '1',
+    cleanCheckoutAttested: process.env.FACTORY_FLOOR_CLEAN_CHECKOUT === '1',
   };
   const ledgerText = execFileSync('pnpm', ['conformance:check'], {
     encoding: 'utf8',
@@ -278,9 +277,7 @@ async function main() {
     (delivery) =>
       !['completed', 'cancelled', 'dead_lettered'].includes(delivery.status),
   );
-  const failedAttempt = attempts.find(
-    (attempt) => attempt.status === 'failed',
-  );
+  const failedAttempt = attempts.find((attempt) => attempt.status === 'failed');
   const replacementAttempt = failedAttempt
     ? attempts.find(
         (attempt) =>
@@ -342,15 +339,13 @@ async function main() {
       ) &&
       Boolean(
         failedAttempt &&
-          resources.some(
-            (resource) => resource.attempt_id === failedAttempt.id,
-          ),
+        resources.some((resource) => resource.attempt_id === failedAttempt.id),
       ) &&
       Boolean(
         replacementAttempt &&
-          resources.some(
-            (resource) => resource.attempt_id === replacementAttempt.id,
-          ),
+        resources.some(
+          (resource) => resource.attempt_id === replacementAttempt.id,
+        ),
       ),
     durablePolicyDecision:
       policyDecisions.length > 0 &&
@@ -445,9 +440,13 @@ async function main() {
   if (!passed) process.exitCode = 1;
 }
 
-process.once('SIGINT', () => void stopControlPlane().finally(() => process.exit(130)));
-process.once('SIGTERM', () =>
-  void stopControlPlane().finally(() => process.exit(143)),
+process.once(
+  'SIGINT',
+  () => void stopControlPlane().finally(() => process.exit(130)),
+);
+process.once(
+  'SIGTERM',
+  () => void stopControlPlane().finally(() => process.exit(143)),
 );
 main()
   .catch((error) => {

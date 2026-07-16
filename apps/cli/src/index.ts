@@ -159,11 +159,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const json = (await response
-      .json()
-      .catch(() => ({
-        error: { code: 'transport_error', message: response.statusText },
-      }))) as {
+    const json = (await response.json().catch(() => ({
+      error: { code: 'transport_error', message: response.statusText },
+    }))) as {
       disposition?: string;
       digest?: string;
       commandId?: string;
