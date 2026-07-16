@@ -455,8 +455,9 @@ export function Executions() {
                     <tr key={id}>
                       <td>
                         <Link to={`/executions/${id}`}>
-                          <CopyId value={id} />
-                        </Link>
+                          Open {id.slice(0, 8)}
+                        </Link>{' '}
+                        <CopyId value={id} />
                       </td>
                       <td>
                         <CopyId value={execution.componentInstanceId} />
@@ -642,8 +643,9 @@ export function Artifacts() {
                     <tr key={id}>
                       <td>
                         <Link to={`/artifacts/${id}`}>
-                          <CopyId value={id} />
-                        </Link>
+                          Open {id.slice(0, 8)}
+                        </Link>{' '}
+                        <CopyId value={id} />
                       </td>
                       <td>
                         <CopyId value={artifact.digest} />
