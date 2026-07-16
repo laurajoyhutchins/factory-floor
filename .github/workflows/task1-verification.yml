@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+env:
+  CONTROL_PLANE_OPERATOR_TOKEN: factory_floor_ci_operator_token
+  CONTROL_PLANE_ADMIN_TOKEN: factory_floor_ci_admin_token
+  WORKER_API_BEARER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_ID: demo-worker
+  FACTORY_FLOOR_WORKER_CAPABILITIES: retrieve@1,compare@1,synthesize@1,verify@1
+  VITE_FACTORY_FLOOR_OPERATOR_TOKEN: factory_floor_ci_operator_token
+
 concurrency:
   group: repository-verification-${{ github.ref }}
   cancel-in-progress: true
