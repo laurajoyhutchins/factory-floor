@@ -1,0 +1,67 @@
+name: Runtime Hardening Diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CONTROL_PLANE_OPERATOR_TOKEN: factory_floor_ci_operator_token
+  CONTROL_PLANE_ADMIN_TOKEN: factory_floor_ci_admin_token
+  WORKER_API_BEARER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_ID: demo-worker
+  FACTORY_FLOOR_WORKER_CAPABILITIES: retrieve@1,compare@1,synthesize@1,verify@1
+  WORKER_AUTHORIZATION_JSON: '{"demo-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1","verify@1"]},"demo-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"demo-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]},"acceptance-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"acceptance-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]}}'
+
+jobs:
+  diagnose:
+    name: ${{ matrix.test }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - test: scheduler-fairness
+            file: tests/integration/runtime-core/scheduler-fairness.test.ts
+          - test: lease-coherence
+            file: tests/integration/runtime-core/lease-coherence.test.ts
+          - test: startup-projection-bounds
+            file: tests/integration/runtime-core/startup-projection-bounds.test.ts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start services
+        run: |
+          pnpm services:up
+          pnpm services:wait
+
+      - name: Run migration
+        env:
+          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+        run: pnpm db:migrate
+
+      - name: Run focused regression
+        env:
+          TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+        run: pnpm exec vitest run --config vitest.integration.config.ts ${{ matrix.file }}
+
+      - name: Stop services
+        if: always()
+        run: pnpm services:clean
