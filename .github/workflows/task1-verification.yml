@@ -16,7 +16,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
 
     steps:
       - name: Check out repository
@@ -134,10 +134,42 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Run Milestone 1 acceptance command
+      - name: Stop development services
+        if: always()
+        run: pnpm services:clean
+
+  m1-acceptance:
+    name: Milestone 1 clean acceptance
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out reviewed commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Milestone 1 acceptance from clean checkout
         env:
           TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
           DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+          ARTIFACT_STORE_ROOT: .factory-floor/demo-artifacts
+          FACTORY_FLOOR_CLEAN_CHECKOUT: '1'
         run: |
           set -o pipefail
           pnpm accept:m1 2>&1 | tee m1-acceptance.log
@@ -150,7 +182,7 @@ jobs:
           path: |
             .factory-floor/evidence/m1/
             m1-acceptance.log
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 30
 
       - name: Stop development services
