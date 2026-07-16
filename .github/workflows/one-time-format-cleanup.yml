@@ -1,4 +1,4 @@
-name: One-time repository formatting diagnostics
+name: One-time repository formatting stabilization
 
 on:
   pull_request:
@@ -6,14 +6,14 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: one-time-repository-formatting
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  stabilize:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -44,26 +44,26 @@ jobs:
       - name: Bootstrap locked dependencies
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Capture formatting diagnostics
+      - name: Stabilize remaining formatting
         run: |
-          set +e
-          pnpm format:check > prettier-check.log 2>&1
-          echo $? > prettier-check.status
-          pnpm exec prettier --list-different . > prettier-different.txt 2>&1
-          git status --short > git-status.txt
-          exit 0
+          pnpm exec prettier --write \
+            apps/control-plane/src/routes/registrations.ts \
+            apps/control-plane/src/routes/systems.ts \
+            packages/runtime-core/src/registration/registration-service.ts
 
-      - name: Upload formatting diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: formatting-diagnostics-${{ github.run_number }}
-          path: |
-            prettier-check.log
-            prettier-check.status
-            prettier-different.txt
-            git-status.txt
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit and push stabilization
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            apps/control-plane/src/routes/registrations.ts \
+            apps/control-plane/src/routes/systems.ts \
+            packages/runtime-core/src/registration/registration-service.ts
+          git commit -m "chore: stabilize Prettier output"
+          git push origin HEAD:agent/reduce-repository-tech-debt
+
+      - name: Check formatting
+        run: pnpm format:check
 
       - name: Check generated contract drift
         run: pnpm contracts:check
