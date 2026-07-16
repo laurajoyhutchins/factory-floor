@@ -8,7 +8,7 @@ describe('Milestone 1 live restart acceptance harness', () => {
   it('runs the process-level restart scenario without duplicate work', async () => {
     const { stdout } = await execFileAsync(
       'node',
-      ['scripts/run-m1-acceptance.mjs'],
+      ['scripts/run-m1-live-restart-acceptance.mjs'],
       {
         timeout: 180_000,
         maxBuffer: 20 * 1024 * 1024,
