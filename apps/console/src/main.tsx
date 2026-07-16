@@ -46,7 +46,7 @@ function App() {
     queryFn: ({ signal }) => consoleApi.health(signal),
   });
   const segment = location.pathname.split('/').filter(Boolean)[0];
-  const title = segment ? titles[segment] ?? 'Not found' : 'Overview';
+  const title = segment ? (titles[segment] ?? 'Not found') : 'Overview';
   const healthStatus =
     health.data?.status ?? (health.isError ? 'disconnected' : 'checking');
 
