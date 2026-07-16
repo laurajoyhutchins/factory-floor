@@ -1,16 +1,32 @@
 # Milestone 1 Durable Reactive Graph evidence
 
-Status: **accepted.** Repository Verification #289 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
+Status: **accepted and released as `v0.1.0`.** Repository Verification #314 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
 
-## One-command acceptance
+## Canonical acceptance command
 
-Run from a clean checkout configured from `.env.example`:
+Run from a clean checkout:
 
 ```bash
 pnpm accept:m1
 ```
 
 The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs migrations and quality gates, executes the investigation vertical slice, exercises live control-plane restart and cancellation fencing, rebuilds projections, reconciles artifacts, records a durable policy decision, collects operator-facing inspection output, sanitizes retained logs, and stops services on success, failure, interruption, or timeout.
+
+## Canonical retained evidence
+
+| Field                      | Accepted value                                                            |
+| -------------------------- | ------------------------------------------------------------------------- |
+| Workflow                   | Repository Verification #314                                              |
+| Workflow run ID            | `29506777040`                                                             |
+| Reviewed head              | `43d553625856a258381c01d1febf5c61e7d86c7f`                                |
+| Evidence artifact          | `m1-acceptance-evidence-314`                                              |
+| Artifact ID                | `8378976443`                                                              |
+| Artifact digest            | `sha256:6a837091662bb3fb02222b20a5f8dd9a89cb9c21a1b6e145086fe401a793ffa3` |
+| Environment                | GitHub Actions hosted Linux runner, fresh checkout                        |
+| Clean-checkout attestation | `true`                                                                    |
+| Acceptance result          | `passed`                                                                  |
+
+Both workflow jobs passed. Ordinary verification included contract validation, generated-contract drift, conformance-ledger validation, zero-warning lint, typecheck, TypeScript and Python tests, formatting, Docker Compose validation, PostgreSQL and MinIO health, migrations, integration and conformance tests, migration reset, and live-restart acceptance. The separate clean acceptance job ran `pnpm accept:m1` and uploaded the evidence bundle.
 
 ## Implementation evidence
 
@@ -20,29 +36,6 @@ The command bootstraps the workspace, validates contracts and conformance struct
 - Registered policy evaluation durably records policy identity and version, evaluator version, subject, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
 - Delivery evidence enumerates every relevant delivery and fails acceptance if one remains outside `completed`, `cancelled`, or `dead_lettered`.
 - The retained bundle is sanitized on every acceptance exit path, including failed runs.
-
-## Automated CI evidence
-
-Repository Verification runs the ordinary repository suite first and then starts a separate clean hosted runner for:
-
-```bash
-pnpm accept:m1
-```
-
-| Field                       | Accepted value                                                            |
-| --------------------------- | ------------------------------------------------------------------------- |
-| Workflow                    | Repository Verification #289                                              |
-| Workflow run ID             | `29479516913`                                                             |
-| Reviewed PR head            | `9da05cfe8347279d8777926d7fade863df8ea037`                                |
-| Actions-tested merge commit | `367482a4891b8b3a1d92185069f7c53aaa9a15cd`                                |
-| Evidence artifact           | `m1-acceptance-evidence-289`                                              |
-| Artifact ID                 | `8367989997`                                                              |
-| Artifact digest             | `sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394` |
-| Environment                 | GitHub Actions hosted Linux runner, fresh checkout                        |
-| Clean-checkout attestation  | `true`                                                                    |
-| Acceptance result           | `passed`                                                                  |
-
-The downloaded artifact was inspected before acceptance. All 15 applicable acceptance checks were true. The archive contained no raw database password, bearer token, lease token, signed token URL, or GitHub credential.
 
 ## Retained operator evidence
 
@@ -69,10 +62,6 @@ The bundle includes `acceptance-evidence.json`, `SUMMARY.md`, and sanitized scen
 The accepted run used a separate GitHub Actions job after ordinary verification. It began from a fresh checkout with no reused `node_modules`, Python environment, database volumes, or artifact store and set `FACTORY_FLOOR_CLEAN_CHECKOUT=1`.
 
 An actual GitHub Codespace was not used. The Milestone 1 completion rule permits a comparably fresh hosted checkout, so the clean-environment criterion is satisfied without making a Codespace-specific claim.
-
-## Formatting baseline
-
-Repository-wide `pnpm format:check` remains red because `main` has broad pre-existing Prettier drift across 101 files. This is recorded as repository baseline debt rather than attributed to Task 12C. Every Task 12C file supported by Prettier passes the scoped acceptance formatting check.
 
 ## Deferred post-Milestone-1 invariants
 
