@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { consoleApi } from '../api/client.js';
 
 export type StreamState =
-  | 'connecting'
-  | 'live'
-  | 'reconnecting'
-  | 'disconnected';
+  'connecting' | 'live' | 'reconnecting' | 'disconnected';
 export type RuntimeEvent = { id?: string; [key: string]: unknown };
 
 export function appendDeduped(
@@ -30,7 +27,10 @@ export function parseSseBatch(text: string) {
   for (const frame of text.replaceAll('\r\n', '\n').split('\n\n')) {
     if (!frame.trim() || frame.startsWith(':')) continue;
     const lines = frame.split('\n');
-    const id = lines.find((line) => line.startsWith('id:'))?.slice(3).trim();
+    const id = lines
+      .find((line) => line.startsWith('id:'))
+      ?.slice(3)
+      .trim();
     const eventType = lines
       .find((line) => line.startsWith('event:'))
       ?.slice(6)
