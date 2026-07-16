@@ -24,6 +24,10 @@ stop_evidence_control_plane() {
 
 cleanup() {
   stop_evidence_control_plane
+  node scripts/sanitize-m1-evidence.mjs \
+    "$FACTORY_FLOOR_EVIDENCE_DIR" \
+    m1-acceptance.log \
+    >/dev/null 2>&1 || true
   pnpm services:clean >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -63,6 +67,7 @@ pnpm exec prettier --check \
   scripts/collect-m1-evidence.mjs \
   scripts/record-m1-policy-evidence.ts \
   scripts/run-m1-cancellation-evidence.ts \
+  scripts/sanitize-m1-evidence.mjs \
   tests/integration/runtime-core/policy-decision.test.ts \
   tests/integration/runtime-core/registration-and-system.test.ts
 
