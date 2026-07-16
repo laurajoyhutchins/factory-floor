@@ -29,6 +29,13 @@ import {
   type ControlPlaneSecurity,
 } from './security.js';
 
+const STARTUP_RECOVERY_BOUNDS = {
+  expiredAttempts: 5_000,
+  cancellingRegions: 1_000,
+  projectionEvents: 100_000,
+  stagedArtifacts: 50_000,
+} as const;
+
 export interface AppDependencies {
   database?: Kysely<Database>;
   registrationService?: RegistrationService;
@@ -72,6 +79,50 @@ function withResultPrevalidation(
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
+}
+
+async function countRows(
+  query: ReturnType<Kysely<Database>['selectFrom']>,
+): Promise<number> {
+  const row = await query
+    .select((eb) => eb.fn.countAll<string>().as('count'))
+    .executeTakeFirstOrThrow();
+  return Number(row.count);
+}
+
+export async function assertStartupRecoveryWithinBounds(
+  db: Kysely<Database>,
+  now = new Date(),
+): Promise<void> {
+  const [expiredAttempts, cancellingRegions, projectionEvents, stagedArtifacts] =
+    await Promise.all([
+      countRows(
+        db
+          .selectFrom('execution_attempts')
+          .where('status', 'in', ['leased', 'running'])
+          .where('lease_expires_at', '<=', now),
+      ),
+      countRows(
+        db
+          .selectFrom('regions')
+          .where('lifecycle_status', '=', 'cancelling'),
+      ),
+      countRows(db.selectFrom('events')),
+      countRows(
+        db.selectFrom('artifact_staging').where('status', '=', 'staged'),
+      ),
+    ]);
+  const observed = {
+    expiredAttempts,
+    cancellingRegions,
+    projectionEvents,
+    stagedArtifacts,
+  };
+  for (const [name, limit] of Object.entries(STARTUP_RECOVERY_BOUNDS))
+    if (observed[name as keyof typeof observed] > limit)
+      throw new Error(
+        `startup_recovery_backlog_exceeded:${name}:${observed[name as keyof typeof observed]}:${limit}`,
+      );
 }
 
 export async function buildApp(
@@ -166,7 +217,11 @@ export async function buildApp(
         blobStore: artifactBlobStore,
       });
     app.addHook('onReady', async () => {
-      const summary = await recovery.run();
+      if (db) await assertStartupRecoveryWithinBounds(db);
+      const summary = await recovery.run({
+        projectionBatchSize: 250,
+        reconciliationBatchSize: 250,
+      });
       app.log.info({ recovery: summary }, 'startup recovery completed');
     });
   }
