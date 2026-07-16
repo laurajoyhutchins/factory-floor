@@ -125,7 +125,7 @@ export class SchedulerService {
           candidate.target_component_instance_id,
         )
         .where('correlation_id', '=', candidate.correlation_id)
-        .where('available_at', '<=', now)
+        .where('available_at', '<=', now as any)
         .execute();
     };
 
