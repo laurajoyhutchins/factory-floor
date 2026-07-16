@@ -94,7 +94,9 @@ function load(file: string, expectedKind: string): any {
   return matches[0];
 }
 
-function authorizationHeaders(token: string | undefined) {
+function authorizationHeaders(
+  token: string | undefined,
+): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
