@@ -112,9 +112,10 @@ describe('console views', () => {
               nextCursor: 'opaque-next==',
             },
       );
+    const user = userEvent.setup();
     wrap(<Executions />, '/executions', '/executions');
     expect(await screen.findByLabelText('Copy ex-1')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
     expect(await screen.findByLabelText('Copy ex-2')).toBeInTheDocument();
     expect(executions.mock.calls[1]?.[0]?.cursor).toBe('opaque-next==');
   });
