@@ -48,7 +48,8 @@ pnpm exec prettier --check \
   scripts/collect-m1-evidence.mjs \
   scripts/record-m1-policy-evidence.ts \
   scripts/run-m1-cancellation-evidence.ts \
-  tests/integration/runtime-core/policy-decision.test.ts
+  tests/integration/runtime-core/policy-decision.test.ts \
+  tests/integration/runtime-core/registration-and-system.test.ts
 
 echo "[factory-floor] Repository-wide pnpm format:check is not an M1 gate because main has documented pre-existing Prettier drift across 101 files; Task 12C Prettier-supported files passed the scoped check above."
 
