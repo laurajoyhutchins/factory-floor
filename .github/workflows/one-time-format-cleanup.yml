@@ -77,18 +77,20 @@ jobs:
       - name: Format repository-owned files
         run: pnpm exec prettier --write .
 
-      - name: Create local cleanup commit
+      - name: Create and push cleanup commit
         run: |
           rm .github/workflows/one-time-format-cleanup.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m "chore: clear repository formatting debt"
+          git push origin HEAD:agent/reduce-repository-tech-debt
 
-      - name: Verify formatting and generated contracts
-        run: |
-          pnpm format:check
-          pnpm contracts:check
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Check generated contract drift
+        run: pnpm contracts:check
 
       - name: Run daemon-independent verification
         run: |
@@ -96,6 +98,3 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm test:python
-
-      - name: Push verified cleanup
-        run: git push origin HEAD:agent/reduce-repository-tech-debt
