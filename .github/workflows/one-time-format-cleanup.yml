@@ -1,15 +1,16 @@
 name: One-time repository formatting cleanup
 
 on:
-  push:
-    branches:
-      - agent/reduce-repository-tech-debt
   pull_request:
     branches:
       - main
 
 permissions:
   contents: write
+
+concurrency:
+  group: one-time-repository-formatting
+  cancel-in-progress: true
 
 jobs:
   format:
@@ -77,14 +78,16 @@ jobs:
       - name: Format repository-owned files
         run: pnpm exec prettier --write .
 
-      - name: Create and push cleanup commit
+      - name: Create local cleanup commit
         run: |
           rm .github/workflows/one-time-format-cleanup.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m "chore: clear repository formatting debt"
-          git push origin HEAD:agent/reduce-repository-tech-debt
+
+      - name: Push cleanup commit
+        run: git push origin HEAD:agent/reduce-repository-tech-debt
 
       - name: Check formatting
         run: pnpm format:check
