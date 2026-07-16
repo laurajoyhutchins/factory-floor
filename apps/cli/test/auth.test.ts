@@ -11,11 +11,12 @@ describe('ff authentication', () => {
   });
 
   it('uses the operator token for inspection requests', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ items: [], nextCursor: null }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ items: [], nextCursor: null }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -50,14 +51,15 @@ describe('ff authentication', () => {
         spec: {},
       }),
     );
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ disposition: 'accepted', commandId: 'command-1' }),
-        {
-          status: 202,
-          headers: { 'content-type': 'application/json' },
-        },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ disposition: 'accepted', commandId: 'command-1' }),
+          {
+            status: 202,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
     );
     vi.stubGlobal('fetch', fetchMock);
 
