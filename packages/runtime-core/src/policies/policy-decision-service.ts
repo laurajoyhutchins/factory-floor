@@ -1,5 +1,5 @@
 import { createUuidV7, type Database, type Json } from '@factory-floor/db';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 export type PolicyOutcome = 'deny' | 'require_approval' | 'modify' | 'allow';
 
@@ -92,7 +92,7 @@ export class PolicyDecisionService {
           normalized_inputs: input.normalizedInputs,
           outcome,
           reason,
-          modifications,
+          modifications: sql<Json>`${JSON.stringify(modifications)}::jsonb`,
         })
         .execute();
 
