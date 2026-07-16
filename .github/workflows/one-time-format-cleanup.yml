@@ -1,4 +1,4 @@
-name: One-time repository formatting cleanup
+name: One-time repository formatting diagnostics
 
 on:
   pull_request:
@@ -6,15 +6,14 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: one-time-repository-formatting
   cancel-in-progress: true
 
 jobs:
-  format:
-    if: github.actor != 'github-actions[bot]'
+  diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -45,39 +44,26 @@ jobs:
       - name: Bootstrap locked dependencies
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Add permanent format command
+      - name: Capture formatting diagnostics
         run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          set +e
+          pnpm format:check > prettier-check.log 2>&1
+          echo $? > prettier-check.status
+          pnpm exec prettier --list-different . > prettier-different.txt 2>&1
+          git status --short > git-status.txt
+          exit 0
 
-          const packagePath = 'package.json';
-          const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
-          const scripts = {};
-          for (const [name, command] of Object.entries(packageJson.scripts)) {
-            if (name === 'format:check') {
-              scripts.format = 'prettier --write .';
-            }
-            scripts[name] = command;
-          }
-          packageJson.scripts = scripts;
-          writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
-          NODE
-
-      - name: Format repository-owned files
-        run: pnpm exec prettier --write .
-
-      - name: Create local cleanup commit
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m "chore: clear repository formatting debt"
-
-      - name: Push cleanup commit
-        run: git push origin HEAD:agent/reduce-repository-tech-debt
-
-      - name: Check formatting
-        run: pnpm format:check
+      - name: Upload formatting diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatting-diagnostics-${{ github.run_number }}
+          path: |
+            prettier-check.log
+            prettier-check.status
+            prettier-different.txt
+            git-status.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Check generated contract drift
         run: pnpm contracts:check
