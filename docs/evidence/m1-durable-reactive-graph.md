@@ -1,6 +1,6 @@
 # Milestone 1 Durable Reactive Graph evidence
 
-Status: **acceptance command and CI retention are ready; final Milestone 1 declaration depends on the retained `pnpm accept:m1` run for the reviewed commit.** This record distinguishes implemented evidence from generated operator evidence and does not claim a Codespace run unless one is explicitly recorded below.
+Status: **accepted.** Repository Verification #289 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
 
 ## One-command acceptance
 
@@ -10,51 +10,69 @@ Run from a clean checkout configured from `.env.example`:
 pnpm accept:m1
 ```
 
-The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs migrations and all quality gates, executes the investigation vertical slice, runs the process-level restart scenario, rebuilds projections, reconciles artifacts, records a durable policy-decision proof, writes sanitized evidence under `.factory-floor/evidence/m1/`, and stops services on success, failure, interruption, or timeout.
+The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs migrations and quality gates, executes the investigation vertical slice, exercises live control-plane restart and cancellation fencing, rebuilds projections, reconciles artifacts, records a durable policy decision, collects operator-facing inspection output, sanitizes retained logs, and stops services on success, failure, interruption, or timeout.
 
 ## Implementation evidence
 
-- The conformance ledger enumerates exactly 18 normative reference invariants. Applicable Milestone 1 invariants are automated and passed; delegation plus dynamic-construction invariants remain explicitly deferred to the bounded dynamic-region milestone.
-- Operator-facing inspection exposes artifact schema identity, schema digest, committed state, locator status, provenance, derivations, and tombstone status through inspection APIs/CLI surfaces.
-- Operator-facing inspection exposes resource-ledger entries by attempt, execution, region, external action when present, resource type, quantity, and unit.
-- Durable policy-decision evidence records policy identity/version, evaluator version, subject kind/identity, normalized inputs, referenced artifact, outcome, reason, modifications, and the approval relationship.
-- Delivery acceptance evidence enumerates every relevant delivery and fails if any delivery remains outside `completed`, `cancelled`, or `dead_lettered`.
+- The conformance ledger enumerates exactly 18 normative reference invariants. Every invariant applicable to the static Milestone 1 runtime is automated and passed.
+- Operator inspection exposes artifact schema identity and digest, committed state, locator status, provenance, derivations, and tombstone state.
+- Operator inspection exposes resource-ledger entries by region, execution, attempt, external action when present, resource type, quantity, and unit.
+- Registered policy evaluation durably records policy identity and version, evaluator version, subject, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
+- Delivery evidence enumerates every relevant delivery and fails acceptance if one remains outside `completed`, `cancelled`, or `dead_lettered`.
+- The retained bundle is sanitized on every acceptance exit path, including failed runs.
 
 ## Automated CI evidence
 
-Repository Verification now runs both:
+Repository Verification runs the ordinary repository suite first and then starts a separate clean hosted runner for:
 
 ```bash
-pnpm conformance:check
 pnpm accept:m1
 ```
 
-CI uploads `.factory-floor/evidence/m1/` and the acceptance log as `m1-acceptance-evidence-${{ github.run_number }}` on success and failure. Exact GitHub Actions run and artifact identifiers must be filled in after the final successful workflow run for the reviewed commit.
+| Field | Accepted value |
+| --- | --- |
+| Workflow | Repository Verification #289 |
+| Workflow run ID | `29479516913` |
+| Reviewed PR head | `9da05cfe8347279d8777926d7fade863df8ea037` |
+| Actions-tested merge commit | `367482a4891b8b3a1d92185069f7c53aaa9a15cd` |
+| Evidence artifact | `m1-acceptance-evidence-289` |
+| Artifact ID | `8367989997` |
+| Artifact digest | `sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394` |
+| Environment | GitHub Actions hosted Linux runner, fresh checkout |
+| Clean-checkout attestation | `true` |
+| Acceptance result | `passed` |
 
-| Field              | Value                |
-| ------------------ | -------------------- |
-| Final workflow run | Pending final CI run |
-| Evidence artifact  | Pending final CI run |
-| Commit SHA         | Pending final CI run |
+The downloaded artifact was inspected before acceptance. All 15 applicable acceptance checks were true. The archive contained no raw database password, bearer token, lease token, signed token URL, or GitHub credential.
 
-## Process-level restart evidence
+## Retained operator evidence
 
-The live restart harness kills and restarts the real control-plane process while verifier attempt 2 is in flight, waits for lease expiration, verifies startup recovery abandons the stale attempt, submits a stale result and observes fencing, then verifies replacement completion without duplicate outputs or downstream deliveries.
+The evidence bundle records:
 
-## Operator-facing inspection evidence
+- one accepted command;
+- six completed logical executions;
+- seven final-investigation attempts, including the deliberate verifier failure and successful replacement;
+- eight terminal deliveries with no duplicate output or downstream-delivery keys;
+- eight committed artifacts with valid digest, schema identity, provenance, and lineage;
+- resource attribution for the failed and replacement verifier attempts;
+- one durable `require_approval` policy decision and requested approval;
+- six complete execution traces and eight artifact-lineage records;
+- live-restart abandonment, replacement, recovery summary, stale-result fencing, and duplicate-free completion;
+- cancellation epoch increment, cancelled attempt and delivery, stale-result rejection, and zero committed stale outputs;
+- projection replay with unchanged delivery, execution, and external-action counts;
+- ten caught-up projection checkpoints;
+- reconciliation of eight consistent artifacts with zero unresolved records.
 
-The retained bundle contains:
-
-- `acceptance-evidence.json` — sanitized machine-readable environment, commit, ledger summary, command IDs, all logical investigation executions, all attempts, failure codes, retry decisions, delivery states, artifacts, derivations, resources, traces, lineage, projection checkpoints, duplicate checks, policy decisions, and deferred items.
-- `SUMMARY.md` — concise operator summary with counts and pass/fail checks.
-
-The bundle intentionally excludes secrets, bearer tokens, database passwords, signed URLs, and private reasoning.
+The bundle includes `acceptance-evidence.json`, `SUMMARY.md`, and sanitized scenario logs. Private model reasoning is neither required nor retained.
 
 ## Clean-environment evidence
 
-The acceptance command is designed for a clean Codespace or equivalent clean checkout: no pre-existing `node_modules`, Python environment, database volumes, or artifact store, with configuration created from `.env.example`.
+The accepted run used a separate GitHub Actions job after ordinary verification. It began from a fresh checkout with no reused `node_modules`, Python environment, database volumes, or artifact store and set `FACTORY_FLOOR_CLEAN_CHECKOUT=1`.
 
-A Codespace run has **not** been performed from this session. If the final verification environment is GitHub Actions rather than Codespaces, record that accurately in the table above and keep any separate Codespace acceptance claim pending until a Codespace run actually occurs.
+An actual GitHub Codespace was not used. The Milestone 1 completion rule permits a comparably fresh hosted checkout, so the clean-environment criterion is satisfied without making a Codespace-specific claim.
+
+## Formatting baseline
+
+Repository-wide `pnpm format:check` remains red because `main` has broad pre-existing Prettier drift across 101 files. This is recorded as repository baseline debt rather than attributed to Task 12C. Every Task 12C file supported by Prettier passes the scoped acceptance formatting check.
 
 ## Deferred post-Milestone-1 invariants
 
