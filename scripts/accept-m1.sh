@@ -8,7 +8,19 @@ export FACTORY_FLOOR_ACCEPTANCE_STARTED_AT="${FACTORY_FLOOR_ACCEPTANCE_STARTED_A
 export FACTORY_FLOOR_EVIDENCE_DIR="${FACTORY_FLOOR_EVIDENCE_DIR:-.factory-floor/evidence/m1}"
 export ARTIFACT_STORE_ROOT="${ARTIFACT_STORE_ROOT:-.factory-floor/demo-artifacts}"
 
+EVIDENCE_CONTROL_PLANE_PID=""
+
+stop_evidence_control_plane() {
+  if [[ -z "$EVIDENCE_CONTROL_PLANE_PID" ]]; then
+    return
+  fi
+  kill -TERM "$EVIDENCE_CONTROL_PLANE_PID" >/dev/null 2>&1 || true
+  wait "$EVIDENCE_CONTROL_PLANE_PID" >/dev/null 2>&1 || true
+  EVIDENCE_CONTROL_PLANE_PID=""
+}
+
 cleanup() {
+  stop_evidence_control_plane
   pnpm services:clean >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -70,5 +82,29 @@ pnpm services:wait
 pnpm db:migrate
 pnpm demo:investigation 2>&1 | tee "$FACTORY_FLOOR_EVIDENCE_DIR/investigation.log"
 pnpm exec tsx scripts/record-m1-policy-evidence.ts 2>&1 | tee "$FACTORY_FLOOR_EVIDENCE_DIR/policy.log"
+
+export FACTORY_FLOOR_CONTROL_PLANE_URL="http://127.0.0.1:3000"
+DATABASE_URL="$DATABASE_URL" \
+PORT=3000 \
+HOST=127.0.0.1 \
+ARTIFACT_STORE_ROOT="$ARTIFACT_STORE_ROOT" \
+WORKER_API_BEARER_TOKEN=m1-evidence-worker-token \
+  node --import tsx apps/control-plane/src/server.ts \
+  >"$FACTORY_FLOOR_EVIDENCE_DIR/evidence-control-plane.log" 2>&1 &
+EVIDENCE_CONTROL_PLANE_PID="$!"
+
+for _ in $(seq 1 300); do
+  if curl --fail --silent "$FACTORY_FLOOR_CONTROL_PLANE_URL/health" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$EVIDENCE_CONTROL_PLANE_PID" >/dev/null 2>&1; then
+    cat "$FACTORY_FLOOR_EVIDENCE_DIR/evidence-control-plane.log"
+    exit 1
+  fi
+  sleep 0.1
+done
+curl --fail --silent "$FACTORY_FLOOR_CONTROL_PLANE_URL/health" >/dev/null
+
 node scripts/collect-m1-evidence.mjs
+stop_evidence_control_plane
 pnpm conformance:check
