@@ -1,0 +1,96 @@
+name: One-time repository formatting cleanup
+
+on:
+  push:
+    branches:
+      - agent/reduce-repository-tech-debt
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out cleanup branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/reduce-repository-tech-debt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv
+
+      - name: Bootstrap locked dependencies
+        run: bash scripts/bootstrap-workspace.sh
+
+      - name: Add permanent formatting commands and CI gate
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const packagePath = 'package.json';
+          const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+          const scripts = {};
+          for (const [name, command] of Object.entries(packageJson.scripts)) {
+            if (name === 'format:check') {
+              scripts.format = 'prettier --write .';
+            }
+            scripts[name] = command;
+          }
+          packageJson.scripts = scripts;
+          writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+
+          const workflowPath = '.github/workflows/task1-verification.yml';
+          let workflow = readFileSync(workflowPath, 'utf8');
+          const marker = "      - name: Run Python tests\n        run: pnpm test:python\n";
+          const formatStep = "\n      - name: Check formatting\n        run: pnpm format:check\n";
+          if (!workflow.includes('      - name: Check formatting')) {
+            if (!workflow.includes(marker)) {
+              throw new Error('Could not locate the Python test step in repository verification');
+            }
+            workflow = workflow.replace(marker, `${marker}${formatStep}`);
+            writeFileSync(workflowPath, workflow);
+          }
+          NODE
+
+      - name: Format repository-owned files
+        run: pnpm exec prettier --write .
+
+      - name: Verify formatting and generated contracts
+        run: |
+          pnpm format:check
+          pnpm contracts:check
+
+      - name: Run daemon-independent verification
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm test:python
+
+      - name: Commit cleanup
+        run: |
+          rm .github/workflows/one-time-format-cleanup.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "chore: clear repository formatting debt"
+          git push origin HEAD:agent/reduce-repository-tech-debt
