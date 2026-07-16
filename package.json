@@ -17,6 +17,7 @@
     "contracts:validate": "node scripts/validate-contracts.mjs",
     "contracts:generate": "node scripts/generate-contracts.mjs",
     "contracts:check": "bash scripts/check-contract-generation-drift.sh",
+    "conformance:check": "node scripts/check-conformance-ledger.mjs",
     "dev:worker-demo-ts": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/demo-ts-worker dev",
     "demo:investigation": "node scripts/run-with-env.mjs tsx examples/investigation/run-demo.ts",
     "bootstrap": "bash scripts/bootstrap-workspace.sh",
