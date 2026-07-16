@@ -51,8 +51,10 @@ invariants:
     coverage: automated
     verification: passed
     evidence:
+      - path: packages/runtime-core/src/observability/observability-service.ts
+        assertion: Operator artifact inspection resolves schema identity and digest while exposing content identity, state, provenance, locator status, and tombstone status.
       - path: scripts/collect-m1-evidence.mjs
-        assertion: Retained operator evidence includes artifact ID, digest algorithm and digest, size, schema identity and digest, media type, committed state, locator status, producing execution and attempt provenance, derivations, and tombstone state.
+        assertion: Retained operator evidence validates every committed artifact and collects its lineage through supported inspection APIs.
 
   - referenceInvariant: 5
     id: M1-CONF-005
@@ -95,8 +97,8 @@ invariants:
     evidence:
       - path: tests/integration/runtime-core/observability-recovery.test.ts
         assertion: Cancellation increments the lifecycle epoch, settles durable state, and rejects stale result commits.
-      - path: tests/integration/runtime-core/worker-protocol.test.ts
-        assertion: Workers observe cancellation and stale lifecycle epochs are fenced at the protocol boundary.
+      - path: scripts/run-m1-cancellation-evidence.ts
+        assertion: The retained acceptance scenario records cancelled region, attempt, and delivery state plus stale-result rejection and zero committed outputs.
 
   - referenceInvariant: 9
     id: M1-CONF-009
@@ -106,10 +108,12 @@ invariants:
     coverage: automated
     verification: passed
     evidence:
-      - path: scripts/record-m1-policy-evidence.mjs
-        assertion: The acceptance run records a durable require-approval policy decision with policy identity and version, evaluator version, subject identity, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
-      - path: scripts/collect-m1-evidence.mjs
-        assertion: Retained operator evidence validates that policy-decision records are inspectable and complete.
+      - path: packages/runtime-core/src/policies/policy-decision-service.ts
+        assertion: Registered policy evaluation persists the complete decision record and creates a requested approval transactionally for require-approval outcomes.
+      - path: tests/integration/runtime-core/policy-decision.test.ts
+        assertion: Integration coverage verifies policy identity, evaluator version, subject, normalized inputs, outcome, reason, modifications, and approval relationship.
+      - path: scripts/record-m1-policy-evidence.ts
+        assertion: The acceptance run invokes the runtime policy boundary rather than inserting audit evidence directly.
 
   - referenceInvariant: 10
     id: M1-CONF-010
@@ -132,8 +136,10 @@ invariants:
     coverage: automated
     verification: passed
     evidence:
+      - path: packages/runtime-core/src/observability/observability-service.ts
+        assertion: The operator resource inspection surface exposes region, execution, attempt, external action, type, quantity, unit, and attributes.
       - path: scripts/collect-m1-evidence.mjs
-        assertion: Retained resource-ledger evidence links resource type, quantity, and unit to region, execution, attempt, and external action when present, including failed verifier and replacement attempts.
+        assertion: Acceptance fails unless resource entries are attributable and separately include the deliberate failed verifier attempt and successful replacement.
 
   - referenceInvariant: 12
     id: M1-CONF-012
@@ -144,7 +150,11 @@ invariants:
     verification: passed
     evidence:
       - path: scripts/collect-m1-evidence.mjs
-        assertion: The acceptance evidence enumerates every delivery and fails when any delivery remains outside completed, cancelled, or dead-lettered terminal states.
+        assertion: The operator evidence enumerates every final-investigation delivery and fails when any remains outside completed, cancelled, or dead-lettered terminal states.
+      - path: scripts/run-m1-cancellation-evidence.ts
+        assertion: Cancellation evidence retains the cancelled delivery rather than deleting it.
+      - path: tests/acceptance/m1-live-restart.test.ts
+        assertion: Restart recovery completes all relevant deliveries without loss or duplication.
 
   - referenceInvariant: 13
     id: M1-CONF-013
@@ -156,6 +166,8 @@ invariants:
     evidence:
       - path: tests/integration/runtime-core/observability-recovery.test.ts
         assertion: Projection history rebuild completes without worker dispatch or external-action execution.
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: Retained evidence compares delivery, execution, and external-action counts before and after projection replay.
 
   - referenceInvariant: 14
     id: M1-CONF-014
@@ -229,19 +241,17 @@ acceptanceCriteria:
         assertion: The completed scenario retains failed, abandoned, and replacement attempts, fences stale submission, and publishes no duplicates.
 
   - id: M1-ACCEPT-OPERATOR-EVIDENCE
-    requirement: Retain operator-facing artifact, resource, trace, lineage, recovery, and reconciliation evidence.
-    coverage: automated
-    verification: passed
-    evidence:
-      - path: scripts/accept-m1.sh
-        assertion: The root acceptance command runs the Milestone 1 sequence, collects sanitized operator-facing evidence, and cleans up services on success or failure.
-      - path: scripts/collect-m1-evidence.mjs
-        assertion: The evidence bundle retains artifact, resource, trace, lineage, recovery, reconciliation, cancellation, projection, duplicate-check, and deferred-item summaries.
+    requirement: Retain operator-facing artifact, resource, trace, lineage, recovery, reconciliation, cancellation, and projection-replay evidence for the reviewed commit.
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Replace this pending entry with retained clean-run evidence only after pnpm accept:m1 succeeds and the GitHub Actions artifact is inspected.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
 
-  - id: M1-ACCEPT-CODESPACE
-    requirement: Reproduce all Milestone 1 acceptance checks from a new clean Codespace checkout.
-    coverage: automated
-    verification: passed
-    evidence:
-      - path: scripts/accept-m1.sh
-        assertion: The acceptance command starts from a cleaned service and artifact state, rebuilds dependencies through the repository bootstrap path, and is wired into CI for clean hosted-checkout reproduction; clean Codespace evidence remains documented separately when not available.
+  - id: M1-ACCEPT-CLEAN-ENVIRONMENT
+    requirement: Reproduce all applicable Milestone 1 checks from a clean Codespace or comparably fresh hosted checkout with no reused dependencies, database volumes, or artifact store.
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Record the separate fresh GitHub Actions acceptance job or an actual Codespace run, including commit, run, artifact, and environment identity.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
