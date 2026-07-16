@@ -1,18 +1,28 @@
+import { normalize } from './adapters.js';
+
 export type ApiFailureKind =
-  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
+  | 'transport'
+  | 'http'
+  | 'malformed-response'
+  | 'not-found'
+  | 'aborted';
 
 export class ApiError extends Error {
   constructor(
     readonly kind: ApiFailureKind,
     message: string,
     readonly status?: number,
+    readonly code?: string,
   ) {
     super(message);
+    this.name = 'ApiError';
   }
 }
+
+export type InspectionRecord = Record<string, unknown>;
 export type Page<T> = { items: T[]; nextCursor: string | null };
-export type Json =
-  null | boolean | number | string | Json[] | { [key: string]: Json };
+export type PageOptions = { cursor?: string | null; limit?: number };
+
 const paths = {
   health: '/health',
   regions: '/api/v1/inspect/regions',
@@ -27,122 +37,175 @@ const paths = {
   topology: '/api/v1/inspect/topology',
   stream: '/api/v1/inspect/stream',
 } as const;
-function pageUrl(
-  path: string,
-  opts: { cursor?: string | null; limit?: number } = {},
-) {
-  const u = new URL(path, 'http://factory-floor.local');
-  if (opts.cursor) u.searchParams.set('cursor', opts.cursor);
-  if (opts.limit) u.searchParams.set('limit', String(opts.limit));
-  return u.pathname + u.search;
+
+function isRecord(value: unknown): value is InspectionRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  let res: Response;
+
+function pageUrl(path: string, opts: PageOptions = {}) {
+  const url = new URL(path, 'http://factory-floor.local');
+  if (opts.cursor !== undefined && opts.cursor !== null)
+    url.searchParams.set('cursor', opts.cursor);
+  if (opts.limit !== undefined)
+    url.searchParams.set('limit', String(opts.limit));
+  return url.pathname + url.search;
+}
+
+function errorDetails(body: unknown): { code?: string; message?: string } {
+  if (!isRecord(body) || !isRecord(body.error)) return {};
+  return {
+    code: typeof body.error.code === 'string' ? body.error.code : undefined,
+    message:
+      typeof body.error.message === 'string' ? body.error.message : undefined,
+  };
+}
+
+async function getJson(path: string, signal?: AbortSignal): Promise<unknown> {
+  let response: Response;
   try {
-    res = await fetch(path, {
+    response = await fetch(path, {
       method: 'GET',
       signal,
       headers: { accept: 'application/json' },
     });
-  } catch (e) {
-    if ((e as Error).name === 'AbortError')
+  } catch (error) {
+    if ((error as Error).name === 'AbortError')
       throw new ApiError('aborted', 'Request was cancelled.');
     throw new ApiError('transport', 'Unable to reach the control plane.');
   }
-  const text = await res.text();
+
+  const text = await response.text();
   let body: unknown = null;
   if (text) {
     try {
       body = JSON.parse(text);
     } catch {
-      if (!res.ok)
+      if (!response.ok)
         throw new ApiError(
           'http',
-          text.slice(0, 160) || res.statusText,
-          res.status,
+          `The control plane returned HTTP ${response.status}.`,
+          response.status,
         );
       throw new ApiError(
         'malformed-response',
         'The control plane returned malformed JSON.',
-        res.status,
+        response.status,
       );
     }
   }
-  if (!res.ok)
+
+  if (!response.ok) {
+    const details = errorDetails(body);
     throw new ApiError(
-      res.status === 404 ? 'not-found' : 'http',
-      typeof body === 'object' && body && 'error' in body
-        ? JSON.stringify((body as { error: unknown }).error)
-        : res.statusText,
-      res.status,
+      response.status === 404 ? 'not-found' : 'http',
+      details.message ?? `The control plane returned HTTP ${response.status}.`,
+      response.status,
+      details.code,
     );
-  return body as T;
+  }
+
+  return normalize(body);
 }
-function assertPage<T>(v: unknown): Page<T> {
+
+function assertRecord(value: unknown, description: string): InspectionRecord {
+  if (!isRecord(value))
+    throw new ApiError(
+      'malformed-response',
+      `Expected ${description} to be an object.`,
+    );
+  return value;
+}
+
+function assertPage(value: unknown): Page<InspectionRecord> {
+  const record = assertRecord(value, 'a paged inspection response');
   if (
-    !v ||
-    typeof v !== 'object' ||
-    !Array.isArray((v as Page<T>).items) ||
-    !('nextCursor' in v)
+    !Array.isArray(record.items) ||
+    !record.items.every(isRecord) ||
+    !('nextCursor' in record) ||
+    (record.nextCursor !== null && typeof record.nextCursor !== 'string')
   )
     throw new ApiError(
       'malformed-response',
       'Expected a paged inspection response.',
     );
-  return v as Page<T>;
+  return {
+    items: record.items,
+    nextCursor: record.nextCursor,
+  };
 }
+
+async function getPage(
+  path: string,
+  options?: PageOptions,
+  signal?: AbortSignal,
+): Promise<Page<InspectionRecord>> {
+  return assertPage(await getJson(pageUrl(path, options), signal));
+}
+
 export const consoleApi = {
-  health: (signal?: AbortSignal) =>
-    getJson<{ status: string; service: string }>(paths.health, signal),
-  regions: (o?: { cursor?: string | null; limit?: number }, s?: AbortSignal) =>
-    getJson(paths.regions && pageUrl(paths.regions, o), s).then(assertPage),
-  events: (o?: { cursor?: string | null; limit?: number }, s?: AbortSignal) =>
-    getJson(pageUrl(paths.events, o), s).then(assertPage),
-  deliveries: (
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
-  ) => getJson(pageUrl(paths.deliveries, o), s).then(assertPage),
-  executions: (
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
-  ) => getJson(pageUrl(paths.executions, o), s).then(assertPage),
-  execution: (id: string, s?: AbortSignal) =>
-    getJson<Record<string, unknown>>(
-      `${paths.executions}/${encodeURIComponent(id)}`,
-      s,
+  health: async (signal?: AbortSignal) => {
+    const value = assertRecord(await getJson(paths.health, signal), 'health');
+    if (typeof value.status !== 'string' || typeof value.service !== 'string')
+      throw new ApiError(
+        'malformed-response',
+        'The control-plane health response is incomplete.',
+      );
+    return { status: value.status, service: value.service };
+  },
+  regions: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.regions, options, signal),
+  events: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.events, options, signal),
+  deliveries: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.deliveries, options, signal),
+  executions: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.executions, options, signal),
+  execution: async (id: string, signal?: AbortSignal) =>
+    assertRecord(
+      await getJson(`${paths.executions}/${encodeURIComponent(id)}`, signal),
+      'an execution trace',
     ),
   executionAttempts: (
     id: string,
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
+    options?: PageOptions,
+    signal?: AbortSignal,
   ) =>
-    getJson(
-      pageUrl(`${paths.executions}/${encodeURIComponent(id)}/attempts`, o),
-      s,
-    ).then(assertPage),
-  attempts: (o?: { cursor?: string | null; limit?: number }, s?: AbortSignal) =>
-    getJson(pageUrl(paths.attempts, o), s).then(assertPage),
-  artifacts: (
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
-  ) => getJson(pageUrl(paths.artifacts, o), s).then(assertPage),
-  artifactLineage: (id: string, s?: AbortSignal) =>
-    getJson<Record<string, unknown>>(
-      `${paths.artifacts}/${encodeURIComponent(id)}/lineage`,
-      s,
+    getPage(
+      `${paths.executions}/${encodeURIComponent(id)}/attempts`,
+      options,
+      signal,
     ),
-  resources: (
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
-  ) => getJson(pageUrl(paths.resources, o), s).then(assertPage),
-  policyDecisions: (
-    o?: { cursor?: string | null; limit?: number },
-    s?: AbortSignal,
-  ) => getJson(pageUrl(paths.policies, o), s).then(assertPage),
-  projections: (s?: AbortSignal) =>
-    getJson<{ items: unknown[] }>(paths.projections, s),
-  topology: (s?: AbortSignal) =>
-    getJson<Record<string, unknown>>(paths.topology, s),
+  attempts: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.attempts, options, signal),
+  artifacts: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.artifacts, options, signal),
+  artifactLineage: async (id: string, signal?: AbortSignal) =>
+    assertRecord(
+      await getJson(
+        `${paths.artifacts}/${encodeURIComponent(id)}/lineage`,
+        signal,
+      ),
+      'artifact lineage',
+    ),
+  resources: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.resources, options, signal),
+  policyDecisions: (options?: PageOptions, signal?: AbortSignal) =>
+    getPage(paths.policies, options, signal),
+  projections: async (signal?: AbortSignal) => {
+    const value = assertRecord(
+      await getJson(paths.projections, signal),
+      'projection status',
+    );
+    if (!Array.isArray(value.items) || !value.items.every(isRecord))
+      throw new ApiError(
+        'malformed-response',
+        'The projection response is incomplete.',
+      );
+    return { items: value.items };
+  },
+  topology: async (signal?: AbortSignal) =>
+    assertRecord(await getJson(paths.topology, signal), 'active topology'),
   streamPath: paths.stream,
 };
+
 export const readOnlyInspectionPaths = paths;
