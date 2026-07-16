@@ -159,6 +159,167 @@ export class ObservabilityService {
     ]);
   }
 
+  async activeTopology(
+    opts: {
+      regionLimit?: number;
+      componentLimit?: number;
+      connectionLimit?: number;
+    } = {},
+  ) {
+    const regionLimit = opts.regionLimit ?? 100;
+    const componentLimit = opts.componentLimit ?? 500;
+    const connectionLimit = opts.connectionLimit ?? 1000;
+    for (const [name, value] of Object.entries({
+      regionLimit,
+      componentLimit,
+      connectionLimit,
+    })) {
+      if (!Number.isInteger(value) || value < 1)
+        throw new Error(`invalid_${name}`);
+    }
+
+    const regions = await this.db
+      .selectFrom('regions as region')
+      .leftJoin(
+        'topology_revisions as revision',
+        'revision.id',
+        'region.active_topology_revision_id',
+      )
+      .select([
+        'region.id',
+        'region.name',
+        'region.parent_region_id',
+        'region.lifecycle_status',
+        'region.lifecycle_epoch',
+        'region.active_topology_revision_id',
+        'revision.revision_number',
+        'revision.content_digest as topology_revision_digest',
+      ])
+      .where('region.active_topology_revision_id', 'is not', null)
+      .orderBy('region.id')
+      .limit(regionLimit + 1)
+      .execute();
+    if (regions.length > regionLimit)
+      throw new Error('topology_region_bound_exceeded');
+
+    const revisionIds = regions
+      .map((region) => region.active_topology_revision_id)
+      .filter((id): id is string => id !== null);
+
+    const components = revisionIds.length
+      ? await this.db
+          .selectFrom('component_instances as component')
+          .innerJoin(
+            'component_definitions as definition',
+            'definition.id',
+            'component.component_definition_id',
+          )
+          .select([
+            'component.id',
+            'component.region_id',
+            'component.topology_revision_id',
+            'component.name',
+            'component.component_definition_id',
+            'definition.name as component_definition_name',
+            'definition.version as component_definition_version',
+            'definition.content_digest as component_definition_digest',
+            'component.lifecycle_status',
+          ])
+          .where('component.topology_revision_id', 'in', revisionIds)
+          .orderBy('component.region_id')
+          .orderBy('component.name')
+          .orderBy('component.id')
+          .limit(componentLimit + 1)
+          .execute()
+      : [];
+    if (components.length > componentLimit)
+      throw new Error('topology_component_bound_exceeded');
+
+    const definitionIds = [
+      ...new Set(
+        components.map((component) => component.component_definition_id),
+      ),
+    ];
+    const ports = definitionIds.length
+      ? await this.db
+          .selectFrom('port_definitions')
+          .select([
+            'id',
+            'component_definition_id',
+            'name',
+            'direction',
+            'schema_id',
+            'required',
+          ])
+          .where('component_definition_id', 'in', definitionIds)
+          .orderBy('component_definition_id')
+          .orderBy('direction')
+          .orderBy('name')
+          .execute()
+      : [];
+
+    const portsByDefinition = new Map<string, typeof ports>();
+    for (const port of ports)
+      portsByDefinition.set(port.component_definition_id, [
+        ...(portsByDefinition.get(port.component_definition_id) ?? []),
+        port,
+      ]);
+
+    const connections = revisionIds.length
+      ? await this.db
+          .selectFrom('connections')
+          .selectAll()
+          .where('topology_revision_id', 'in', revisionIds)
+          .orderBy('topology_revision_id')
+          .orderBy('source_component_instance_id')
+          .orderBy('source_port_name')
+          .orderBy('target_component_instance_id')
+          .orderBy('target_port_name')
+          .limit(connectionLimit + 1)
+          .execute()
+      : [];
+    if (connections.length > connectionLimit)
+      throw new Error('topology_connection_bound_exceeded');
+
+    return {
+      bounds: { regionLimit, componentLimit, connectionLimit },
+      regions: regions.map((region) => ({
+        id: region.id,
+        name: region.name,
+        parentRegionId: region.parent_region_id,
+        lifecycleStatus: region.lifecycle_status,
+        lifecycleEpoch: region.lifecycle_epoch,
+        activeTopologyRevision: {
+          id: region.active_topology_revision_id,
+          revisionNumber: region.revision_number,
+          digest: region.topology_revision_digest,
+        },
+      })),
+      components: components.map((component) => ({
+        id: component.id,
+        regionId: component.region_id,
+        topologyRevisionId: component.topology_revision_id,
+        name: component.name,
+        definition: {
+          id: component.component_definition_id,
+          name: component.component_definition_name,
+          version: component.component_definition_version,
+          digest: component.component_definition_digest,
+        },
+        lifecycleStatus: component.lifecycle_status,
+        ports: portsByDefinition.get(component.component_definition_id) ?? [],
+      })),
+      connections: connections.map((connection) => ({
+        id: connection.id,
+        topologyRevisionId: connection.topology_revision_id,
+        sourceComponentId: connection.source_component_instance_id,
+        sourcePortName: connection.source_port_name,
+        targetComponentId: connection.target_component_instance_id,
+        targetPortName: connection.target_port_name,
+      })),
+    };
+  }
+
   async listEvents(opts: { cursor?: string; limit?: number } = {}) {
     return this.page('events', opts, [
       'id',

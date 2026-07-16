@@ -1,0 +1,142 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #111;
+  color: #e7e1d3;
+}
+body {
+  margin: 0;
+}
+a {
+  color: #e8bd6d;
+}
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+aside {
+  background: #17191b;
+  border-right: 1px solid #3a3a35;
+  padding: 1rem;
+}
+nav {
+  display: grid;
+  gap: 0.5rem;
+}
+nav a {
+  padding: 0.55rem;
+  border: 1px solid #333;
+  text-decoration: none;
+}
+nav a.active {
+  background: #2d332e;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #333;
+  padding: 0.75rem 1rem;
+}
+main {
+  padding: 1rem;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+article,
+.panel,
+section {
+  border: 1px solid #373a36;
+  background: #1a1d1d;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+.badge {
+  border: 1px solid #78705d;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: #252821;
+}
+.muted {
+  color: #aaa;
+}
+.error {
+  color: #ffb3a8;
+}
+.json {
+  max-width: 100%;
+  overflow: auto;
+  background: #111;
+  padding: 0.5rem;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+.copy {
+  font:
+    12px ui-monospace,
+    monospace;
+  background: #262626;
+  color: #e7e1d3;
+  border: 1px solid #555;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th,
+td {
+  border-bottom: 1px solid #333;
+  text-align: left;
+  padding: 0.45rem;
+  vertical-align: top;
+}
+th {
+  color: #c5b892;
+}
+.split {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1rem;
+}
+.graph {
+  height: 620px;
+  background: #101414;
+}
+.graph.small {
+  height: 320px;
+}
+.timeline li {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border-left: 4px solid #9a7954;
+  background: #171717;
+}
+:focus-visible {
+  outline: 2px solid #e8bd6d;
+}
+@media (max-width: 700px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  aside {
+    border-right: 0;
+  }
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .graph {
+    height: 420px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

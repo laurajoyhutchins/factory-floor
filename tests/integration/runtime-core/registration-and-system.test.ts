@@ -7,6 +7,7 @@ import {
   resetDatabaseForDevelopment,
 } from '../../../packages/db/src/index.js';
 import {
+  ObservabilityService,
   RegistrationService,
   SystemApplicationService,
 } from '../../../packages/runtime-core/src/index.js';
@@ -156,6 +157,24 @@ describe('registration and static system application', () => {
       .where('name', '=', 'investigation')
       .executeTakeFirstOrThrow();
     expect(investigation.active_topology_revision_id).not.toBeNull();
+
+    const topology = await new ObservabilityService(db).activeTopology();
+    expect(topology.regions.map((region) => region.name)).toContain(
+      'investigation',
+    );
+    expect(topology.components.map((component) => component.name)).toEqual([
+      'retrieve',
+      'verify',
+    ]);
+    expect(topology.connections).toEqual([
+      expect.objectContaining({
+        sourcePortName: 'evidence',
+        targetPortName: 'evidence',
+      }),
+    ]);
+    expect(topology.components[0].ports.map((port) => port.name)).toContain(
+      'objective',
+    );
   });
 
   it('rejects invalid declarations before writing anything', async () => {
