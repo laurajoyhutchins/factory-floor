@@ -63,9 +63,10 @@ export function workerAuthorizationFromEnv(
         )
       )
         throw new Error('worker authorization entries are invalid');
+      const capabilities = entry.capabilities as string[];
       workers[workerId] = {
         token: entry.token,
-        capabilities: [...new Set(entry.capabilities)],
+        capabilities: [...new Set(capabilities)],
       };
     }
     if (Object.keys(workers).length === 0)
@@ -263,7 +264,11 @@ export async function registerWorkerRoutes(
                 403,
               );
             const delegated = new Set(allowed.capabilities);
-            if (input.capabilities.some((capability) => !delegated.has(capability)))
+            if (
+              input.capabilities.some(
+                (capability) => !delegated.has(capability),
+              )
+            )
               throw new WorkerProtocolError(
                 'capability_denied',
                 'worker requested an undelegated component selector',
