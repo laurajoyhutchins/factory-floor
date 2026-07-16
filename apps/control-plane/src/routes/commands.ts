@@ -19,7 +19,8 @@ function isCommandRequestBody(value: unknown): value is CommandRequestBody {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return false;
   const body = value as Record<string, unknown>;
-  if (typeof body.region !== 'string' || body.region.trim() === '') return false;
+  if (typeof body.region !== 'string' || body.region.trim() === '')
+    return false;
   if (typeof body.commandType !== 'string' || body.commandType.trim() === '')
     return false;
   for (const field of ['correlationId', 'idempotencyKey', 'expiresAt'] as const)

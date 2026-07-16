@@ -135,7 +135,11 @@ export class CommandService {
       });
       const deliveries = rejected
         ? []
-        : await this.routing.routeCommand(trx, command as any, revision! as any);
+        : await this.routing.routeCommand(
+            trx,
+            command as any,
+            revision! as any,
+          );
       return {
         commandId: command.id,
         status: command.status,

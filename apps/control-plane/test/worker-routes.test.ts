@@ -28,16 +28,19 @@ function createService() {
       uploadUrl: `/worker/v1/artifacts/upload/${uuid}`,
       expiresAt: new Date().toISOString(),
     })),
-    upload: vi.fn(async (_stagedRef: string, _input: unknown, stream: Readable) => {
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-      return {
-        protocolVersion: '1.0',
-        stagedRef: uuid,
-        digest: '3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7',
-        sizeBytes: Buffer.concat(chunks).length,
-      };
-    }),
+    upload: vi.fn(
+      async (_stagedRef: string, _input: unknown, stream: Readable) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+        return {
+          protocolVersion: '1.0',
+          stagedRef: uuid,
+          digest:
+            '3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7',
+          sizeBytes: Buffer.concat(chunks).length,
+        };
+      },
+    ),
     submitResult: vi.fn(async () => ({
       protocolVersion: '1.0',
       accepted: true,
@@ -97,7 +100,10 @@ describe('worker routes', () => {
       payload: { protocolVersion: '1.0', workerId: 'w', capabilities: [] },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ protocolVersion: '1.0', claimed: false });
+    expect(response.json()).toMatchObject({
+      protocolVersion: '1.0',
+      claimed: false,
+    });
     expect(service.claim).toHaveBeenCalledOnce();
   });
 
@@ -168,7 +174,8 @@ describe('worker routes', () => {
         status: 'failed',
         failure: {
           code: 'DEMO_FIRST_ATTEMPT_INTENTIONAL_FAILURE',
-          message: 'Intentional deterministic first-attempt verifier failure for the demo.',
+          message:
+            'Intentional deterministic first-attempt verifier failure for the demo.',
           category: 'model',
           retryable: true,
           details: {
@@ -204,7 +211,9 @@ describe('worker routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ stagedRef: uuid, sizeBytes: 4 });
     expect(service.upload).toHaveBeenCalledOnce();
-    expect(service.upload.mock.calls[0]?.[1]).toMatchObject({ lifecycleEpoch: 0 });
+    expect(service.upload.mock.calls[0]?.[1]).toMatchObject({
+      lifecycleEpoch: 0,
+    });
   });
 
   it('does not apply the worker error envelope to public routes', async () => {
@@ -222,6 +231,9 @@ describe('worker routes', () => {
     });
     expect(response.statusCode).toBe(400);
     expect(response.json()).not.toHaveProperty('protocolVersion');
-    expect(response.json()).not.toHaveProperty('code', 'internal_transient_failure');
+    expect(response.json()).not.toHaveProperty(
+      'code',
+      'internal_transient_failure',
+    );
   });
 });

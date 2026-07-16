@@ -12,7 +12,8 @@ function option(name: string): string | undefined {
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
-const artifactRoot = process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts';
+const artifactRoot =
+  process.env.ARTIFACT_STORE_ROOT ?? '.factory-floor/artifacts';
 const removeOrphans = process.argv.includes('--remove-orphans');
 const dryRun = process.argv.includes('--dry-run') || !removeOrphans;
 const db = createDatabase(databaseUrl);

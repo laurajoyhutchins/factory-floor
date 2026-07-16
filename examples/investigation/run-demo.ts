@@ -4,7 +4,10 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { Client } from 'pg';
 import { parseAllDocuments } from 'yaml';
-import { createDatabase, migrateToLatest } from '../../packages/db/src/index.js';
+import {
+  createDatabase,
+  migrateToLatest,
+} from '../../packages/db/src/index.js';
 import { buildApp } from '../../apps/control-plane/src/app.js';
 import {
   RegistrationService,
@@ -68,10 +71,7 @@ function startProcess(
   return child;
 }
 
-function signalProcessTree(
-  child: ChildProcess,
-  signal: NodeJS.Signals,
-): void {
+function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
   if (child.pid === undefined) return;
   if (process.platform !== 'win32') {
     try {
@@ -210,7 +210,11 @@ async function main() {
     for (;;) {
       const executions = await db
         .selectFrom('executions as execution')
-        .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
+        .innerJoin(
+          'deliveries as delivery',
+          'delivery.id',
+          'execution.delivery_id',
+        )
         .innerJoin(
           'component_instances as component',
           'component.id',
@@ -222,8 +226,16 @@ async function main() {
         .execute();
       const attempts = await db
         .selectFrom('execution_attempts as attempt')
-        .innerJoin('executions as execution', 'execution.id', 'attempt.execution_id')
-        .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
+        .innerJoin(
+          'executions as execution',
+          'execution.id',
+          'attempt.execution_id',
+        )
+        .innerJoin(
+          'deliveries as delivery',
+          'delivery.id',
+          'execution.delivery_id',
+        )
         .select([
           'attempt.id',
           'attempt.execution_id',
@@ -235,8 +247,16 @@ async function main() {
         .execute();
       const outputs = await db
         .selectFrom('execution_outputs as output')
-        .innerJoin('executions as execution', 'execution.id', 'output.execution_id')
-        .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
+        .innerJoin(
+          'executions as execution',
+          'execution.id',
+          'output.execution_id',
+        )
+        .innerJoin(
+          'deliveries as delivery',
+          'delivery.id',
+          'execution.delivery_id',
+        )
         .select(['output.id', 'output.execution_id', 'output.port_name'])
         .where('delivery.correlation_id', '=', command.correlationId)
         .execute();

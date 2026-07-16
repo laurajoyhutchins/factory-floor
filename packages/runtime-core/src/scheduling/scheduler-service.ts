@@ -105,7 +105,11 @@ export class SchedulerService {
       const ports = await trx
         .selectFrom('port_definitions')
         .selectAll()
-        .where('component_definition_id', '=', component.component_definition_id)
+        .where(
+          'component_definition_id',
+          '=',
+          component.component_definition_id,
+        )
         .where('direction', '=', 'input')
         .orderBy('name')
         .execute();
@@ -134,7 +138,9 @@ export class SchedulerService {
         const expected = fanInExpected.get(port.name) ?? 1;
         if (rows.length < expected) return null;
         if (rows.length > expected)
-          throw new Error(`ambiguous duplicate deliveries for port ${port.name}`);
+          throw new Error(
+            `ambiguous duplicate deliveries for port ${port.name}`,
+          );
         selected.push(...rows);
       }
 
@@ -196,7 +202,11 @@ export class SchedulerService {
         .selectFrom('executions')
         .selectAll()
         .where('region_id', '=', candidate.region_id)
-        .where('component_instance_id', '=', candidate.target_component_instance_id)
+        .where(
+          'component_instance_id',
+          '=',
+          candidate.target_component_instance_id,
+        )
         .where('topology_revision_id', '=', candidate.topology_revision_id)
         .where('lifecycle_epoch', '=', region.lifecycle_epoch)
         .where('input_set_digest', '=', digest)

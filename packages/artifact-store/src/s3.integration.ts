@@ -19,14 +19,17 @@ const credentials = {
   secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'factoryfloor_dev_password',
 };
 
-const createClient = () => new S3Client({ endpoint, region, credentials, forcePathStyle: true });
-const chunks = (...parts: string[]) => Readable.from(parts.map((part) => Buffer.from(part)));
+const createClient = () =>
+  new S3Client({ endpoint, region, credentials, forcePathStyle: true });
+const chunks = (...parts: string[]) =>
+  Readable.from(parts.map((part) => Buffer.from(part)));
 const readAll = async (stream: NodeJS.ReadableStream): Promise<string> => {
   const buffers: Buffer[] = [];
   for await (const chunk of stream) buffers.push(Buffer.from(chunk as Buffer));
   return Buffer.concat(buffers).toString('utf8');
 };
-const digestOf = (text: string) => createHash('sha256').update(text).digest('hex');
+const digestOf = (text: string) =>
+  createHash('sha256').update(text).digest('hex');
 const metadata = (bytes: string) => ({
   digest: digestOf(bytes),
   size: Buffer.byteLength(bytes).toString(),
@@ -42,27 +45,40 @@ describe('S3ArtifactBlobStore MinIO conformance', () => {
     return {
       createStore: async () => {
         await client.send(new CreateBucketCommand({ Bucket: bucket }));
-        return new S3ArtifactBlobStore({ endpoint, region, bucket, prefix, forcePathStyle: true, clientConfig: { credentials } });
+        return new S3ArtifactBlobStore({
+          endpoint,
+          region,
+          bucket,
+          prefix,
+          forcePathStyle: true,
+          clientConfig: { credentials },
+        });
       },
       corruptStaged: async (stagingId, bytes) => {
-        await client.send(new PutObjectCommand({
-          Bucket: bucket,
-          Key: `${prefix}/staging/${stagingId}`,
-          Body: bytes,
-          Metadata: metadata('abc'),
-        }));
+        await client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: `${prefix}/staging/${stagingId}`,
+            Body: bytes,
+            Metadata: metadata('abc'),
+          }),
+        );
       },
       corruptCommitted: async (digest, bytes) => {
-        await client.send(new PutObjectCommand({
-          Bucket: bucket,
-          Key: `${prefix}/committed/sha256/${digest.slice(0, 2)}/${digest}`,
-          Body: bytes,
-          Metadata: metadata('abc'),
-        }));
+        await client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: `${prefix}/committed/sha256/${digest.slice(0, 2)}/${digest}`,
+            Body: bytes,
+            Metadata: metadata('abc'),
+          }),
+        );
       },
       cleanup: async () => {
         await emptyBucket(client, bucket);
-        await client.send(new DeleteBucketCommand({ Bucket: bucket })).catch(() => undefined);
+        await client
+          .send(new DeleteBucketCommand({ Bucket: bucket }))
+          .catch(() => undefined);
       },
     };
   });
@@ -76,38 +92,64 @@ describe('S3ArtifactBlobStore MinIO behavior', () => {
 
   beforeEach(async () => {
     await client.send(new CreateBucketCommand({ Bucket: bucket }));
-    store = new S3ArtifactBlobStore({ endpoint, region, bucket, prefix, forcePathStyle: true, clientConfig: { credentials } });
+    store = new S3ArtifactBlobStore({
+      endpoint,
+      region,
+      bucket,
+      prefix,
+      forcePathStyle: true,
+      clientConfig: { credentials },
+    });
   });
 
   afterEach(async () => {
     await emptyBucket(client, bucket);
-    await client.send(new DeleteBucketCommand({ Bucket: bucket })).catch(() => undefined);
+    await client
+      .send(new DeleteBucketCommand({ Bucket: bucket }))
+      .catch(() => undefined);
   });
 
   it('streams multi-chunk content and returns opaque locators without credentials', async () => {
-    const staged = await store.stage('multi', chunks('a'.repeat(64 * 1024), 'b'.repeat(64 * 1024), 'c'));
+    const staged = await store.stage(
+      'multi',
+      chunks('a'.repeat(64 * 1024), 'b'.repeat(64 * 1024), 'c'),
+    );
     expect(staged.stagedLocator).toBe(`s3://${bucket}/${prefix}/staging/multi`);
     expect(staged.stagedLocator).not.toContain(credentials.secretAccessKey);
-    expect(await readAll(await store.readStaged('multi'))).toHaveLength(128 * 1024 + 1);
+    expect(await readAll(await store.readStaged('multi'))).toHaveLength(
+      128 * 1024 + 1,
+    );
   });
 
   it('does not expose incomplete tmp objects through reads, existence, locators, or listing', async () => {
-    await client.send(new PutObjectCommand({ Bucket: bucket, Key: `${prefix}/tmp/orphan`, Body: 'abc' }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: `${prefix}/tmp/orphan`,
+        Body: 'abc',
+      }),
+    );
     expect(await store.stagedExists('orphan')).toBe(false);
-    await expect(store.readStaged('orphan')).rejects.toMatchObject({ code: 'not_found' });
+    await expect(store.readStaged('orphan')).rejects.toMatchObject({
+      code: 'not_found',
+    });
     const page = await store.listStaged({ limit: 10 });
     expect(page.objects).toEqual([]);
   });
 
   it('keeps promotion safely retryable after committed publication but before staged cleanup', async () => {
     const staged = await store.stage('left-behind', chunks('abc'));
-    await client.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: `${prefix}/committed/sha256/${staged.digest.slice(0, 2)}/${staged.digest}`,
-      Body: 'abc',
-      Metadata: metadata('abc'),
-    }));
-    await expect(store.promote('left-behind', staged.digest, staged.size)).resolves.toMatchObject({ digest: staged.digest });
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: `${prefix}/committed/sha256/${staged.digest.slice(0, 2)}/${staged.digest}`,
+        Body: 'abc',
+        Metadata: metadata('abc'),
+      }),
+    );
+    await expect(
+      store.promote('left-behind', staged.digest, staged.size),
+    ).resolves.toMatchObject({ digest: staged.digest });
     expect(await store.stagedExists('left-behind')).toBe(false);
   });
 
@@ -123,9 +165,19 @@ describe('S3ArtifactBlobStore MinIO behavior', () => {
 
 async function emptyBucket(client: S3Client, bucket: string): Promise<void> {
   while (true) {
-    const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket }));
-    const objects = (listed.Contents ?? []).flatMap((object) => (object.Key === undefined ? [] : [{ Key: object.Key }]));
-    if (objects.length > 0) await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: objects } }));
+    const listed = await client.send(
+      new ListObjectsV2Command({ Bucket: bucket }),
+    );
+    const objects = (listed.Contents ?? []).flatMap((object) =>
+      object.Key === undefined ? [] : [{ Key: object.Key }],
+    );
+    if (objects.length > 0)
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: objects },
+        }),
+      );
     if (listed.IsTruncated !== true) break;
   }
 }

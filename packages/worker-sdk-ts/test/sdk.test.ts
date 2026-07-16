@@ -5,9 +5,7 @@ import type {
   InvocationEnvelope,
   ProposedResult,
 } from '@factory-floor/contracts-ts';
-import workerFixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with {
-  type: 'json',
-};
+import workerFixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with { type: 'json' };
 import {
   ComponentRegistry,
   WorkerProtocolClient,
@@ -40,7 +38,9 @@ function executable(runner: WorkerRunner): ExecutableRunner {
   return runner as unknown as ExecutableRunner;
 }
 
-function runnerClient(overrides: Record<string, unknown> = {}): WorkerProtocolClient {
+function runnerClient(
+  overrides: Record<string, unknown> = {},
+): WorkerProtocolClient {
   return {
     claim: async () => ({
       protocolVersion: '1.0',

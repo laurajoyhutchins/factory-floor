@@ -50,12 +50,12 @@ function completed(
   };
 }
 
-function firstPayload(
-  inputs: { payload: unknown }[],
-): Record<string, unknown> {
-  return (inputs[0]?.payload && typeof inputs[0].payload === 'object'
-    ? inputs[0].payload
-    : {}) as Record<string, unknown>;
+function firstPayload(inputs: { payload: unknown }[]): Record<string, unknown> {
+  return (
+    inputs[0]?.payload && typeof inputs[0].payload === 'object'
+      ? inputs[0].payload
+      : {}
+  ) as Record<string, unknown>;
 }
 
 function stableString(value: unknown): string {
@@ -162,8 +162,7 @@ export async function startDemoWorkerFromEnv(): Promise<void> {
   const bearerToken = process.env.FACTORY_FLOOR_WORKER_TOKEN ?? '';
   if (bearerToken.length === 0)
     throw new Error('FACTORY_FLOOR_WORKER_TOKEN is required');
-  const workerId =
-    process.env.FACTORY_FLOOR_WORKER_ID ?? 'demo-ts-worker';
+  const workerId = process.env.FACTORY_FLOOR_WORKER_ID ?? 'demo-ts-worker';
   const concurrency = Number(
     process.env.FACTORY_FLOOR_WORKER_CONCURRENCY ?? '1',
   );

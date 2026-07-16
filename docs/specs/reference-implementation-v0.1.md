@@ -12,14 +12,14 @@ Factory Floor is a durable execution substrate for composing information-work sy
 
 The product-facing vocabulary may use factory language, while APIs and durable records retain precise runtime terms:
 
-| Product language | Runtime term |
-|---|---|
-| Machine | Component definition or instance |
-| Work cell | Region |
-| Line | Connection |
-| Workpiece | Artifact reference |
-| Blueprint | Template |
-| Factory Floor | Installation and operator console |
+| Product language | Runtime term                      |
+| ---------------- | --------------------------------- |
+| Machine          | Component definition or instance  |
+| Work cell        | Region                            |
+| Line             | Connection                        |
+| Workpiece        | Artifact reference                |
+| Blueprint        | Template                          |
+| Factory Floor    | Installation and operator console |
 
 Product terminology must never obscure security, provenance, lifecycle, or schema semantics.
 
@@ -159,12 +159,12 @@ Workers submit proposed results containing:
 
 ```ts
 interface ProposedExecutionResult {
-  protocolVersion: "1.0";
+  protocolVersion: '1.0';
   executionId: string;
   attemptId: string;
   leaseToken: string;
   lifecycleEpoch: number;
-  status: "completed" | "failed" | "cancelled";
+  status: 'completed' | 'failed' | 'cancelled';
   stagedArtifacts: StagedArtifactRef[];
   proposedEvents: ProposedEvent[];
   proposedState?: StagedArtifactRef;

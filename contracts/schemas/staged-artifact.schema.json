@@ -11,8 +11,19 @@
     "sizeBytes": { "type": "integer", "minimum": 0 },
     "mediaType": { "type": "string", "minLength": 1 },
     "schemaId": { "type": "string", "minLength": 1 },
-    "schemaDigest": { "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest" },
+    "schemaDigest": {
+      "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest"
+    },
     "provenance": { "$ref": "source-identity.schema.json" }
   },
-  "required": ["stagingId", "portName", "digest", "sizeBytes", "mediaType", "schemaId", "schemaDigest", "provenance"]
+  "required": [
+    "stagingId",
+    "portName",
+    "digest",
+    "sizeBytes",
+    "mediaType",
+    "schemaId",
+    "schemaDigest",
+    "provenance"
+  ]
 }

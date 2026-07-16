@@ -12,5 +12,12 @@
     "requestArtifact": { "$ref": "staged-artifact.schema.json" },
     "risk": { "enum": ["low", "medium", "high", "irreversible"] }
   },
-  "required": ["proposalId", "actionType", "idempotencyKey", "capabilityHandle", "requestArtifact", "risk"]
+  "required": [
+    "proposalId",
+    "actionType",
+    "idempotencyKey",
+    "capabilityHandle",
+    "requestArtifact",
+    "risk"
+  ]
 }

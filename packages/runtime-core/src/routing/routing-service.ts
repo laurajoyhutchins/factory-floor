@@ -33,7 +33,10 @@ export class RoutingService {
     },
     revision: { id: string; topology: Json },
   ) {
-    const targets = topologyIngress(revision.topology as any, command.command_type);
+    const targets = topologyIngress(
+      revision.topology as any,
+      command.command_type,
+    );
     const deliveries = [];
     for (const target of targets) {
       const instance = await db
@@ -116,8 +119,7 @@ export class RoutingService {
           id: createUuidV7(),
           region_id: event.region_id,
           topology_revision_id: topologyRevisionId,
-          target_component_instance_id:
-            connection.target_component_instance_id,
+          target_component_instance_id: connection.target_component_instance_id,
           target_port_name: connection.target_port_name,
           source_event_id: event.id,
           correlation_id: event.correlation_id ?? event.id,

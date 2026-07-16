@@ -29,7 +29,8 @@ for (const { path, schema } of schemas) {
     typeof schema.$id === 'string' && schema.$id.length > 0
       ? schema.$id
       : pathToFileURL(path).href;
-  if (!ajv.getSchema(key)) throw new Error(`Failed to compile schema ${relative(root, path)}`);
+  if (!ajv.getSchema(key))
+    throw new Error(`Failed to compile schema ${relative(root, path)}`);
 }
 
 globalThis.console.log(

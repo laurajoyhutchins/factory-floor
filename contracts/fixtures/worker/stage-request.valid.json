@@ -1,1 +1,12 @@
-{"protocolVersion":"1.0","executionId":"018f6f73-8d5b-7cc8-9ed9-6b2f4e25d001","attemptId":"018f6f73-8d5b-7cc8-9ed9-6b2f4e25d002","leaseToken":"opaque","lifecycleEpoch":0,"portName":"result","mediaType":"application/json","expectedDigest":"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7","expectedSizeBytes":4,"metadata":{}}
+{
+  "protocolVersion": "1.0",
+  "executionId": "018f6f73-8d5b-7cc8-9ed9-6b2f4e25d001",
+  "attemptId": "018f6f73-8d5b-7cc8-9ed9-6b2f4e25d002",
+  "leaseToken": "opaque",
+  "lifecycleEpoch": 0,
+  "portName": "result",
+  "mediaType": "application/json",
+  "expectedDigest": "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7",
+  "expectedSizeBytes": 4,
+  "metadata": {}
+}

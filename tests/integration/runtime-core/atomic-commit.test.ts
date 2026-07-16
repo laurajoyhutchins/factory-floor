@@ -221,7 +221,9 @@ describe('atomic execution commit and retry', () => {
   });
 
   beforeEach(async () => {
-    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    expect(
+      (await resetDatabaseForDevelopment(db, 'test')).error,
+    ).toBeUndefined();
     ({ schemaId, grantId } = await seed(db));
     root = await mkdtemp(join(tmpdir(), 'ff-atomic-'));
     blobStore = new FilesystemArtifactBlobStore(root);
@@ -372,7 +374,9 @@ describe('atomic execution commit and retry', () => {
         .where('staged_ref', '=', artifact.stagingId)
         .executeTakeFirstOrThrow(),
     ).resolves.toMatchObject({ status: 'promoted' });
-    await expect(blobStore.committedExists(artifact.digest)).resolves.toBe(true);
+    await expect(blobStore.committedExists(artifact.digest)).resolves.toBe(
+      true,
+    );
   });
 
   it('rolls back validation failures and permits a corrected result', async () => {
@@ -524,10 +528,7 @@ describe('atomic execution commit and retry', () => {
     ).resolves.toMatchObject({ accepted: true, duplicate: false });
 
     await expect(
-      db
-        .selectFrom('external_actions')
-        .selectAll()
-        .executeTakeFirstOrThrow(),
+      db.selectFrom('external_actions').selectAll().executeTakeFirstOrThrow(),
     ).resolves.toMatchObject({
       proposal_id: proposalId,
       capability_grant_id: grantId,
@@ -551,8 +552,8 @@ describe('atomic execution commit and retry', () => {
     await expect(
       db.selectFrom('resource_ledger').selectAll().execute(),
     ).resolves.toHaveLength(5);
-    await expect(blobStore.committedExists(requestArtifact.digest)).resolves.toBe(
-      true,
-    );
+    await expect(
+      blobStore.committedExists(requestArtifact.digest),
+    ).resolves.toBe(true);
   });
 });

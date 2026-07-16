@@ -123,37 +123,43 @@ export async function registerWorkerRoutes(
 
       workerApp.setErrorHandler((error: FastifyError, request, reply) => {
         if (error instanceof WorkerProtocolError)
-          return reply.code(error.statusCode).send(
-            workerError(
-              request.id,
-              error.code,
-              error.message,
-              error.retryable,
-            ),
-          );
+          return reply
+            .code(error.statusCode)
+            .send(
+              workerError(
+                request.id,
+                error.code,
+                error.message,
+                error.retryable,
+              ),
+            );
         if (error.validation) {
           request.log.warn(
             { validation: error.validation },
             'worker request validation failed',
           );
-          return reply.code(400).send(
-            workerError(
-              request.id,
-              'invalid_request',
-              'request did not match the worker protocol schema',
-              false,
-            ),
-          );
+          return reply
+            .code(400)
+            .send(
+              workerError(
+                request.id,
+                'invalid_request',
+                'request did not match the worker protocol schema',
+                false,
+              ),
+            );
         }
         request.log.error({ err: error }, 'worker route failed');
-        return reply.code(500).send(
-          workerError(
-            request.id,
-            'internal_transient_failure',
-            'internal worker protocol failure',
-            true,
-          ),
-        );
+        return reply
+          .code(500)
+          .send(
+            workerError(
+              request.id,
+              'internal_transient_failure',
+              'internal worker protocol failure',
+              true,
+            ),
+          );
       });
 
       workerApp.post(
@@ -177,7 +183,9 @@ export async function registerWorkerRoutes(
         { schema: { body: { $ref: contractId('worker/heartbeat') } } },
         async (request) =>
           service.cancellation(
-            request.body as Parameters<WorkerProtocolService['cancellation']>[0],
+            request.body as Parameters<
+              WorkerProtocolService['cancellation']
+            >[0],
           ),
       );
       workerApp.post(
@@ -223,7 +231,9 @@ export async function registerWorkerRoutes(
         { schema: { body: { $ref: contractId('proposed-result') } } },
         async (request) =>
           service.submitResult(
-            request.body as Parameters<WorkerProtocolService['submitResult']>[0],
+            request.body as Parameters<
+              WorkerProtocolService['submitResult']
+            >[0],
           ),
       );
       workerApp.post(

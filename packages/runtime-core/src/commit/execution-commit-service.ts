@@ -97,7 +97,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isExecutionSource(value: Json, executionId: string, attemptId: string) {
+function isExecutionSource(
+  value: Json,
+  executionId: string,
+  attemptId: string,
+) {
   return (
     isRecord(value) &&
     value.kind === 'execution' &&
@@ -205,7 +209,11 @@ export class ExecutionCommitService {
           .executeTakeFirstOrThrow();
         const deliveries = await trx
           .selectFrom('execution_inputs as input')
-          .innerJoin('deliveries as delivery', 'delivery.id', 'input.delivery_id')
+          .innerJoin(
+            'deliveries as delivery',
+            'delivery.id',
+            'input.delivery_id',
+          )
           .select([
             'delivery.id',
             'delivery.status',
@@ -249,7 +257,11 @@ export class ExecutionCommitService {
         const ports = await trx
           .selectFrom('port_definitions')
           .selectAll()
-          .where('component_definition_id', '=', component.component_definition_id)
+          .where(
+            'component_definition_id',
+            '=',
+            component.component_definition_id,
+          )
           .execute();
         const artifactIds = new Map<string, string>();
         const seen = new Set<string>();

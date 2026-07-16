@@ -38,7 +38,10 @@ interface S3Internals {
     key: string,
     missingCode: ArtifactBlobStoreError['code'],
   ): Promise<{ Metadata?: Record<string, string> }>;
-  getReadable(key: string, missingCode: ArtifactBlobStoreError['code']): Promise<Readable>;
+  getReadable(
+    key: string,
+    missingCode: ArtifactBlobStoreError['code'],
+  ): Promise<Readable>;
 }
 
 class DigestAccumulator {
@@ -46,7 +49,9 @@ class DigestAccumulator {
   private size = 0n;
 
   update(chunk: unknown): Buffer {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    const bytes = Buffer.isBuffer(chunk)
+      ? chunk
+      : Buffer.from(chunk as Uint8Array);
     this.hash.update(bytes);
     this.size += BigInt(bytes.length);
     return bytes;
@@ -57,7 +62,10 @@ class DigestAccumulator {
   }
 }
 
-function createDigestMeter(): { readonly stream: Transform; readonly result: () => ObjectMetadata } {
+function createDigestMeter(): {
+  readonly stream: Transform;
+  readonly result: () => ObjectMetadata;
+} {
   const accumulator = new DigestAccumulator();
   return {
     stream: new Transform({
@@ -83,29 +91,43 @@ function parseMetadata(
   code: ArtifactBlobStoreError['code'],
 ): ObjectMetadata {
   if (
-    metadata?.format !== 'factory-floor-artifact-blob'
-    || metadata.version !== '1'
-    || !/^[a-f0-9]{64}$/.test(metadata.digest ?? '')
-    || !/^(0|[1-9][0-9]*)$/.test(metadata.size ?? '')
+    metadata?.format !== 'factory-floor-artifact-blob' ||
+    metadata.version !== '1' ||
+    !/^[a-f0-9]{64}$/.test(metadata.digest ?? '') ||
+    !/^(0|[1-9][0-9]*)$/.test(metadata.size ?? '')
   ) {
-    throw new ArtifactBlobStoreError('object metadata is missing or invalid', code);
+    throw new ArtifactBlobStoreError(
+      'object metadata is missing or invalid',
+      code,
+    );
   }
   return { digest: metadata.digest!, size: BigInt(metadata.size!) };
 }
 
 function contentLength(size: bigint): number {
   if (size > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new ArtifactBlobStoreError('object is too large for a single S3 upload', 'invalid_size');
+    throw new ArtifactBlobStoreError(
+      'object is too large for a single S3 upload',
+      'invalid_size',
+    );
   }
   return Number(size);
 }
 
 function isS3PreconditionFailed(error: unknown): boolean {
-  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return candidate.name === 'PreconditionFailed' || candidate.$metadata?.httpStatusCode === 412;
+  const candidate = error as {
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    candidate.name === 'PreconditionFailed' ||
+    candidate.$metadata?.httpStatusCode === 412
+  );
 }
 
-async function createTemporaryFile(prefix: string): Promise<{ directory: string; path: string }> {
+async function createTemporaryFile(
+  prefix: string,
+): Promise<{ directory: string; path: string }> {
   const directory = await mkdtemp(join(tmpdir(), `factory-floor-${prefix}-`));
   return { directory, path: join(directory, 'data') };
 }
@@ -122,9 +144,13 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
     options: StageOptions = {},
   ): Promise<StagingReceipt> {
     validateStagingId(stagingId);
-    if (options.expectedDigest !== undefined) validateDigest(options.expectedDigest);
+    if (options.expectedDigest !== undefined)
+      validateDigest(options.expectedDigest);
     if (options.expectedSize !== undefined && options.expectedSize < 0n) {
-      throw new ArtifactBlobStoreError('expected size must be non-negative', 'invalid_size');
+      throw new ArtifactBlobStoreError(
+        'expected size must be non-negative',
+        'invalid_size',
+      );
     }
 
     const store = this as unknown as S3Internals;
@@ -132,29 +158,56 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
     const temporary = await createTemporaryFile('s3-stage');
     const meter = createDigestMeter();
     try {
-      await pipeline(bytes, meter.stream, createWriteStream(temporary.path, { flags: 'wx' }));
+      await pipeline(
+        bytes,
+        meter.stream,
+        createWriteStream(temporary.path, { flags: 'wx' }),
+      );
       const measured = meter.result();
-      if (options.expectedSize !== undefined && options.expectedSize !== measured.size) {
-        throw new ArtifactBlobStoreError('staged content size did not match expected size', 'size_mismatch');
+      if (
+        options.expectedSize !== undefined &&
+        options.expectedSize !== measured.size
+      ) {
+        throw new ArtifactBlobStoreError(
+          'staged content size did not match expected size',
+          'size_mismatch',
+        );
       }
-      if (options.expectedDigest !== undefined && options.expectedDigest !== measured.digest) {
-        throw new ArtifactBlobStoreError('staged content digest did not match expected digest', 'digest_mismatch');
+      if (
+        options.expectedDigest !== undefined &&
+        options.expectedDigest !== measured.digest
+      ) {
+        throw new ArtifactBlobStoreError(
+          'staged content digest did not match expected digest',
+          'digest_mismatch',
+        );
       }
 
       try {
-        await store.client.send(new PutObjectCommand({
-          Bucket: store.bucket,
-          Key: finalKey,
-          Body: createReadStream(temporary.path),
-          ContentLength: contentLength(measured.size),
-          Metadata: objectMetadata(measured),
-          IfNoneMatch: '*',
-        }));
+        await store.client.send(
+          new PutObjectCommand({
+            Bucket: store.bucket,
+            Key: finalKey,
+            Body: createReadStream(temporary.path),
+            ContentLength: contentLength(measured.size),
+            Metadata: objectMetadata(measured),
+            IfNoneMatch: '*',
+          }),
+        );
       } catch (error) {
         if (!isS3PreconditionFailed(error)) throw error;
-        const existing = await store.readVerifiedMetadata(finalKey, 'staging_conflict');
-        if (existing.digest !== measured.digest || existing.size !== measured.size) {
-          throw new ArtifactBlobStoreError('staging object conflicts with existing content', 'staging_conflict');
+        const existing = await store.readVerifiedMetadata(
+          finalKey,
+          'staging_conflict',
+        );
+        if (
+          existing.digest !== measured.digest ||
+          existing.size !== measured.size
+        ) {
+          throw new ArtifactBlobStoreError(
+            'staging object conflicts with existing content',
+            'staging_conflict',
+          );
         }
         return {
           stagingId,
@@ -182,7 +235,11 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
   ): Promise<CommittedReceipt> {
     validateStagingId(stagingId);
     validateDigest(digest);
-    if (size < 0n) throw new ArtifactBlobStoreError('size must be non-negative', 'invalid_size');
+    if (size < 0n)
+      throw new ArtifactBlobStoreError(
+        'size must be non-negative',
+        'invalid_size',
+      );
 
     const store = this as unknown as S3Internals;
     const stagedKey = store.stagingKey(stagingId);
@@ -190,7 +247,10 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
     const committedLocator = store.locator(committedKey);
 
     if (await store.objectExists(committedKey)) {
-      const existing = await store.readVerifiedMetadata(committedKey, 'committed_conflict');
+      const existing = await store.readVerifiedMetadata(
+        committedKey,
+        'committed_conflict',
+      );
       if (existing.digest !== digest || existing.size !== size) {
         throw new ArtifactBlobStoreError(
           'committed object conflicts with requested digest or size',
@@ -201,16 +261,28 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
       return { digest, size, committedLocator };
     }
     if (!(await store.objectExists(stagedKey))) {
-      throw new ArtifactBlobStoreError(`staged object ${stagingId} was not found`, 'not_found');
+      throw new ArtifactBlobStoreError(
+        `staged object ${stagingId} was not found`,
+        'not_found',
+      );
     }
 
     const stagedHead = await store.headObject(stagedKey, 'staging_conflict');
-    const stagedMetadata = parseMetadata(stagedHead.Metadata, 'staging_conflict');
+    const stagedMetadata = parseMetadata(
+      stagedHead.Metadata,
+      'staging_conflict',
+    );
     if (stagedMetadata.size !== size) {
-      throw new ArtifactBlobStoreError('staged metadata size does not match promotion size', 'size_mismatch');
+      throw new ArtifactBlobStoreError(
+        'staged metadata size does not match promotion size',
+        'size_mismatch',
+      );
     }
     if (stagedMetadata.digest !== digest) {
-      throw new ArtifactBlobStoreError('staged metadata digest does not match promotion digest', 'digest_mismatch');
+      throw new ArtifactBlobStoreError(
+        'staged metadata digest does not match promotion digest',
+        'digest_mismatch',
+      );
     }
 
     const temporary = await createTemporaryFile('s3-promote');
@@ -223,24 +295,35 @@ export class S3ArtifactBlobStore extends BaseS3ArtifactBlobStore {
       );
       const measured = meter.result();
       if (measured.size !== size) {
-        throw new ArtifactBlobStoreError('staged content size does not match promotion size', 'size_mismatch');
+        throw new ArtifactBlobStoreError(
+          'staged content size does not match promotion size',
+          'size_mismatch',
+        );
       }
       if (measured.digest !== digest) {
-        throw new ArtifactBlobStoreError('staged content digest does not match promotion digest', 'digest_mismatch');
+        throw new ArtifactBlobStoreError(
+          'staged content digest does not match promotion digest',
+          'digest_mismatch',
+        );
       }
 
       try {
-        await store.client.send(new PutObjectCommand({
-          Bucket: store.bucket,
-          Key: committedKey,
-          Body: createReadStream(temporary.path),
-          ContentLength: contentLength(measured.size),
-          Metadata: objectMetadata(measured),
-          IfNoneMatch: '*',
-        }));
+        await store.client.send(
+          new PutObjectCommand({
+            Bucket: store.bucket,
+            Key: committedKey,
+            Body: createReadStream(temporary.path),
+            ContentLength: contentLength(measured.size),
+            Metadata: objectMetadata(measured),
+            IfNoneMatch: '*',
+          }),
+        );
       } catch (error) {
         if (!isS3PreconditionFailed(error)) throw error;
-        const existing = await store.readVerifiedMetadata(committedKey, 'committed_conflict');
+        const existing = await store.readVerifiedMetadata(
+          committedKey,
+          'committed_conflict',
+        );
         if (existing.digest !== digest || existing.size !== size) {
           throw new ArtifactBlobStoreError(
             'committed object conflicts with requested digest or size',

@@ -119,7 +119,11 @@ export class StartupRecoveryService {
           .executeTakeFirstOrThrow();
         const inputDeliveries = await trx
           .selectFrom('execution_inputs as input')
-          .innerJoin('deliveries as delivery', 'delivery.id', 'input.delivery_id')
+          .innerJoin(
+            'deliveries as delivery',
+            'delivery.id',
+            'input.delivery_id',
+          )
           .select('delivery.id')
           .where('input.execution_id', '=', execution.id)
           .forUpdate()
@@ -155,9 +159,7 @@ export class StartupRecoveryService {
               failure: null,
             } as never)
             .onConflict((conflict) =>
-              conflict
-                .columns(['execution_id', 'attempt_number'])
-                .doNothing(),
+              conflict.columns(['execution_id', 'attempt_number']).doNothing(),
             )
             .returning('id')
             .executeTakeFirst();

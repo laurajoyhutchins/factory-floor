@@ -1,1 +1,5 @@
-{"protocolVersion":"1.0","workerId":"worker-a","capabilities":["retrieve@1"]}
+{
+  "protocolVersion": "1.0",
+  "workerId": "worker-a",
+  "capabilities": ["retrieve@1"]
+}
