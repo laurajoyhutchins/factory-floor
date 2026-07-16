@@ -74,16 +74,20 @@ export function workerAuthorizationFromEnv(
     return { workers };
   }
 
-  const workerId = env.FACTORY_FLOOR_WORKER_ID?.trim();
+  const configuredWorkerId = env.FACTORY_FLOOR_WORKER_ID?.trim();
   const token = env.WORKER_API_BEARER_TOKEN?.trim();
   const capabilities = env.FACTORY_FLOOR_WORKER_CAPABILITIES?.split(',')
     .map((capability) => capability.trim())
     .filter(Boolean);
-  if (!workerId || !token || !capabilities?.length)
+  if (!configuredWorkerId || !token || !capabilities?.length)
     throw new Error(
       'configure WORKER_AUTHORIZATION_JSON or FACTORY_FLOOR_WORKER_ID, WORKER_API_BEARER_TOKEN, and FACTORY_FLOOR_WORKER_CAPABILITIES',
     );
-  return { workers: { [workerId]: { token, capabilities } } };
+  return {
+    workers: {
+      '*': { token, capabilities },
+    },
+  };
 }
 
 function protocolSchemas(): Record<string, unknown>[] {
@@ -253,9 +257,13 @@ export async function registerWorkerRoutes(
           >[0] & { protocolVersion?: string };
           if (typeof authorization !== 'string') {
             const workerIds = authenticatedWorkers.get(request) ?? [];
-            const allowed = workerIds.includes(input.workerId)
+            const exact = workerIds.includes(input.workerId)
               ? authorization?.workers[input.workerId]
               : undefined;
+            const wildcard = workerIds.includes('*')
+              ? authorization?.workers['*']
+              : undefined;
+            const allowed = exact ?? wildcard;
             if (!allowed)
               throw new WorkerProtocolError(
                 'capability_denied',
