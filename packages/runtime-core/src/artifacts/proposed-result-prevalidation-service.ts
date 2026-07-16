@@ -1,8 +1,5 @@
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
-import {
-  ArtifactRepository,
-  type Database,
-} from '@factory-floor/db';
+import { ArtifactRepository, type Database } from '@factory-floor/db';
 import type { Kysely } from 'kysely';
 import { ArtifactDomainError } from './errors.js';
 import { ArtifactValidationService } from './artifact-validation-service.js';
@@ -28,6 +25,16 @@ export class ProposedResultPrevalidationService {
     private readonly blobStore: ArtifactBlobStore,
     private readonly maxJsonBytes = 104_857_600n,
   ) {}
+
+  async hasExistingSubmission(input: ProposedResultLike): Promise<boolean> {
+    if (typeof input.attemptId !== 'string') return false;
+    const existing = await this.db
+      .selectFrom('worker_result_submissions')
+      .select('attempt_id')
+      .where('attempt_id', '=', input.attemptId)
+      .executeTakeFirst();
+    return existing !== undefined;
+  }
 
   async prevalidate(input: ProposedResultLike): Promise<void> {
     if (input.status !== 'completed') return;
