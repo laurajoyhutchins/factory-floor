@@ -88,6 +88,26 @@ describe('inspection routes', () => {
     expect(topology.json().regions[0].id).toBe('r1');
   });
 
+  it('keeps projection rebuild in the admin namespace', async () => {
+    const obs = service();
+    const app = await buildApp({ observabilityService: obs as never });
+
+    const oldPath = await app.inject({
+      method: 'POST',
+      url: '/api/v1/inspect/projections/rebuild',
+      payload: { batchSize: 10 },
+    });
+    expect(oldPath.statusCode).toBe(404);
+
+    const adminPath = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/projections/rebuild',
+      payload: { batchSize: 10 },
+    });
+    expect(adminPath.statusCode).toBe(200);
+    expect(obs.rebuildProjections).toHaveBeenCalledWith(10);
+  });
+
   it('streams opaque resumable SSE cursors and checkpoints', async () => {
     const obs = service();
     const app = await buildApp({ observabilityService: obs as never });
