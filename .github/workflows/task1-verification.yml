@@ -56,6 +56,9 @@ jobs:
       - name: Check generated contract drift
         run: pnpm contracts:check
 
+      - name: Validate conformance ledger
+        run: pnpm conformance:check
+
       - name: Lint
         run: pnpm lint
 
