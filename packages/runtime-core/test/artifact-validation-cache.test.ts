@@ -31,7 +31,7 @@ describe('artifact validation receipts', () => {
       readStagingById: vi.fn(async () => row),
       readArtifactSchemaById: vi.fn(async () => schema),
     };
-    const readStaged = vi.fn(async () => Readable.from(bytes));
+    const readStaged = vi.fn(async () => Readable.from([bytes]));
     const service = new ArtifactValidationService({
       db: {} as never,
       repository: repository as never,
