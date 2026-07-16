@@ -36,6 +36,6 @@ if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
       if (token) headers.set('authorization', `Bearer ${token}`);
     }
 
-    return originalFetch(input, { ...init, headers });
+    return originalFetch(request ?? url, { ...init, headers });
   };
 }
