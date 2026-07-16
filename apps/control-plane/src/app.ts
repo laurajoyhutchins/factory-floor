@@ -61,6 +61,7 @@ function withResultPrevalidation(
         return async (
           input: Parameters<WorkerProtocolService['submitResult']>[0],
         ) => {
+          await target.assertActive(input);
           try {
             await prevalidation.prevalidate(input);
           } catch (error) {
