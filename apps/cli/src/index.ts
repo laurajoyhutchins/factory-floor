@@ -94,12 +94,26 @@ function load(file: string, expectedKind: string): any {
   return matches[0];
 }
 
+function authorizationHeaders(token: string | undefined) {
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const key = `${argv[0] ?? ''} ${argv[1] ?? ''}`;
   const inspectRoute = inspectRoutes[key];
   const route = routes[key];
   const file = argv[2];
   const server = arg(argv, '--server', 'http://127.0.0.1:3000')!;
+  const operatorToken = arg(
+    argv,
+    '--operator-token',
+    process.env.CONTROL_PLANE_OPERATOR_TOKEN,
+  );
+  const adminToken = arg(
+    argv,
+    '--admin-token',
+    process.env.CONTROL_PLANE_ADMIN_TOKEN,
+  );
   const asJson = argv.includes('--json');
 
   if (inspectRoute) {
@@ -116,7 +130,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       const lim = arg(argv, '--limit');
       if (cursor) url.searchParams.set('cursor', cursor);
       if (lim) url.searchParams.set('limit', lim);
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: authorizationHeaders(operatorToken ?? adminToken),
+      });
       const json = await response.json();
       if (!response.ok) {
         console.error(
@@ -141,7 +157,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (route === undefined || file === undefined) {
     console.error(
-      'Usage: ff <schema|component|template|policy> register <file> [--server URL] [--json]\n       ff system apply <file> [--server URL] [--json]\n       ff command submit <file> [--server URL] [--json] [--idempotency-key KEY] [--correlation-id ID]\n       ff inspect <regions|events|deliveries|executions|attempts|artifacts|resources|policy-decisions|projections> [id] [--server URL] [--json] [--cursor CURSOR] [--limit N]',
+      'Usage: ff <schema|component|template|policy> register <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff system apply <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff command submit <file> [--server URL] [--admin-token TOKEN] [--json] [--idempotency-key KEY] [--correlation-id ID]\n       ff inspect <regions|events|deliveries|executions|attempts|artifacts|resources|policy-decisions|projections> [id] [--server URL] [--operator-token TOKEN] [--json] [--cursor CURSOR] [--limit N]',
     );
     return 2;
   }
@@ -156,7 +172,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
     const response = await fetch(new URL(route.endpoint, server), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...authorizationHeaders(adminToken),
+      },
       body: JSON.stringify(body),
     });
     const json = (await response.json().catch(() => ({
