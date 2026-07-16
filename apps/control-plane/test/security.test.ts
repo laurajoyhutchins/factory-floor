@@ -16,7 +16,9 @@ describe('control-plane HTTP security', () => {
     app.get('/api/v1/inspect/events', async () => ({ items: [] }));
     app.post('/api/v1/commands', async () => ({ accepted: true }));
 
-    await expect(app.inject({ method: 'GET', url: '/health' })).resolves.toMatchObject({
+    await expect(
+      app.inject({ method: 'GET', url: '/health' }),
+    ).resolves.toMatchObject({
       statusCode: 200,
     });
     await expect(
