@@ -85,6 +85,9 @@ jobs:
       - name: Run Python tests
         run: pnpm test:python
 
+      - name: Check formatting
+        run: pnpm format:check
+
       - name: Validate Compose configuration
         run: docker compose config
 
