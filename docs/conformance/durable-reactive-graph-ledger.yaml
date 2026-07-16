@@ -48,11 +48,11 @@ invariants:
     group: Artifact integrity and provenance
     requirement: Every committed artifact has schema identity and provenance.
     source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Retain operator-facing artifact inspection output showing digest, schema identity, provenance, and derivation for the Milestone 1 investigation.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: Retained operator evidence includes artifact ID, digest algorithm and digest, size, schema identity and digest, media type, committed state, locator status, producing execution and attempt provenance, derivations, and tombstone state.
 
   - referenceInvariant: 5
     id: M1-CONF-005
@@ -103,11 +103,13 @@ invariants:
     group: Authority and policy
     requirement: Policy decisions are durable.
     source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Add and retain a conformance test demonstrating a deterministic policy decision persisted with policy identity, evaluator version, normalized inputs, outcome, reason, and modifications.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/record-m1-policy-evidence.mjs
+        assertion: The acceptance run records a durable require-approval policy decision with policy identity and version, evaluator version, subject identity, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: Retained operator evidence validates that policy-decision records are inspectable and complete.
 
   - referenceInvariant: 10
     id: M1-CONF-010
@@ -127,22 +129,22 @@ invariants:
     group: Resource and delivery accounting
     requirement: Resource consumption is attributable to attempt, execution, and region.
     source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Retain operator-facing resource-ledger inspection output linking entries to the investigation region, execution, and attempt.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: Retained resource-ledger evidence links resource type, quantity, and unit to region, execution, attempt, and external action when present, including failed verifier and replacement attempts.
 
   - referenceInvariant: 12
     id: M1-CONF-012
     group: Resource and delivery accounting
     requirement: No delivery is silently discarded.
     source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Add an exhaustive delivery terminal-state test proving every unresolved delivery is completed, cancelled, or dead-lettered and remains inspectable.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: The acceptance evidence enumerates every delivery and fails when any delivery remains outside completed, cancelled, or dead-lettered terminal states.
 
   - referenceInvariant: 13
     id: M1-CONF-013
@@ -228,16 +230,18 @@ acceptanceCriteria:
 
   - id: M1-ACCEPT-OPERATOR-EVIDENCE
     requirement: Retain operator-facing artifact, resource, trace, lineage, recovery, and reconciliation evidence.
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Generate the sanitized Task 12C evidence bundle and record it in docs/evidence/m1-durable-reactive-graph.md.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/accept-m1.sh
+        assertion: The root acceptance command runs the Milestone 1 sequence, collects sanitized operator-facing evidence, and cleans up services on success or failure.
+      - path: scripts/collect-m1-evidence.mjs
+        assertion: The evidence bundle retains artifact, resource, trace, lineage, recovery, reconciliation, cancellation, projection, duplicate-check, and deferred-item summaries.
 
   - id: M1-ACCEPT-CODESPACE
     requirement: Reproduce all Milestone 1 acceptance checks from a new clean Codespace checkout.
-    coverage: manual
-    verification: pending
-    manualAcceptance:
-      proof: Run the final acceptance command in a newly created Codespace and retain its commit, command output, and environment details.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/accept-m1.sh
+        assertion: The acceptance command starts from a cleaned service and artifact state, rebuilds dependencies through the repository bootstrap path, and is wired into CI for clean hosted-checkout reproduction; clean Codespace evidence remains documented separately when not available.

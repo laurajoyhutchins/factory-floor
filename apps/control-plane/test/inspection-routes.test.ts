@@ -16,6 +16,20 @@ function service() {
     listExecutions: vi.fn(async () => ({ items: [], nextCursor: null })),
     listAttempts: vi.fn(async () => ({ items: [], nextCursor: null })),
     listArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
+    listResources: vi.fn(async () => ({
+      items: [
+        {
+          id: 'res1',
+          attempt_id: 'attempt1',
+          resource_type: 'cpuMilliseconds',
+        },
+      ],
+      nextCursor: null,
+    })),
+    listPolicyDecisions: vi.fn(async () => ({
+      items: [{ id: 'pol1', policy_name: 'm1.acceptance.operator-inspection' }],
+      nextCursor: null,
+    })),
     artifactLineage: vi.fn(async () => ({
       artifact: { id: 'a1' },
       derivations: [],
@@ -45,6 +59,20 @@ describe('inspection routes', () => {
       cursor: undefined,
       limit: 1,
     });
+
+    const resources = await app.inject('/api/v1/inspect/resources?limit=2');
+    expect(resources.statusCode).toBe(200);
+    expect(resources.json().items[0].attempt_id).toBe('attempt1');
+    expect(obs.listResources).toHaveBeenCalledWith({
+      cursor: undefined,
+      limit: 2,
+    });
+
+    const policies = await app.inject('/api/v1/inspect/policy-decisions');
+    expect(policies.statusCode).toBe(200);
+    expect(policies.json().items[0].policy_name).toBe(
+      'm1.acceptance.operator-inspection',
+    );
 
     const projections = await app.inject('/api/v1/inspect/projections');
     expect(projections.statusCode).toBe(200);

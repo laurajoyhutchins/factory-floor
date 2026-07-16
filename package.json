@@ -39,7 +39,8 @@
     "projections:rebuild": "node scripts/run-with-env.mjs tsx scripts/rebuild-projections.mjs",
     "cleanup": "bash scripts/maintain-workspace.sh clean",
     "acceptance:m1-live-restart": "node scripts/run-with-env.mjs node scripts/run-m1-live-restart-acceptance.mjs",
-    "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.acceptance.config.ts"
+    "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.acceptance.config.ts",
+    "accept:m1": "bash scripts/accept-m1.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
