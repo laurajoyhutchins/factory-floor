@@ -7,6 +7,7 @@ import type { RuntimeDb } from '@factory-floor/db';
 import { ArtifactDomainError } from './errors.js';
 
 const VALIDATION_RECEIPT_LIMIT = 1_024;
+const COMPILED_VALIDATOR_LIMIT = 1_024;
 const validationReceipts = new Map<string, string>();
 const compiledValidators = new Map<string, ValidateFunction>();
 
@@ -23,6 +24,29 @@ function rememberReceipt(stagingRowId: string, fingerprint: string) {
     if (!oldest) break;
     validationReceipts.delete(oldest);
   }
+}
+
+function compiledValidator(
+  schemaDigest: string,
+  schema: object,
+): ValidateFunction {
+  const existing = compiledValidators.get(schemaDigest);
+  if (existing) {
+    compiledValidators.delete(schemaDigest);
+    compiledValidators.set(schemaDigest, existing);
+    return existing;
+  }
+  const Ajv2020 = Ajv2020Import.default ?? Ajv2020Import;
+  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(
+    schema,
+  );
+  compiledValidators.set(schemaDigest, validate);
+  while (compiledValidators.size > COMPILED_VALIDATOR_LIMIT) {
+    const oldest = compiledValidators.keys().next().value as string | undefined;
+    if (!oldest) break;
+    compiledValidators.delete(oldest);
+  }
+  return validate;
 }
 
 export class ArtifactValidationService {
@@ -114,14 +138,10 @@ export class ArtifactValidationService {
         'artifact is not valid JSON',
       );
     }
-    const Ajv2020 = Ajv2020Import.default ?? Ajv2020Import;
-    let validate = compiledValidators.get(schema.content_digest);
-    if (!validate) {
-      validate = new Ajv2020({ allErrors: true, strict: false }).compile(
-        schema.schema as object,
-      );
-      compiledValidators.set(schema.content_digest, validate);
-    }
+    const validate = compiledValidator(
+      schema.content_digest,
+      schema.schema as object,
+    );
     if (!validate(instance))
       throw new ArtifactDomainError(
         'schema_validation_failed',
