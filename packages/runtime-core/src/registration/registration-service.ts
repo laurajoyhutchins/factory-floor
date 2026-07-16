@@ -101,17 +101,15 @@ export class RegistrationService {
     return this.idempotent(
       (db) => this.repo.findComponentDefinition(db, name, version),
       () =>
-        this.db
-          .transaction()
-          .execute((trx) =>
-            this.repo.createComponentDefinition(trx, {
-              name,
-              version,
-              contentDigest: digest,
-              definition: doc as Json,
-              ports,
-            }),
-          ),
+        this.db.transaction().execute((trx) =>
+          this.repo.createComponentDefinition(trx, {
+            name,
+            version,
+            contentDigest: digest,
+            definition: doc as Json,
+            ports,
+          }),
+        ),
       digest,
     );
   }

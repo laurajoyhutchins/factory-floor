@@ -17,11 +17,9 @@ export async function registerSystemRoutes(
         return reply
           .code(e.code.includes('conflict') ? 409 : 422)
           .send({ error: { code: e.code, message: e.message } });
-      return reply
-        .code(500)
-        .send({
-          error: { code: 'internal_error', message: 'Unexpected error' },
-        });
+      return reply.code(500).send({
+        error: { code: 'internal_error', message: 'Unexpected error' },
+      });
     }
   });
 }

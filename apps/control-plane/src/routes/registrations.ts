@@ -23,13 +23,11 @@ export async function registerRegistrationRoutes(
     (fn: (body: any) => Promise<any>) => async (request: any, reply: any) => {
       try {
         const result = await fn(request.body);
-        return reply
-          .code(result.disposition === 'created' ? 201 : 200)
-          .send({
-            disposition: result.disposition,
-            digest: result.digest,
-            entity: result.entity,
-          });
+        return reply.code(result.disposition === 'created' ? 201 : 200).send({
+          disposition: result.disposition,
+          digest: result.digest,
+          entity: result.entity,
+        });
       } catch (e) {
         const m = mapError(e);
         return reply.code(m.statusCode).send(m.body);
