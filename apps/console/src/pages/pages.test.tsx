@@ -68,7 +68,9 @@ describe('console views', () => {
     expect(await screen.findByText('Delivery queue')).toBeInTheDocument();
     expect(screen.getByText('completed: 6')).toBeInTheDocument();
     expect(screen.getByText('1 failed attempts')).toBeInTheDocument();
-    expect(screen.getByText(/maximum reported staleness 9999 ms/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/maximum reported staleness 9999 ms/),
+    ).toBeInTheDocument();
   });
 
   it('preserves failed attempt history and replacement success', async () => {

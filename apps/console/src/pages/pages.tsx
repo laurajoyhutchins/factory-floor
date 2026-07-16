@@ -128,7 +128,7 @@ export function Overview({
   );
   const displayedEvents = liveEvents.length
     ? liveEvents.map(rec)
-    : recentEvents.data?.items ?? [];
+    : (recentEvents.data?.items ?? []);
 
   return (
     <>
@@ -160,7 +160,11 @@ export function Overview({
           />
           <MetricCard
             title="Projection freshness"
-            value={uncheckpointed ? `${uncheckpointed} uncheckpointed` : 'checkpointed'}
+            value={
+              uncheckpointed
+                ? `${uncheckpointed} uncheckpointed`
+                : 'checkpointed'
+            }
             detail={`maximum reported staleness ${maximumStaleness} ms`}
           />
         </section>
@@ -170,7 +174,11 @@ export function Overview({
             <DataTable
               rows={resourceTotals}
               cols={['resourceType', 'quantity', 'unit']}
-              labels={{ resourceType: 'Resource', quantity: 'Quantity', unit: 'Unit' }}
+              labels={{
+                resourceType: 'Resource',
+                quantity: 'Quantity',
+                unit: 'Unit',
+              }}
             />
           ) : (
             <p className="muted">No resource entries recorded yet.</p>
@@ -347,8 +355,7 @@ export function Topology() {
                     <StatusBadge value={component.lifecycleStatus} /> · ports{' '}
                     {arr(component.ports)
                       .map(
-                        (port) =>
-                          `${text(port.direction)}:${text(port.name)}`,
+                        (port) => `${text(port.direction)}:${text(port.name)}`,
                       )
                       .join(', ')}
                   </li>
@@ -368,9 +375,11 @@ export function Topology() {
                   setSelectedComponentId(undefined);
                 }}
               >
-                {text(connection.sourceComponentId)}:{text(connection.sourcePortName)}
+                {text(connection.sourceComponentId)}:
+                {text(connection.sourcePortName)}
                 {' → '}
-                {text(connection.targetComponentId)}:{text(connection.targetPortName)}
+                {text(connection.targetComponentId)}:
+                {text(connection.targetPortName)}
               </button>
             </li>
           ))}
@@ -397,7 +406,9 @@ export function Executions() {
     status === 'all'
       ? rows
       : rows.filter((execution) => String(execution.status) === status);
-  const statuses = [...new Set(rows.map((execution) => String(execution.status)))];
+  const statuses = [
+    ...new Set(rows.map((execution) => String(execution.status))),
+  ];
 
   return (
     <State q={query}>
@@ -405,7 +416,10 @@ export function Executions() {
         <div className="toolbar">
           <label>
             Status in loaded records{' '}
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
               <option value="all">all</option>
               {statuses.map((value) => (
                 <option key={value} value={value}>
@@ -414,7 +428,9 @@ export function Executions() {
               ))}
             </select>
           </label>
-          <span className="muted">Showing {filtered.length} loaded executions</span>
+          <span className="muted">
+            Showing {filtered.length} loaded executions
+          </span>
         </div>
         {filtered.length ? (
           <div className="table-scroll">
@@ -562,11 +578,17 @@ export function ExecutionDetail() {
       </section>
       <section>
         <h3>Inputs</h3>
-        <DataTable rows={arr(chain.inputs)} cols={['id', 'portName', 'artifactId']} />
+        <DataTable
+          rows={arr(chain.inputs)}
+          cols={['id', 'portName', 'artifactId']}
+        />
       </section>
       <section>
         <h3>Outputs</h3>
-        <DataTable rows={arr(chain.outputs)} cols={['id', 'portName', 'artifactId']} />
+        <DataTable
+          rows={arr(chain.outputs)}
+          cols={['id', 'portName', 'artifactId']}
+        />
       </section>
       <section>
         <h3>Emitted events</h3>
@@ -627,7 +649,8 @@ export function Artifacts() {
                         <CopyId value={artifact.digest} />
                       </td>
                       <td>
-                        {text(artifact.schemaName)}@{text(artifact.schemaVersion)}
+                        {text(artifact.schemaName)}@
+                        {text(artifact.schemaVersion)}
                       </td>
                       <td>{text(artifact.mediaType)}</td>
                       <td>{text(artifact.sizeBytes)}</td>
@@ -673,7 +696,12 @@ export function buildLineageGraph(data: InspectionRecord) {
   const nodes: Node[] = sorted.map((id, index) => ({
     id,
     position: { x: (index % 4) * 220, y: Math.floor(index / 4) * 140 },
-    data: { label: id === String(artifact.id) ? `selected · ${id.slice(0, 8)}` : id.slice(0, 8) },
+    data: {
+      label:
+        id === String(artifact.id)
+          ? `selected · ${id.slice(0, 8)}`
+          : id.slice(0, 8),
+    },
     className: id === String(artifact.id) ? 'selected-node' : undefined,
   }));
   const edges: Edge[] = derivations.flatMap((derivation, index) => {
