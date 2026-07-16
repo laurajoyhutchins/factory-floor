@@ -18,6 +18,9 @@ function inspectionError(reply: FastifyReply, error: unknown) {
     'invalid_cursor',
     'invalid_limit',
     'invalid_batch_size',
+    'topology_region_bound_exceeded',
+    'topology_component_bound_exceeded',
+    'topology_connection_bound_exceeded',
   ].includes(code)
     ? 400
     : 500;
@@ -49,6 +52,9 @@ export async function registerInspectionRoutes(
 ) {
   app.get('/api/v1/inspect/regions', async (request, reply) =>
     inspect(reply, () => service.listRegions(pageQuery(request))),
+  );
+  app.get('/api/v1/inspect/topology', async (_request, reply) =>
+    inspect(reply, () => service.activeTopology()),
   );
   app.get('/api/v1/inspect/events', async (request, reply) =>
     inspect(reply, () => service.listEvents(pageQuery(request))),

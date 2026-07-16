@@ -252,3 +252,9 @@ The canonical retained acceptance bundle for the release baseline is:
 Detailed acceptance evidence is retained in `docs/evidence/m1-durable-reactive-graph.md`.
 
 Milestone 1 is complete. New architecture work should be scoped under Milestone 2 or a later milestone.
+
+## Post-M1 operator-console milestone
+
+- [x] Add a first read-only operator console application that makes the completed Milestone 1 investigation inspectable without SQL.
+- [x] Keep it inspection-only: consume control-plane GET APIs, add no command submission, cancellation, approval, rebuild, or topology mutation controls.
+- [x] Add a narrow active-topology inspection endpoint for visualization while preserving Milestone 1 runtime invariants.

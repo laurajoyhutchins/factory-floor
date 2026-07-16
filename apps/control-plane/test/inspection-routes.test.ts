@@ -8,6 +8,11 @@ function service() {
       items: [{ id: 'r1', lifecycle_status: 'ready' }],
       nextCursor: null,
     })),
+    activeTopology: vi.fn(async () => ({
+      regions: [{ id: 'r1' }],
+      components: [],
+      connections: [],
+    })),
     listEvents: vi.fn(async () => ({
       items: [{ id: 'e1', event_type: 'x' }],
       nextCursor: 'cursor',
@@ -77,6 +82,10 @@ describe('inspection routes', () => {
     const projections = await app.inject('/api/v1/inspect/projections');
     expect(projections.statusCode).toBe(200);
     expect(projections.json().items[0].projectionName).toBe('region-status');
+
+    const topology = await app.inject('/api/v1/inspect/topology');
+    expect(topology.statusCode).toBe(200);
+    expect(topology.json().regions[0].id).toBe('r1');
   });
 
   it('streams opaque resumable SSE cursors and checkpoints', async () => {

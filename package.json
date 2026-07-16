@@ -42,7 +42,10 @@
     "cleanup": "bash scripts/maintain-workspace.sh clean",
     "acceptance:m1-live-restart": "node scripts/run-with-env.mjs node scripts/run-m1-live-restart-acceptance.mjs",
     "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.acceptance.config.ts",
-    "accept:m1": "bash scripts/accept-m1.sh"
+    "accept:m1": "bash scripts/accept-m1.sh",
+    "dev:console": "pnpm --filter @factory-floor/console dev",
+    "build:console": "pnpm --filter @factory-floor/console build",
+    "test:console": "pnpm --filter @factory-floor/console test"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

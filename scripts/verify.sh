@@ -26,6 +26,8 @@ pnpm conformance:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm --filter @factory-floor/console test
+pnpm --filter @factory-floor/console build
 pnpm test:python
 pnpm format:check
 docker compose config
