@@ -4,7 +4,8 @@ import { ApiError } from '../api/client.js';
 import { shortId } from '../api/adapters.js';
 
 export function JsonBlock({ value }: { value: unknown }) {
-  const text = value === undefined ? '(not recorded)' : JSON.stringify(value, null, 2);
+  const text =
+    value === undefined ? '(not recorded)' : JSON.stringify(value, null, 2);
   return <pre className="json">{text}</pre>;
 }
 
@@ -64,7 +65,8 @@ export function State({
   if ((q.isLoading || q.isPending) && q.data === undefined)
     return <p className="muted">Loading…</p>;
   if (q.error) {
-    const notFound = q.error instanceof ApiError && q.error.kind === 'not-found';
+    const notFound =
+      q.error instanceof ApiError && q.error.kind === 'not-found';
     const message = notFound
       ? 'The selected record was not found.'
       : q.error instanceof ApiError
