@@ -22,6 +22,7 @@ fi
 
 pnpm contracts:validate
 pnpm contracts:check
+pnpm conformance:check
 pnpm lint
 pnpm typecheck
 pnpm test
