@@ -243,15 +243,15 @@ acceptanceCriteria:
   - id: M1-ACCEPT-OPERATOR-EVIDENCE
     requirement: Retain operator-facing artifact, resource, trace, lineage, recovery, reconciliation, cancellation, and projection-replay evidence for the reviewed commit.
     coverage: manual
-    verification: pending
+    verification: passed
     manualAcceptance:
-      proof: Replace this pending entry with retained clean-run evidence only after pnpm accept:m1 succeeds and the GitHub Actions artifact is inspected.
+      proof: Repository Verification #289 retained and inspection-validated artifact m1-acceptance-evidence-289 (artifact ID 8367989997, digest sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394). All 15 applicable checks passed and retained logs were sanitized.
       tracking: docs/evidence/m1-durable-reactive-graph.md
 
   - id: M1-ACCEPT-CLEAN-ENVIRONMENT
     requirement: Reproduce all applicable Milestone 1 checks from a clean Codespace or comparably fresh hosted checkout with no reused dependencies, database volumes, or artifact store.
     coverage: manual
-    verification: pending
+    verification: passed
     manualAcceptance:
-      proof: Record the separate fresh GitHub Actions acceptance job or an actual Codespace run, including commit, run, artifact, and environment identity.
+      proof: Repository Verification #289 run ID 29479516913 completed pnpm accept:m1 on a separate fresh GitHub Actions hosted Linux checkout with cleanCheckoutAttested true. An actual Codespace was not claimed.
       tracking: docs/evidence/m1-durable-reactive-graph.md
