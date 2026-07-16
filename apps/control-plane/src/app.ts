@@ -17,7 +17,10 @@ import { parse } from 'yaml';
 import { registerRegistrationRoutes } from './routes/registrations.js';
 import { registerSystemRoutes } from './routes/systems.js';
 import { registerCommandRoutes } from './routes/commands.js';
-import { registerWorkerRoutes } from './routes/worker.js';
+import {
+  registerWorkerRoutes,
+  type WorkerAuthorization,
+} from './routes/worker.js';
 import { registerInspectionRoutes } from './routes/inspection.js';
 import {
   registerControlPlaneSecurity,
@@ -32,6 +35,7 @@ export interface AppDependencies {
   workerProtocolService?: WorkerProtocolService;
   artifactBlobStore?: ArtifactBlobStore;
   workerAuthToken?: string;
+  workerAuthorization?: WorkerAuthorization;
   observabilityService?: ObservabilityService;
   startupRecoveryService?: StartupRecoveryService;
   runStartupRecovery?: boolean;
@@ -108,7 +112,7 @@ export async function buildApp(
             process.env.CONTROL_PLANE_PUBLIC_URL ??
             'http://127.0.0.1:3000',
         }),
-      deps.workerAuthToken,
+      deps.workerAuthorization ?? deps.workerAuthToken,
     );
 
   if (
