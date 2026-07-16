@@ -1,4 +1,4 @@
-name: One-time repository formatting stabilization
+name: Prepare permanent formatting guardrails
 
 on:
   pull_request:
@@ -6,16 +6,16 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: one-time-repository-formatting
   cancel-in-progress: true
 
 jobs:
-  stabilize:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - name: Check out cleanup branch
@@ -33,44 +33,47 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.12.1 --activate
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare permanent files
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const workflowPath = '.github/workflows/task1-verification.yml';
+          let workflow = readFileSync(workflowPath, 'utf8');
+          const marker = "      - name: Run Python tests\n        run: pnpm test:python\n";
+          const formattingStep = "\n      - name: Check formatting\n        run: pnpm format:check\n";
+          if (!workflow.includes('      - name: Check formatting')) {
+            if (!workflow.includes(marker)) {
+              throw new Error('Could not locate the Python test step');
+            }
+            workflow = workflow.replace(marker, `${marker}${formattingStep}`);
+          }
+          writeFileSync(workflowPath, workflow);
+
+          const ignorePath = '.prettierignore';
+          const ignore = readFileSync(ignorePath, 'utf8').replace(
+            /\n# Workflow files are maintained[\s\S]*?\.github\/workflows\/\n/,
+            '\n',
+          );
+          writeFileSync(ignorePath, ignore);
+          NODE
+
+          pnpm exec prettier --write --ignore-path /dev/null \
+            .github/workflows/task1-verification.yml \
+            .prettierignore
+          pnpm exec prettier --check --ignore-path /dev/null \
+            .github/workflows/task1-verification.yml \
+            .prettierignore
+
+      - name: Upload permanent files
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.12'
-
-      - name: Install uv
-        run: python -m pip install --disable-pip-version-check uv
-
-      - name: Bootstrap locked dependencies
-        run: bash scripts/bootstrap-workspace.sh
-
-      - name: Stabilize remaining formatting
-        run: |
-          pnpm exec prettier --write \
-            apps/control-plane/src/routes/registrations.ts \
-            apps/control-plane/src/routes/systems.ts \
-            packages/runtime-core/src/registration/registration-service.ts
-
-      - name: Commit and push stabilization
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add \
-            apps/control-plane/src/routes/registrations.ts \
-            apps/control-plane/src/routes/systems.ts \
-            packages/runtime-core/src/registration/registration-service.ts
-          git commit -m "chore: stabilize Prettier output"
-          git push origin HEAD:agent/reduce-repository-tech-debt
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Check generated contract drift
-        run: pnpm contracts:check
-
-      - name: Run daemon-independent verification
-        run: |
-          pnpm lint
-          pnpm typecheck
-          pnpm test
-          pnpm test:python
+          name: permanent-formatting-guardrails-${{ github.run_number }}
+          path: |
+            .github/workflows/task1-verification.yml
+            .prettierignore
+          if-no-files-found: error
+          retention-days: 7
