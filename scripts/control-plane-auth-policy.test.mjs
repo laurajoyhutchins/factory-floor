@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { shouldAttachControlPlaneAuthorization } from './control-plane-auth-policy.mjs';
+import {
+  shouldAttachControlPlaneAuthorization,
+} from './control-plane-auth-policy.mjs';
 
 describe('control-plane fetch authorization policy', () => {
   const baseUrl = 'http://127.0.0.1:3000';
