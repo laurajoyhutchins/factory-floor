@@ -19,6 +19,10 @@ import { registerSystemRoutes } from './routes/systems.js';
 import { registerCommandRoutes } from './routes/commands.js';
 import { registerWorkerRoutes } from './routes/worker.js';
 import { registerInspectionRoutes } from './routes/inspection.js';
+import {
+  registerControlPlaneSecurity,
+  type ControlPlaneSecurity,
+} from './security.js';
 
 export interface AppDependencies {
   database?: Kysely<Database>;
@@ -31,6 +35,7 @@ export interface AppDependencies {
   observabilityService?: ObservabilityService;
   startupRecoveryService?: StartupRecoveryService;
   runStartupRecovery?: boolean;
+  controlPlaneSecurity?: ControlPlaneSecurity;
 }
 
 export async function buildApp(
@@ -51,6 +56,8 @@ export async function buildApp(
       }
     },
   );
+  if (deps.controlPlaneSecurity)
+    registerControlPlaneSecurity(app, deps.controlPlaneSecurity);
   app.get('/health', async () => ({
     status: 'ok',
     service: 'control-plane',
