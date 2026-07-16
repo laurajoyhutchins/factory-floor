@@ -1,0 +1,243 @@
+version: 2
+milestone: M1 Durable Reactive Graph
+reference: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+completionRule: The ledger is structurally complete when every normative reference invariant is represented. Milestone acceptance additionally requires every applicable invariant and acceptance criterion to be verified as passed.
+
+invariants:
+  - referenceInvariant: 1
+    id: M1-CONF-001
+    group: Identity and attribution
+    requirement: Every component instance belongs to exactly one region.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/db/migration.test.ts
+        assertion: PostgreSQL requires each component instance to reference one region and rejects invalid durable relationships.
+      - path: tests/integration/runtime-core/registration-and-system.test.ts
+        assertion: Applied system declarations create component instances under the declared region.
+
+  - referenceInvariant: 2
+    id: M1-CONF-002
+    group: Identity and attribution
+    requirement: Every event has an attributable source and region.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: packages/runtime-core/test/task6-identity.test.ts
+        assertion: Command, event, delivery, execution, and attempt identities remain distinct and event source fields are retained.
+      - path: tests/integration/runtime-core/command-scheduler.test.ts
+        assertion: Accepted commands and routed events retain region and causal source identity.
+
+  - referenceInvariant: 3
+    id: M1-CONF-003
+    group: Artifact integrity and provenance
+    requirement: Every artifact is immutable.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: packages/runtime-core/test/artifact-services.test.ts
+        assertion: Artifact identity is digest based and committed metadata is not rewritten during publication, tombstoning, or reconciliation.
+      - path: packages/artifact-store/src/filesystem.test.ts
+        assertion: Staged and committed blob operations enforce digest identity and idempotent promotion.
+
+  - referenceInvariant: 4
+    id: M1-CONF-004
+    group: Artifact integrity and provenance
+    requirement: Every committed artifact has schema identity and provenance.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Retain operator-facing artifact inspection output showing digest, schema identity, provenance, and derivation for the Milestone 1 investigation.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
+
+  - referenceInvariant: 5
+    id: M1-CONF-005
+    group: Authority and policy
+    requirement: Every external action requires a valid capability grant.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: An unissued capability handle is rejected atomically while an active grant records an authorized external-action proposal.
+
+  - referenceInvariant: 6
+    id: M1-CONF-006
+    group: Authority and policy
+    requirement: Delegated authority cannot exceed parent authority.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: deferred
+    verification: deferred
+    rationale: Milestone 1 uses direct capability grants and does not expose capability delegation.
+    targetMilestone: M2 bounded dynamic regions
+
+  - referenceInvariant: 7
+    id: M1-CONF-007
+    group: Dynamic construction
+    requirement: Dynamic regions cannot modify ancestor topology.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: deferred
+    verification: deferred
+    rationale: Dynamic child-region construction is explicitly outside Milestone 1, which uses a static investigation region.
+    targetMilestone: M2 bounded dynamic regions
+
+  - referenceInvariant: 8
+    id: M1-CONF-008
+    group: Lifecycle and recovery
+    requirement: Cancellation propagates and stale epochs cannot commit normal outputs.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/observability-recovery.test.ts
+        assertion: Cancellation increments the lifecycle epoch, settles durable state, and rejects stale result commits.
+      - path: tests/integration/runtime-core/worker-protocol.test.ts
+        assertion: Workers observe cancellation and stale lifecycle epochs are fenced at the protocol boundary.
+
+  - referenceInvariant: 9
+    id: M1-CONF-009
+    group: Authority and policy
+    requirement: Policy decisions are durable.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Add and retain a conformance test demonstrating a deterministic policy decision persisted with policy identity, evaluator version, normalized inputs, outcome, reason, and modifications.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
+
+  - referenceInvariant: 10
+    id: M1-CONF-010
+    group: Lifecycle and recovery
+    requirement: Failed attempts remain visible after retry.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: Failed-attempt details and staged partial artifacts remain durable while a replacement attempt is created.
+      - path: examples/investigation/run-demo.ts
+        assertion: The deliberate verifier failure and successful replacement remain visible in the completed investigation.
+
+  - referenceInvariant: 11
+    id: M1-CONF-011
+    group: Resource and delivery accounting
+    requirement: Resource consumption is attributable to attempt, execution, and region.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Retain operator-facing resource-ledger inspection output linking entries to the investigation region, execution, and attempt.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
+
+  - referenceInvariant: 12
+    id: M1-CONF-012
+    group: Resource and delivery accounting
+    requirement: No delivery is silently discarded.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Add an exhaustive delivery terminal-state test proving every unresolved delivery is completed, cancelled, or dead-lettered and remains inspectable.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
+
+  - referenceInvariant: 13
+    id: M1-CONF-013
+    group: Replay and side-effect safety
+    requirement: Historical replay never repeats external side effects.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/observability-recovery.test.ts
+        assertion: Projection history rebuild completes without worker dispatch or external-action execution.
+
+  - referenceInvariant: 14
+    id: M1-CONF-014
+    group: Trust boundaries
+    requirement: Enforcement does not depend on worker compliance.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/worker-protocol.test.ts
+        assertion: The control plane rejects unauthenticated, stale, invalid, and unauthorized worker submissions.
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: Transactional validation prevents untrusted proposed results from partially publishing runtime truth.
+
+  - referenceInvariant: 15
+    id: M1-CONF-015
+    group: Dynamic construction
+    requirement: Dynamic construction is explicitly bounded.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: deferred
+    verification: deferred
+    rationale: Milestone 1 has no dynamic construction surface; the static graph is bounded by its committed declaration.
+    targetMilestone: M2 bounded dynamic regions
+
+  - referenceInvariant: 16
+    id: M1-CONF-016
+    group: Trust boundaries
+    requirement: Workers cannot publish runtime truth directly.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/worker-protocol.test.ts
+        assertion: Workers can only submit versioned proposed results through authenticated protocol endpoints.
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: The control plane alone validates and atomically commits artifacts, events, deliveries, resources, actions, and terminal state.
+
+  - referenceInvariant: 17
+    id: M1-CONF-017
+    group: Atomicity and idempotency
+    requirement: A successful result becomes visible atomically.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: Successful effects publish together and validation failures leave no partial artifacts, outputs, resources, or submissions.
+
+  - referenceInvariant: 18
+    id: M1-CONF-018
+    group: Atomicity and idempotency
+    requirement: Duplicate delivery or completion cannot duplicate committed outputs.
+    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: tests/integration/runtime-core/atomic-commit.test.ts
+        assertion: Repeated identical completion is idempotent and conflicting duplicate completion is rejected.
+      - path: tests/acceptance/m1-live-restart.test.ts
+        assertion: A real control-plane restart completes replacement work without duplicate outputs or downstream deliveries.
+
+acceptanceCriteria:
+  - id: M1-ACCEPT-RESTART
+    requirement: Restart the real control-plane process during an investigation without lost work or duplicate committed effects.
+    coverage: automated
+    verification: passed
+    evidence:
+      - path: scripts/run-m1-live-restart-acceptance.mjs
+        assertion: The harness kills and restarts the control-plane process after verifier attempt 2 is running and its lease expires.
+      - path: tests/acceptance/m1-live-restart.test.ts
+        assertion: The completed scenario retains failed, abandoned, and replacement attempts, fences stale submission, and publishes no duplicates.
+
+  - id: M1-ACCEPT-OPERATOR-EVIDENCE
+    requirement: Retain operator-facing artifact, resource, trace, lineage, recovery, and reconciliation evidence.
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Generate the sanitized Task 12C evidence bundle and record it in docs/evidence/m1-durable-reactive-graph.md.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
+
+  - id: M1-ACCEPT-CODESPACE
+    requirement: Reproduce all Milestone 1 acceptance checks from a new clean Codespace checkout.
+    coverage: manual
+    verification: pending
+    manualAcceptance:
+      proof: Run the final acceptance command in a newly created Codespace and retain its commit, command output, and environment details.
+      tracking: docs/evidence/m1-durable-reactive-graph.md
