@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 const marker = Symbol.for('factory-floor.control-plane-fetch-auth');
 
 if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
@@ -10,10 +12,14 @@ if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
     'http://127.0.0.1:3000';
 
   globalThis.fetch = async (input, init = {}) => {
-    const request = input instanceof Request ? input : undefined;
+    const request =
+      typeof globalThis.Request === 'function' &&
+      input instanceof globalThis.Request
+        ? input
+        : undefined;
     const url = new URL(request?.url ?? String(input), baseUrl);
     const method = String(init.method ?? request?.method ?? 'GET').toUpperCase();
-    const headers = new Headers(init.headers ?? request?.headers);
+    const headers = new globalThis.Headers(init.headers ?? request?.headers);
 
     if (
       localHosts.has(url.hostname) &&
