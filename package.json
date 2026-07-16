@@ -32,7 +32,7 @@
     "dev:worker-demo-py": "node scripts/run-with-env.mjs uv run --project workers/demo-py --locked factory-floor-demo-py",
     "dev:workers": "node scripts/run-dev-processes.mjs",
     "test:python": "uv run --project packages/worker-sdk-py --locked pytest && uv run --project workers/demo-py --locked pytest",
-    "test:conformance": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts tests/integration/runtime-core/observability-recovery.test.ts",
+    "test:conformance": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts tests/integration/runtime-core/observability-recovery.test.ts tests/integration/runtime-core/policy-decision.test.ts",
     "verify": "bash scripts/verify.sh",
     "format:check": "prettier --check .",
     "artifacts:reconcile": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/control-plane artifacts:reconcile",
