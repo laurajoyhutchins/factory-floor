@@ -7,7 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: repository-verification-${{ github.ref }}
@@ -123,6 +123,36 @@ jobs:
             apps/console/src/styles.css
           if-no-files-found: error
           retention-days: 7
+
+      - name: Commit pinned formatter output to pull request branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          formatted_dir="$(mktemp -d)"
+          cp --parents \
+            apps/console/src/api/client.ts \
+            apps/console/src/components/ui.tsx \
+            apps/console/src/hooks/liveEvents.ts \
+            apps/console/src/hooks/liveEvents.test.ts \
+            apps/console/src/main.tsx \
+            apps/console/src/pages/pages.tsx \
+            apps/console/src/pages/pages.test.tsx \
+            apps/console/src/styles.css \
+            "$formatted_dir"
+          git fetch origin "$HEAD_BRANCH"
+          git checkout -B "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
+          cp -R "$formatted_dir/apps" .
+          git add apps/console/src
+          if git diff --cached --quiet; then
+            echo "Formatter output already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(console): apply pinned Prettier output"
+          git push origin "HEAD:$HEAD_BRANCH"
 
       - name: Check formatting
         run: pnpm format:check
