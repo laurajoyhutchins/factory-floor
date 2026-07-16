@@ -7,7 +7,19 @@
   "properties": {
     "code": { "type": "string", "minLength": 1 },
     "message": { "type": "string", "minLength": 1 },
-    "category": { "enum": ["invalid_input", "schema_mismatch", "capability_denied", "policy_denied", "timeout", "dependency", "model", "cancelled", "unknown"] },
+    "category": {
+      "enum": [
+        "invalid_input",
+        "schema_mismatch",
+        "capability_denied",
+        "policy_denied",
+        "timeout",
+        "dependency",
+        "model",
+        "cancelled",
+        "unknown"
+      ]
+    },
     "retryable": { "type": "boolean" },
     "details": { "type": "object", "additionalProperties": true }
   },

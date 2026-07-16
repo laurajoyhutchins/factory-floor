@@ -1,1 +1,19 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://factory-floor.local/contracts/worker/heartbeat-response.schema.json","title":"WorkerHeartbeatResponse","type":"object","additionalProperties":false,"properties":{"protocolVersion":{"const":"1.0"},"leaseValid":{"type":"boolean"},"leaseExpiresAt":{"type":"string","format":"date-time"},"cancellation":{"enum":["continue","cancellation_requested"]}},"required":["protocolVersion","leaseValid","leaseExpiresAt","cancellation"]}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/worker/heartbeat-response.schema.json",
+  "title": "WorkerHeartbeatResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "leaseValid": { "type": "boolean" },
+    "leaseExpiresAt": { "type": "string", "format": "date-time" },
+    "cancellation": { "enum": ["continue", "cancellation_requested"] }
+  },
+  "required": [
+    "protocolVersion",
+    "leaseValid",
+    "leaseExpiresAt",
+    "cancellation"
+  ]
+}

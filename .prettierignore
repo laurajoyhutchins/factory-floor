@@ -1,0 +1,11 @@
+# Dependencies, caches, and runtime output
+node_modules/
+dist/
+coverage/
+.factory-floor/
+
+# Package-manager and generated artifacts have their own canonical producers
+pnpm-lock.yaml
+**/uv.lock
+packages/contracts-ts/src/generated/
+packages/contracts-py/factory_floor_contracts/

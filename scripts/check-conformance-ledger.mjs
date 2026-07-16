@@ -194,7 +194,9 @@ if (!ledger || typeof ledger !== 'object') {
 }
 
 if (errors.length > 0) {
-  globalThis.console.error(`Conformance ledger check failed for ${ledgerPath}:`);
+  globalThis.console.error(
+    `Conformance ledger check failed for ${ledgerPath}:`,
+  );
   for (const error of errors) globalThis.console.error(`- ${error}`);
   process.exit(1);
 }

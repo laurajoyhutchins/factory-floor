@@ -22,35 +22,35 @@ Bootstrap uses Node 22, Corepack-managed `pnpm@10.12.1`, Python 3.12, and uv loc
 
 ## Root command map
 
-| Goal | Command |
-|---|---|
-| Bootstrap dependencies | `pnpm bootstrap` |
-| Start PostgreSQL and MinIO | `pnpm services:up` |
-| Wait for service readiness | `pnpm services:wait` |
-| Show service status | `pnpm services:status` |
-| Show concise service logs | `pnpm services:logs` |
-| Run migrations | `pnpm db:migrate` |
-| Reset database in development/test only | `pnpm db:reset` |
-| Start control plane | `pnpm dev:control-plane` |
-| Start TypeScript worker | `pnpm dev:worker-demo-ts` |
-| Start Python worker | `pnpm dev:worker-demo-py` |
-| Start control plane and both workers | `pnpm dev:workers` |
-| Run investigation demo | `pnpm demo:investigation` |
-| Run TypeScript unit tests | `pnpm test` |
-| Run Python tests | `pnpm test:python` |
-| Run integration tests | `pnpm test:integration` |
-| Run recovery/replay conformance tests | `pnpm test:conformance` |
-| Full service-backed verification | `pnpm verify` |
-| Contract validation | `pnpm contracts:validate` |
-| Generated contract drift check | `pnpm contracts:check` |
-| Lint | `pnpm lint` |
-| Typecheck | `pnpm typecheck` |
-| Format check | `pnpm format:check` |
-| Artifact reconciliation dry run | `pnpm artifacts:reconcile` |
-| Projection rebuild | `pnpm projections:rebuild` |
-| Remove transient build/test caches | `pnpm cleanup` |
-| Stop services | `pnpm services:down` |
-| Remove service volumes | `pnpm services:clean` |
+| Goal                                    | Command                    |
+| --------------------------------------- | -------------------------- |
+| Bootstrap dependencies                  | `pnpm bootstrap`           |
+| Start PostgreSQL and MinIO              | `pnpm services:up`         |
+| Wait for service readiness              | `pnpm services:wait`       |
+| Show service status                     | `pnpm services:status`     |
+| Show concise service logs               | `pnpm services:logs`       |
+| Run migrations                          | `pnpm db:migrate`          |
+| Reset database in development/test only | `pnpm db:reset`            |
+| Start control plane                     | `pnpm dev:control-plane`   |
+| Start TypeScript worker                 | `pnpm dev:worker-demo-ts`  |
+| Start Python worker                     | `pnpm dev:worker-demo-py`  |
+| Start control plane and both workers    | `pnpm dev:workers`         |
+| Run investigation demo                  | `pnpm demo:investigation`  |
+| Run TypeScript unit tests               | `pnpm test`                |
+| Run Python tests                        | `pnpm test:python`         |
+| Run integration tests                   | `pnpm test:integration`    |
+| Run recovery/replay conformance tests   | `pnpm test:conformance`    |
+| Full service-backed verification        | `pnpm verify`              |
+| Contract validation                     | `pnpm contracts:validate`  |
+| Generated contract drift check          | `pnpm contracts:check`     |
+| Lint                                    | `pnpm lint`                |
+| Typecheck                               | `pnpm typecheck`           |
+| Format check                            | `pnpm format:check`        |
+| Artifact reconciliation dry run         | `pnpm artifacts:reconcile` |
+| Projection rebuild                      | `pnpm projections:rebuild` |
+| Remove transient build/test caches      | `pnpm cleanup`             |
+| Stop services                           | `pnpm services:down`       |
+| Remove service volumes                  | `pnpm services:clean`      |
 
 `pnpm verify` validates contracts, generated-code drift, formatting, lint, types, TypeScript and Python tests, Compose configuration, service readiness, migrations, the Docker-backed integration/demo path, and recovery/replay tests. It starts and stops PostgreSQL and MinIO while preserving volumes by default. Set `FACTORY_FLOOR_VERIFY_CLEAN=1` to remove existing volumes before the run.
 

@@ -1,1 +1,25 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://factory-floor.local/contracts/worker/capability-request.schema.json","title":"WorkerCapabilityRequest","type":"object","additionalProperties":false,"properties":{"protocolVersion":{"const":"1.0"},"executionId":{"type":"string","format":"uuid"},"attemptId":{"type":"string","format":"uuid"},"leaseToken":{"type":"string","minLength":1},"lifecycleEpoch":{"type":"integer","minimum":0},"handle":{"type":"string","minLength":1},"input":{"type":"object","additionalProperties":true}},"required":["protocolVersion","executionId","attemptId","leaseToken","lifecycleEpoch","handle","input"]}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/worker/capability-request.schema.json",
+  "title": "WorkerCapabilityRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "executionId": { "type": "string", "format": "uuid" },
+    "attemptId": { "type": "string", "format": "uuid" },
+    "leaseToken": { "type": "string", "minLength": 1 },
+    "lifecycleEpoch": { "type": "integer", "minimum": 0 },
+    "handle": { "type": "string", "minLength": 1 },
+    "input": { "type": "object", "additionalProperties": true }
+  },
+  "required": [
+    "protocolVersion",
+    "executionId",
+    "attemptId",
+    "leaseToken",
+    "lifecycleEpoch",
+    "handle",
+    "input"
+  ]
+}

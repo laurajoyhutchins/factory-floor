@@ -33,11 +33,7 @@ type ProposedResultBody = ProposedResult extends infer Result
     : never
   : never;
 
-export type BinaryContent =
-  | string
-  | ArrayBuffer
-  | ArrayBufferView
-  | Blob;
+export type BinaryContent = string | ArrayBuffer | ArrayBufferView | Blob;
 
 export interface WorkerClientOptions {
   baseUrl: string;
@@ -117,11 +113,7 @@ export interface WorkerResultSubmissionResponse {
 }
 
 type RequestPayload =
-  | JsonRecord
-  | WorkerHeartbeat
-  | BodyInit
-  | Readable
-  | ArrayBufferView;
+  JsonRecord | WorkerHeartbeat | BodyInit | Readable | ArrayBufferView;
 
 export class WorkerProtocolClient {
   private readonly baseUrl: URL;
@@ -484,7 +476,10 @@ function requireString(value: unknown, field: string): asserts value is string {
     throw invalidEnvelope(`${field} must be a non-empty string`);
 }
 
-function requireTimestamp(value: unknown, field: string): asserts value is string {
+function requireTimestamp(
+  value: unknown,
+  field: string,
+): asserts value is string {
   requireString(value, field);
   if (!Number.isFinite(Date.parse(value)))
     throw invalidEnvelope(`${field} must be a timestamp`);
@@ -524,14 +519,17 @@ function mapError(status: number, payload: unknown): WorkerSdkError {
             : status >= 500
               ? 'transient'
               : 'invalid_request';
-  return new WorkerSdkError(error.message ?? `worker protocol error ${status}`, {
-    kind,
-    retryable: error.retryable ?? status >= 500,
-    status,
-    code,
-    requestId: error.requestId,
-    details: error.details,
-  });
+  return new WorkerSdkError(
+    error.message ?? `worker protocol error ${status}`,
+    {
+      kind,
+      retryable: error.retryable ?? status >= 500,
+      status,
+      code,
+      requestId: error.requestId,
+      details: error.details,
+    },
+  );
 }
 
 function defaultSleep(
@@ -900,7 +898,12 @@ export class WorkerRunner {
       log: this.options.logger,
       stageBinary,
       stageJson: (portName, value, metadata) =>
-        stageBinary(portName, canonicalJson(value), 'application/json', metadata),
+        stageBinary(
+          portName,
+          canonicalJson(value),
+          'application/json',
+          metadata,
+        ),
       invokeCapability: (handle, input, options) =>
         this.options.client.invokeCapability(envelope, handle, input, {
           signal,
@@ -968,11 +971,7 @@ export function canonicalJson(value: unknown): Uint8Array<ArrayBuffer> {
 }
 
 function sortJson(value: unknown): unknown {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean'
-  )
+  if (value === null || typeof value === 'string' || typeof value === 'boolean')
     return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value))

@@ -10,9 +10,9 @@ import {
 describe('artifact domain helpers', () => {
   it('classifies JSON media types narrowly', () => {
     expect(isJsonMediaType('application/json')).toBe(true);
-    expect(
-      isJsonMediaType('application/vnd.factory+json; charset=utf-8'),
-    ).toBe(true);
+    expect(isJsonMediaType('application/vnd.factory+json; charset=utf-8')).toBe(
+      true,
+    );
     expect(isJsonMediaType('text/json')).toBe(false);
     expect(isJsonMediaType('application/octet-stream')).toBe(false);
   });

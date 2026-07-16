@@ -17,5 +17,14 @@
     "uri": { "type": "string", "minLength": 1 },
     "provenance": { "$ref": "source-identity.schema.json" }
   },
-  "required": ["artifactId", "digest", "sizeBytes", "mediaType", "schemaId", "schemaDigest", "uri", "provenance"]
+  "required": [
+    "artifactId",
+    "digest",
+    "sizeBytes",
+    "mediaType",
+    "schemaId",
+    "schemaDigest",
+    "uri",
+    "provenance"
+  ]
 }

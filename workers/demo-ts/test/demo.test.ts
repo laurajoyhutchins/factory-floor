@@ -5,9 +5,7 @@ import type {
   ProposedResult,
   StagedArtifact,
 } from '@factory-floor/contracts-ts';
-import fixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with {
-  type: 'json',
-};
+import fixture from '../../../contracts/fixtures/worker/invocation-envelope.valid.json' with { type: 'json' };
 
 async function run(name: string, payload: unknown) {
   const registry = createDemoRegistry();
@@ -86,9 +84,7 @@ describe('deterministic demo components', () => {
     const a = await run('compare', { z: 1, a: 2 });
     const b = await run('compare', { a: 2, z: 1 });
     expect(a.stable).toBe(b.stable);
-    expect(a.staged.map((item) => item.portName)).toEqual([
-      'candidate-claims',
-    ]);
+    expect(a.staged.map((item) => item.portName)).toEqual(['candidate-claims']);
   });
 
   it('synthesize emits every required canonical output port', async () => {

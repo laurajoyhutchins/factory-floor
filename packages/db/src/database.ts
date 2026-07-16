@@ -8,12 +8,7 @@ import {
 import pg from 'pg';
 
 export type Json =
-  | null
-  | boolean
-  | number
-  | string
-  | Json[]
-  | { [key: string]: Json };
+  null | boolean | number | string | Json[] | { [key: string]: Json };
 export type RuntimeDb = Kysely<Database> | Transaction<Database>;
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;

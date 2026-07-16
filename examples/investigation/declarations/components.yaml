@@ -3,31 +3,81 @@ kind: ComponentDefinition
 metadata: { name: retrieve, version: '1' }
 spec:
   ports:
-    - { name: objective, direction: input, required: true, schema: { name: objective, version: v1 } }
-    - { name: evidence, direction: output, required: true, schema: { name: evidence, version: v1 } }
+    - {
+        name: objective,
+        direction: input,
+        required: true,
+        schema: { name: objective, version: v1 },
+      }
+    - {
+        name: evidence,
+        direction: output,
+        required: true,
+        schema: { name: evidence, version: v1 },
+      }
 ---
 apiVersion: factory-floor.dev/v1alpha1
 kind: ComponentDefinition
 metadata: { name: compare, version: '1' }
 spec:
   ports:
-    - { name: evidence, direction: input, required: true, schema: { name: evidence, version: v1 } }
-    - { name: candidate-claims, direction: output, required: true, schema: { name: candidate-claims, version: v1 } }
+    - {
+        name: evidence,
+        direction: input,
+        required: true,
+        schema: { name: evidence, version: v1 },
+      }
+    - {
+        name: candidate-claims,
+        direction: output,
+        required: true,
+        schema: { name: candidate-claims, version: v1 },
+      }
 ---
 apiVersion: factory-floor.dev/v1alpha1
 kind: ComponentDefinition
 metadata: { name: verify, version: '1' }
 spec:
   ports:
-    - { name: candidate-claims, direction: input, required: true, schema: { name: candidate-claims, version: v1 } }
-    - { name: verified-claims, direction: output, required: true, schema: { name: verification-result, version: v1 } }
+    - {
+        name: candidate-claims,
+        direction: input,
+        required: true,
+        schema: { name: candidate-claims, version: v1 },
+      }
+    - {
+        name: verified-claims,
+        direction: output,
+        required: true,
+        schema: { name: verification-result, version: v1 },
+      }
 ---
 apiVersion: factory-floor.dev/v1alpha1
 kind: ComponentDefinition
 metadata: { name: synthesize, version: '1' }
 spec:
   ports:
-    - { name: verified-claims, direction: input, required: true, schema: { name: verification-result, version: v1 } }
-    - { name: result, direction: output, required: true, schema: { name: result, version: v1 } }
-    - { name: evidence-bundle, direction: output, required: true, schema: { name: evidence-bundle, version: v1 } }
-    - { name: uncertainty-report, direction: output, required: true, schema: { name: uncertainty-report, version: v1 } }
+    - {
+        name: verified-claims,
+        direction: input,
+        required: true,
+        schema: { name: verification-result, version: v1 },
+      }
+    - {
+        name: result,
+        direction: output,
+        required: true,
+        schema: { name: result, version: v1 },
+      }
+    - {
+        name: evidence-bundle,
+        direction: output,
+        required: true,
+        schema: { name: evidence-bundle, version: v1 },
+      }
+    - {
+        name: uncertainty-report,
+        direction: output,
+        required: true,
+        schema: { name: uncertainty-report, version: v1 },
+      }

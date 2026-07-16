@@ -231,9 +231,7 @@ function duplicateKeys(rows, key) {
     const value = key(row);
     if (value !== null) counts.set(value, (counts.get(value) ?? 0) + 1);
   }
-  return [...counts]
-    .filter(([, count]) => count > 1)
-    .map(([value]) => value);
+  return [...counts].filter(([, count]) => count > 1).map(([value]) => value);
 }
 
 async function collectSummary(staleAttempt) {

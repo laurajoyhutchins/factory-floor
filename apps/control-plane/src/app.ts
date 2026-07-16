@@ -69,7 +69,8 @@ export async function buildApp(
         )
       : undefined);
   const observability =
-    deps.observabilityService ?? (db ? new ObservabilityService(db) : undefined);
+    deps.observabilityService ??
+    (db ? new ObservabilityService(db) : undefined);
 
   if (db || deps.registrationService)
     await registerRegistrationRoutes(

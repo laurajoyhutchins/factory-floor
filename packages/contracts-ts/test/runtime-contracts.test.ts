@@ -16,11 +16,16 @@ function readFixture(path: string): unknown {
 function validators() {
   const ajv = new Ajv2020({ strict: true, allErrors: true });
   addFormats(ajv);
-  for (const name of readdirSync(schemaDir).filter((entry) => entry.endsWith('.schema.json')).sort()) {
+  for (const name of readdirSync(schemaDir)
+    .filter((entry) => entry.endsWith('.schema.json'))
+    .sort()) {
     ajv.addSchema(JSON.parse(readFileSync(join(schemaDir, name), 'utf8')));
   }
   return {
-    validate: (schema: string, value: unknown) => ajv.getSchema(`https://factory-floor.local/contracts/${schema}.schema.json`)!(value),
+    validate: (schema: string, value: unknown) =>
+      ajv.getSchema(
+        `https://factory-floor.local/contracts/${schema}.schema.json`,
+      )!(value),
   };
 }
 
@@ -45,8 +50,19 @@ const stagedArtifact = {
   schemaDigest: digest,
   provenance: source,
 };
-const resourceUsage = { cpuMilliseconds: 1, wallMilliseconds: 2, inputBytes: 3, outputBytes: 4, externalCalls: 0 };
-const failure = { code: 'VERIFY_FAILED', message: 'Verifier rejected the result.', category: 'model', retryable: true };
+const resourceUsage = {
+  cpuMilliseconds: 1,
+  wallMilliseconds: 2,
+  inputBytes: 3,
+  outputBytes: 4,
+  externalCalls: 0,
+};
+const failure = {
+  code: 'VERIFY_FAILED',
+  message: 'Verifier rejected the result.',
+  category: 'model',
+  retryable: true,
+};
 const externalActionProposal = {
   proposalId: uuid,
   actionType: 'notify.operator',
@@ -70,55 +86,125 @@ describe('runtime JSON contracts', () => {
   });
 
   it('accepts a valid invocation envelope', () => {
-    expect(validators().validate('invocation-envelope', {
-      protocolVersion: '1.0',
-      executionId: uuid,
-      attemptId: uuid,
-      attemptNumber: 1,
-      leaseToken: 'lease',
-      leaseExpiresAt: '2026-07-14T00:00:00.000Z',
-      lifecycleEpoch: 0,
-      component: { componentId: uuid, definitionId: uuid, definitionName: 'demo', definitionVersion: '1', definition: {}, configuration: {} },
-      inputs: [{ portName: 'in', deliveryId: uuid, payload: {}, artifacts: [artifact], artifactReadUrls: ['https://worker.local/artifacts/a'] }],
-      state: null,
-      capabilityHandles: ['cap_123'],
-      cancellationUrl: 'https://worker.local/cancel',
-      heartbeatUrl: 'https://worker.local/heartbeat',
-      resultSubmissionUrl: 'https://worker.local/results',
-      artifactStagingUrl: 'https://worker.local/artifacts/stage',
-      capabilityInvocationUrl: 'https://worker.local/capabilities/invoke',
-      limits: { heartbeatIntervalMs: 20000, maxArtifactBytes: 104857600 },
-      traceContext: { traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01' },
-      source,
-    })).toBe(true);
+    expect(
+      validators().validate('invocation-envelope', {
+        protocolVersion: '1.0',
+        executionId: uuid,
+        attemptId: uuid,
+        attemptNumber: 1,
+        leaseToken: 'lease',
+        leaseExpiresAt: '2026-07-14T00:00:00.000Z',
+        lifecycleEpoch: 0,
+        component: {
+          componentId: uuid,
+          definitionId: uuid,
+          definitionName: 'demo',
+          definitionVersion: '1',
+          definition: {},
+          configuration: {},
+        },
+        inputs: [
+          {
+            portName: 'in',
+            deliveryId: uuid,
+            payload: {},
+            artifacts: [artifact],
+            artifactReadUrls: ['https://worker.local/artifacts/a'],
+          },
+        ],
+        state: null,
+        capabilityHandles: ['cap_123'],
+        cancellationUrl: 'https://worker.local/cancel',
+        heartbeatUrl: 'https://worker.local/heartbeat',
+        resultSubmissionUrl: 'https://worker.local/results',
+        artifactStagingUrl: 'https://worker.local/artifacts/stage',
+        capabilityInvocationUrl: 'https://worker.local/capabilities/invoke',
+        limits: { heartbeatIntervalMs: 20000, maxArtifactBytes: 104857600 },
+        traceContext: {
+          traceparent:
+            '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
+        },
+        source,
+      }),
+    ).toBe(true);
   });
 
   it('rejects uppercase or short SHA-256 digests', () => {
-    expect(validators().validate('artifact-descriptor', { ...artifact, digest: 'A'.repeat(64) })).toBe(false);
-    expect(validators().validate('artifact-descriptor', { ...artifact, digest: 'a'.repeat(63) })).toBe(false);
+    expect(
+      validators().validate('artifact-descriptor', {
+        ...artifact,
+        digest: 'A'.repeat(64),
+      }),
+    ).toBe(false);
+    expect(
+      validators().validate('artifact-descriptor', {
+        ...artifact,
+        digest: 'a'.repeat(63),
+      }),
+    ).toBe(false);
   });
 
   it('validates shared proposed-result fixtures with Ajv', () => {
-    expect(validators().validate('proposed-result', readFixture('proposed-results/valid-completed.json'))).toBe(true);
-    expect(validators().validate('proposed-result', readFixture('proposed-results/valid-failed.json'))).toBe(true);
-    expect(validators().validate('proposed-result', readFixture('proposed-results/invalid-failed-missing-failure.json'))).toBe(false);
-    expect(validators().validate('proposed-result', readFixture('proposed-results/invalid-completed-with-failure.json'))).toBe(false);
+    expect(
+      validators().validate(
+        'proposed-result',
+        readFixture('proposed-results/valid-completed.json'),
+      ),
+    ).toBe(true);
+    expect(
+      validators().validate(
+        'proposed-result',
+        readFixture('proposed-results/valid-failed.json'),
+      ),
+    ).toBe(true);
+    expect(
+      validators().validate(
+        'proposed-result',
+        readFixture('proposed-results/invalid-failed-missing-failure.json'),
+      ),
+    ).toBe(false);
+    expect(
+      validators().validate(
+        'proposed-result',
+        readFixture('proposed-results/invalid-completed-with-failure.json'),
+      ),
+    ).toBe(false);
   });
 
   it('uses source identity as a kind-discriminated union', () => {
-    expect(validators().validate('source-identity', { kind: 'command', eventId: uuid, submittedBy: 'operator' })).toBe(false);
-    expect(validators().validate('source-identity', { kind: 'event', eventId: uuid, producerComponentId: uuid })).toBe(true);
+    expect(
+      validators().validate('source-identity', {
+        kind: 'command',
+        eventId: uuid,
+        submittedBy: 'operator',
+      }),
+    ).toBe(false);
+    expect(
+      validators().validate('source-identity', {
+        kind: 'event',
+        eventId: uuid,
+        producerComponentId: uuid,
+      }),
+    ).toBe(true);
   });
 
   it('rejects additional properties on protocol envelopes', () => {
     const proposed = {
-      ...readFixture('proposed-results/valid-completed.json') as Record<string, unknown>,
+      ...(readFixture('proposed-results/valid-completed.json') as Record<
+        string,
+        unknown
+      >),
       surprise: true,
     };
     expect(validators().validate('proposed-result', proposed)).toBe(false);
   });
 
   it('rejects malformed proposed events', () => {
-    expect(validators().validate('proposed-event', readFixture('proposed-events/invalid-event-missing-subject.json'))).toBe(false);
+    expect(
+      validators().validate(
+        'proposed-event',
+        readFixture('proposed-events/invalid-event-missing-subject.json'),
+      ),
+    ).toBe(false);
   });
 });

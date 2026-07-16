@@ -102,16 +102,16 @@ With no command, it runs `doctor`, which is non-destructive. It validates the pi
 
 Supported commands are:
 
-| Command | Behavior |
-|---|---|
-| `doctor` | Inspect toolchain, repository, storage, lockfiles, and Docker. |
-| `sync` | Re-run the shared bootstrap and synchronize dependencies. |
-| `verify` | Run available lint, typecheck, unit, Python, and Compose configuration checks. |
-| `integration` | Run the root `test:integration` script when defined. |
-| `clean` | Remove transient build and test caches while preserving installed dependencies. |
-| `reset` | Remove `node_modules`, Python virtual environments, and the local pnpm store, then bootstrap again. |
-| `pull-services` | Pull Docker Compose images when a Compose file exists and a daemon is reachable. |
-| `all` | Run `sync` followed by `verify`. |
+| Command         | Behavior                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------- |
+| `doctor`        | Inspect toolchain, repository, storage, lockfiles, and Docker.                                      |
+| `sync`          | Re-run the shared bootstrap and synchronize dependencies.                                           |
+| `verify`        | Run available lint, typecheck, unit, Python, and Compose configuration checks.                      |
+| `integration`   | Run the root `test:integration` script when defined.                                                |
+| `clean`         | Remove transient build and test caches while preserving installed dependencies.                     |
+| `reset`         | Remove `node_modules`, Python virtual environments, and the local pnpm store, then bootstrap again. |
+| `pull-services` | Pull Docker Compose images when a Compose file exists and a daemon is reachable.                    |
+| `all`           | Run `sync` followed by `verify`.                                                                    |
 
 Commands may be combined and are executed from left to right:
 

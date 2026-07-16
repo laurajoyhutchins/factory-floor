@@ -20,11 +20,7 @@
           "minLength": 1
         }
       },
-      "required": [
-        "kind",
-        "commandId",
-        "submittedBy"
-      ]
+      "required": ["kind", "commandId", "submittedBy"]
     },
     {
       "type": "object",
@@ -42,11 +38,7 @@
           "format": "uuid"
         }
       },
-      "required": [
-        "kind",
-        "eventId",
-        "producerComponentId"
-      ]
+      "required": ["kind", "eventId", "producerComponentId"]
     },
     {
       "type": "object",
@@ -63,11 +55,7 @@
           "$ref": "artifact-descriptor.schema.json#/$defs/sha256Digest"
         }
       },
-      "required": [
-        "kind",
-        "artifactId",
-        "digest"
-      ]
+      "required": ["kind", "artifactId", "digest"]
     },
     {
       "type": "object",
@@ -85,11 +73,7 @@
           "format": "uuid"
         }
       },
-      "required": [
-        "kind",
-        "executionId",
-        "attemptId"
-      ]
+      "required": ["kind", "executionId", "attemptId"]
     }
   ]
 }

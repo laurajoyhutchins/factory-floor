@@ -1,1 +1,17 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://factory-floor.local/contracts/worker/claim-request.schema.json","title":"WorkerClaimRequest","type":"object","additionalProperties":false,"properties":{"protocolVersion":{"const":"1.0"},"workerId":{"type":"string","minLength":1,"maxLength":128},"capabilities":{"type":"array","items":{"type":"string","minLength":1,"maxLength":128},"maxItems":64}},"required":["protocolVersion","workerId","capabilities"]}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/worker/claim-request.schema.json",
+  "title": "WorkerClaimRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "workerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "maxItems": 64
+    }
+  },
+  "required": ["protocolVersion", "workerId", "capabilities"]
+}

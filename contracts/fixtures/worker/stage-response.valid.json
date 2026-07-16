@@ -1,1 +1,6 @@
-{"protocolVersion":"1.0","stagedRef":"018f6f73-8d5b-7cc8-9ed9-6b2f4e25d006","uploadUrl":"/worker/v1/artifacts/upload/018f6f73-8d5b-7cc8-9ed9-6b2f4e25d006","expiresAt":"2026-07-15T00:01:00.000Z"}
+{
+  "protocolVersion": "1.0",
+  "stagedRef": "018f6f73-8d5b-7cc8-9ed9-6b2f4e25d006",
+  "uploadUrl": "/worker/v1/artifacts/upload/018f6f73-8d5b-7cc8-9ed9-6b2f4e25d006",
+  "expiresAt": "2026-07-15T00:01:00.000Z"
+}

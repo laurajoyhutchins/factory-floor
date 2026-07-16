@@ -39,7 +39,11 @@ const templateDocument = {
 describe('SystemApplicationService', () => {
   it('resolves the registered investigation template and applies its static topology idempotently', async () => {
     const transaction = {};
-    const db = { transaction: () => ({ execute: (callback: (trx: unknown) => unknown) => callback(transaction) }) } as any;
+    const db = {
+      transaction: () => ({
+        execute: (callback: (trx: unknown) => unknown) => callback(transaction),
+      }),
+    } as any;
     const roots = new Map<string, any>();
     const children = new Map<string, any>();
     let activeRevision: any;
@@ -48,15 +52,29 @@ describe('SystemApplicationService', () => {
 
     const topology = {
       findRoot: async (_db: unknown, name: string) => roots.get(name),
-      createRegion: async (_db: unknown, name: string, parentRegionId: string | null) => {
-        const row = { id: `region-${name}`, name, parent_region_id: parentRegionId };
+      createRegion: async (
+        _db: unknown,
+        name: string,
+        parentRegionId: string | null,
+      ) => {
+        const row = {
+          id: `region-${name}`,
+          name,
+          parent_region_id: parentRegionId,
+        };
         if (parentRegionId === null) roots.set(name, row);
         else children.set(`${parentRegionId}:${name}`, row);
         return row;
       },
-      findChild: async (_db: unknown, parent: string, name: string) => children.get(`${parent}:${name}`),
+      findChild: async (_db: unknown, parent: string, name: string) =>
+        children.get(`${parent}:${name}`),
       activeRevision: async () => activeRevision,
-      createRevision: async (_db: unknown, regionId: string, digest: string, storedTopology: unknown) => ({
+      createRevision: async (
+        _db: unknown,
+        regionId: string,
+        digest: string,
+        storedTopology: unknown,
+      ) => ({
         id: 'revision-1',
         region_id: regionId,
         content_digest: digest,
@@ -69,17 +87,32 @@ describe('SystemApplicationService', () => {
       createConnection: async (_db: unknown, input: any) => {
         createdConnections.push(input);
       },
-      activate: async (_db: unknown, _regionId: string, _revisionId: string) => {
-        activeRevision = { content_digest: canonicalJsonDigest({ system: systemDocument, templateDigest: 't'.repeat(64) }) };
+      activate: async (
+        _db: unknown,
+        _regionId: string,
+        _revisionId: string,
+      ) => {
+        activeRevision = {
+          content_digest: canonicalJsonDigest({
+            system: systemDocument,
+            templateDigest: 't'.repeat(64),
+          }),
+        };
       },
     } as any;
 
     const definitions = {
-      findTemplate: async () => ({ template: templateDocument, content_digest: 't'.repeat(64) }),
-      findComponentDefinition: async (_db: unknown, name: string) => ({ id: `definition-${name}` }),
-      listPorts: async (_db: unknown, definitionId: string) => definitionId.endsWith('retrieve')
-        ? [{ name: 'objective' }, { name: 'evidence' }]
-        : [{ name: 'evidence' }, { name: 'result' }],
+      findTemplate: async () => ({
+        template: templateDocument,
+        content_digest: 't'.repeat(64),
+      }),
+      findComponentDefinition: async (_db: unknown, name: string) => ({
+        id: `definition-${name}`,
+      }),
+      listPorts: async (_db: unknown, definitionId: string) =>
+        definitionId.endsWith('retrieve')
+          ? [{ name: 'objective' }, { name: 'evidence' }]
+          : [{ name: 'evidence' }, { name: 'result' }],
     } as any;
 
     const service = new SystemApplicationService(db, definitions, topology);
@@ -88,9 +121,15 @@ describe('SystemApplicationService', () => {
 
     expect(first.disposition).toBe('created');
     expect(first.regions).toHaveLength(4);
-    expect(createdInstances.map((instance) => instance.name)).toEqual(['retrieve', 'verify']);
+    expect(createdInstances.map((instance) => instance.name)).toEqual([
+      'retrieve',
+      'verify',
+    ]);
     expect(createdConnections).toHaveLength(1);
-    expect(second).toMatchObject({ disposition: 'existing', digest: first.digest });
+    expect(second).toMatchObject({
+      disposition: 'existing',
+      digest: first.digest,
+    });
     expect(createdInstances).toHaveLength(2);
   });
 });

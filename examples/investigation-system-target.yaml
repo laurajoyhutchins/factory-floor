@@ -2,7 +2,7 @@ apiVersion: factoryfloor.dev/v1alpha1
 kind: System
 metadata:
   name: investigation-demo
-  version: "0.1.0"
+  version: '0.1.0'
 spec:
   rootRegion:
     id: investigation-demo-root
@@ -49,7 +49,7 @@ apiVersion: factoryfloor.dev/v1alpha1
 kind: Template
 metadata:
   name: bounded-investigation
-  version: "1"
+  version: '1'
 spec:
   inputs:
     - port: objective

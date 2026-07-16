@@ -197,10 +197,7 @@ describe('observability replay and startup recovery', () => {
     expect(status).toHaveLength(PROJECTION_NAMES.length);
     expect(status.every((item) => item.lastEventId !== null)).toBe(true);
     expect(
-      await db
-        .selectFrom('projection_checkpoints')
-        .selectAll()
-        .execute(),
+      await db.selectFrom('projection_checkpoints').selectAll().execute(),
     ).toHaveLength(PROJECTION_NAMES.length);
     expect(
       await db

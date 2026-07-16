@@ -23,19 +23,91 @@
         "definition": true,
         "configuration": true
       },
-      "required": ["componentId", "definitionId", "definitionName", "definitionVersion", "definition", "configuration"]
+      "required": [
+        "componentId",
+        "definitionId",
+        "definitionName",
+        "definitionVersion",
+        "definition",
+        "configuration"
+      ]
     },
-    "inputs": { "type": "array", "items": { "type":"object", "additionalProperties": false, "properties": { "portName":{"type":"string"}, "deliveryId":{"type":"string","format":"uuid"}, "payload": true, "artifacts":{"type":"array","items":{"$ref":"artifact-descriptor.schema.json"}}, "artifactReadUrls":{"type":"array","items":{"type":"string","format":"uri"}} }, "required":["portName","deliveryId","payload","artifacts","artifactReadUrls"] } },
-    "state": { "anyOf": [{ "$ref": "artifact-descriptor.schema.json" }, { "type": "null" }] },
-    "capabilityHandles": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "portName": { "type": "string" },
+          "deliveryId": { "type": "string", "format": "uuid" },
+          "payload": true,
+          "artifacts": {
+            "type": "array",
+            "items": { "$ref": "artifact-descriptor.schema.json" }
+          },
+          "artifactReadUrls": {
+            "type": "array",
+            "items": { "type": "string", "format": "uri" }
+          }
+        },
+        "required": [
+          "portName",
+          "deliveryId",
+          "payload",
+          "artifacts",
+          "artifactReadUrls"
+        ]
+      }
+    },
+    "state": {
+      "anyOf": [
+        { "$ref": "artifact-descriptor.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "capabilityHandles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "cancellationUrl": { "type": "string", "format": "uri" },
     "heartbeatUrl": { "type": "string", "format": "uri" },
     "resultSubmissionUrl": { "type": "string", "format": "uri" },
     "artifactStagingUrl": { "type": "string", "format": "uri" },
     "capabilityInvocationUrl": { "type": "string", "format": "uri" },
-    "traceContext": { "type": "object", "additionalProperties": { "type": "string" } },
-    "limits": { "type":"object", "additionalProperties": false, "properties":{"heartbeatIntervalMs":{"type":"integer","minimum":1},"maxArtifactBytes":{"type":"integer","minimum":1}}, "required":["heartbeatIntervalMs","maxArtifactBytes"] },
+    "traceContext": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heartbeatIntervalMs": { "type": "integer", "minimum": 1 },
+        "maxArtifactBytes": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["heartbeatIntervalMs", "maxArtifactBytes"]
+    },
     "source": { "$ref": "source-identity.schema.json" }
   },
-  "required": ["protocolVersion", "executionId", "attemptId", "attemptNumber", "leaseToken", "leaseExpiresAt", "lifecycleEpoch", "component", "inputs", "state", "capabilityHandles", "cancellationUrl", "heartbeatUrl", "resultSubmissionUrl", "artifactStagingUrl", "capabilityInvocationUrl", "traceContext", "limits", "source"]
+  "required": [
+    "protocolVersion",
+    "executionId",
+    "attemptId",
+    "attemptNumber",
+    "leaseToken",
+    "leaseExpiresAt",
+    "lifecycleEpoch",
+    "component",
+    "inputs",
+    "state",
+    "capabilityHandles",
+    "cancellationUrl",
+    "heartbeatUrl",
+    "resultSubmissionUrl",
+    "artifactStagingUrl",
+    "capabilityInvocationUrl",
+    "traceContext",
+    "limits",
+    "source"
+  ]
 }

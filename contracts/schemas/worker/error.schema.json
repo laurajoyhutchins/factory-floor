@@ -1,1 +1,16 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://factory-floor.local/contracts/worker/error.schema.json","title":"WorkerError","type":"object","additionalProperties":false,"properties":{"protocolVersion":{"const":"1.0"},"code":{"type":"string","pattern":"^[a-z0-9_]+$"},"message":{"type":"string","minLength":1,"maxLength":512},"retryable":{"type":"boolean"},"requestId":{"type":"string","minLength":1},"details":{"type":"object","additionalProperties":true}},"required":["protocolVersion","code","message","retryable","requestId"]}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/worker/error.schema.json",
+  "title": "WorkerError",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "code": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "retryable": { "type": "boolean" },
+    "requestId": { "type": "string", "minLength": 1 },
+    "details": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["protocolVersion", "code", "message", "retryable", "requestId"]
+}

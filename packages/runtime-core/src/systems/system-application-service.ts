@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Kysely } from 'kysely';
 import type { Database, Json } from '@factory-floor/db';
-import { DefinitionRepository, isUniqueViolation, TopologyRepository } from '@factory-floor/db';
+import {
+  DefinitionRepository,
+  isUniqueViolation,
+  TopologyRepository,
+} from '@factory-floor/db';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { DomainError } from '../declarations/errors.js';
 import {
@@ -19,9 +23,15 @@ export interface SystemApplyResult {
 function parseRef(reference: string): { name: string; version: string } {
   const separator = reference.lastIndexOf('@');
   if (separator < 1 || separator === reference.length - 1) {
-    throw new DomainError('invalid_declaration', `Invalid reference ${reference}`);
+    throw new DomainError(
+      'invalid_declaration',
+      `Invalid reference ${reference}`,
+    );
   }
-  return { name: reference.slice(0, separator), version: reference.slice(separator + 1) };
+  return {
+    name: reference.slice(0, separator),
+    version: reference.slice(separator + 1),
+  };
 }
 
 function endpoint(value: string): { instance: string; port: string } {
@@ -29,7 +39,10 @@ function endpoint(value: string): { instance: string; port: string } {
   if (separator < 1 || separator === value.length - 1) {
     throw new DomainError('invalid_declaration', `Invalid endpoint ${value}`);
   }
-  return { instance: value.slice(0, separator), port: value.slice(separator + 1) };
+  return {
+    instance: value.slice(0, separator),
+    port: value.slice(separator + 1),
+  };
 }
 
 export class SystemApplicationService {
@@ -60,23 +73,42 @@ export class SystemApplicationService {
         disposition = 'created';
       }
 
-      const regionRows = new Map<string, Awaited<ReturnType<TopologyRepository['createRegion']>>>();
+      const regionRows = new Map<
+        string,
+        Awaited<ReturnType<TopologyRepository['createRegion']>>
+      >();
       for (const regionDeclaration of document.spec.regions) {
-        let region = await this.topology.findChild(transaction, root.id, regionDeclaration.id);
+        let region = await this.topology.findChild(
+          transaction,
+          root.id,
+          regionDeclaration.id,
+        );
         if (region === undefined) {
-          region = await this.topology.createRegion(transaction, regionDeclaration.id, root.id);
+          region = await this.topology.createRegion(
+            transaction,
+            regionDeclaration.id,
+            root.id,
+          );
           disposition = 'created';
         }
         regionRows.set(regionDeclaration.id, region);
       }
 
-      const investigationDeclaration = document.spec.regions.find((region: any) => region.id === 'investigation');
+      const investigationDeclaration = document.spec.regions.find(
+        (region: any) => region.id === 'investigation',
+      );
       if (investigationDeclaration === undefined) {
-        throw new DomainError('invalid_declaration', 'System must declare the investigation region');
+        throw new DomainError(
+          'invalid_declaration',
+          'System must declare the investigation region',
+        );
       }
       const investigationRegion = regionRows.get('investigation');
       if (investigationRegion === undefined) {
-        throw new DomainError('invalid_declaration', 'Investigation region was not created');
+        throw new DomainError(
+          'invalid_declaration',
+          'Investigation region was not created',
+        );
       }
 
       const templateReference = parseRef(investigationDeclaration.template);
@@ -107,15 +139,28 @@ export class SystemApplicationService {
         system: document,
         templateDigest: templateRow.content_digest,
       });
-      const activeRevision = await this.topology.activeRevision(transaction, investigationRegion.id);
+      const activeRevision = await this.topology.activeRevision(
+        transaction,
+        investigationRegion.id,
+      );
       if (activeRevision !== undefined) {
         if (activeRevision.content_digest === digest) {
-          return { disposition, digest, regions: [root, ...regionRows.values()] };
+          return {
+            disposition,
+            digest,
+            regions: [root, ...regionRows.values()],
+          };
         }
-        throw new DomainError('system_conflict', 'Static system exists with different content');
+        throw new DomainError(
+          'system_conflict',
+          'Static system exists with different content',
+        );
       }
 
-      const definitionByInstance = new Map<string, { id: string; ports: Map<string, 'input'|'output'|'state'> }>();
+      const definitionByInstance = new Map<
+        string,
+        { id: string; ports: Map<string, 'input' | 'output' | 'state'> }
+      >();
       for (const instance of staticTopology.instances) {
         const reference = parseRef(instance.component);
         const definition = await this.definitions.findComponentDefinition(
@@ -129,22 +174,39 @@ export class SystemApplicationService {
             `Component definition ${instance.component} was not found`,
           );
         }
-        const ports = await this.definitions.listPorts(transaction, definition.id);
+        const ports = await this.definitions.listPorts(
+          transaction,
+          definition.id,
+        );
         definitionByInstance.set(instance.name, {
           id: definition.id,
-          ports: new Map(ports.map((port) => [port.name, port.direction as 'input'|'output'|'state'])),
+          ports: new Map(
+            ports.map((port) => [
+              port.name,
+              port.direction as 'input' | 'output' | 'state',
+            ]),
+          ),
         });
       }
 
-      for (const [commandType, rule] of Object.entries(staticTopology.ingress?.commands ?? {})) {
+      for (const [commandType, rule] of Object.entries(
+        staticTopology.ingress?.commands ?? {},
+      )) {
         const seen = new Set<string>();
         for (const target of (rule as any).targets ?? []) {
           const ports = definitionByInstance.get(target.component)?.ports;
           if (ports?.get(target.port) !== 'input') {
-            throw new DomainError('invalid_port_reference', `Invalid ingress ${commandType} target ${target.component}.${target.port}`);
+            throw new DomainError(
+              'invalid_port_reference',
+              `Invalid ingress ${commandType} target ${target.component}.${target.port}`,
+            );
           }
           const key = `${target.component}.${target.port}`;
-          if (seen.has(key)) throw new DomainError('duplicate_ingress_target', `Duplicate ingress target ${key}`);
+          if (seen.has(key))
+            throw new DomainError(
+              'duplicate_ingress_target',
+              `Duplicate ingress target ${key}`,
+            );
           seen.add(key);
         }
       }
@@ -152,10 +214,11 @@ export class SystemApplicationService {
       for (const connection of staticTopology.connections) {
         const source = endpoint(connection.from);
         const target = endpoint(connection.to);
-        if (source.instance === 'region' || target.instance === 'region') continue;
+        if (source.instance === 'region' || target.instance === 'region')
+          continue;
         if (
-          !definitionByInstance.get(source.instance)?.ports.has(source.port)
-          || !definitionByInstance.get(target.instance)?.ports.has(target.port)
+          !definitionByInstance.get(source.instance)?.ports.has(source.port) ||
+          !definitionByInstance.get(target.instance)?.ports.has(target.port)
         ) {
           throw new DomainError(
             'invalid_port_reference',
@@ -183,15 +246,24 @@ export class SystemApplicationService {
         instanceIds.set(instance.name, row.id);
       }
 
-      for (const [commandType, rule] of Object.entries(staticTopology.ingress?.commands ?? {})) {
+      for (const [commandType, rule] of Object.entries(
+        staticTopology.ingress?.commands ?? {},
+      )) {
         const seen = new Set<string>();
         for (const target of (rule as any).targets ?? []) {
           const ports = definitionByInstance.get(target.component)?.ports;
           if (ports?.get(target.port) !== 'input') {
-            throw new DomainError('invalid_port_reference', `Invalid ingress ${commandType} target ${target.component}.${target.port}`);
+            throw new DomainError(
+              'invalid_port_reference',
+              `Invalid ingress ${commandType} target ${target.component}.${target.port}`,
+            );
           }
           const key = `${target.component}.${target.port}`;
-          if (seen.has(key)) throw new DomainError('duplicate_ingress_target', `Duplicate ingress target ${key}`);
+          if (seen.has(key))
+            throw new DomainError(
+              'duplicate_ingress_target',
+              `Duplicate ingress target ${key}`,
+            );
           seen.add(key);
         }
       }
@@ -199,7 +271,8 @@ export class SystemApplicationService {
       for (const connection of staticTopology.connections) {
         const source = endpoint(connection.from);
         const target = endpoint(connection.to);
-        if (source.instance === 'region' || target.instance === 'region') continue;
+        if (source.instance === 'region' || target.instance === 'region')
+          continue;
         await this.topology.createConnection(transaction, {
           revisionId: revision.id,
           sourceId: instanceIds.get(source.instance)!,
@@ -209,8 +282,16 @@ export class SystemApplicationService {
         });
       }
 
-      await this.topology.activate(transaction, investigationRegion.id, revision.id);
-      return { disposition: 'created', digest, regions: [root, ...regionRows.values()] };
+      await this.topology.activate(
+        transaction,
+        investigationRegion.id,
+        revision.id,
+      );
+      return {
+        disposition: 'created',
+        digest,
+        regions: [root, ...regionRows.values()],
+      };
     });
   }
 }

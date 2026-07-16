@@ -15,11 +15,7 @@
         },
         "envelope": true
       },
-      "required": [
-        "protocolVersion",
-        "claimed",
-        "envelope"
-      ]
+      "required": ["protocolVersion", "claimed", "envelope"]
     },
     {
       "type": "object",
@@ -37,11 +33,7 @@
           "maximum": 60000
         }
       },
-      "required": [
-        "protocolVersion",
-        "claimed",
-        "retryAfterMs"
-      ]
+      "required": ["protocolVersion", "claimed", "retryAfterMs"]
     }
   ]
 }

@@ -169,12 +169,16 @@ describe('durable command routing and scheduler concurrency', () => {
     ]);
     expect(new Set(results.map((result) => result.commandId)).size).toBe(1);
     expect(new Set(results.map((result) => result.eventId)).size).toBe(1);
-    expect(new Set(results.flatMap((result) => result.deliveryIds)).size).toBe(2);
-    expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(1);
-    expect(await db.selectFrom('events').selectAll().execute()).toHaveLength(1);
-    expect(await db.selectFrom('deliveries').selectAll().execute()).toHaveLength(
+    expect(new Set(results.flatMap((result) => result.deliveryIds)).size).toBe(
       2,
     );
+    expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(
+      1,
+    );
+    expect(await db.selectFrom('events').selectAll().execute()).toHaveLength(1);
+    expect(
+      await db.selectFrom('deliveries').selectAll().execute(),
+    ).toHaveLength(2);
   });
 
   it('allows only one competing poller to lease a complete multi-input group', async () => {
@@ -190,17 +194,23 @@ describe('durable command routing and scheduler concurrency', () => {
 
     const scheduler = new SchedulerService(db);
     const results = await Promise.all([
-      scheduler.pollForExecution({ owner: 'worker-a', leaseDurationMs: 30_000 }),
-      scheduler.pollForExecution({ owner: 'worker-b', leaseDurationMs: 30_000 }),
+      scheduler.pollForExecution({
+        owner: 'worker-a',
+        leaseDurationMs: 30_000,
+      }),
+      scheduler.pollForExecution({
+        owner: 'worker-b',
+        leaseDurationMs: 30_000,
+      }),
     ]);
 
     const scheduled = results.filter((result) => result !== null);
     expect(scheduled).toHaveLength(1);
     expect(results.filter((result) => result === null)).toHaveLength(1);
     expect(scheduled[0]?.inputs).toHaveLength(2);
-    expect(await db.selectFrom('executions').selectAll().execute()).toHaveLength(
-      1,
-    );
+    expect(
+      await db.selectFrom('executions').selectAll().execute(),
+    ).toHaveLength(1);
     expect(
       await db.selectFrom('execution_attempts').selectAll().execute(),
     ).toHaveLength(1);
@@ -217,9 +227,9 @@ describe('durable command routing and scheduler concurrency', () => {
           delivery.lease_token !== null,
       ),
     ).toBe(true);
-    expect(new Set(deliveries.map((delivery) => delivery.lease_token)).size).toBe(
-      1,
-    );
+    expect(
+      new Set(deliveries.map((delivery) => delivery.lease_token)).size,
+    ).toBe(1);
   });
 
   it('durably rejects an already expired command without creating deliveries', async () => {
@@ -244,7 +254,9 @@ describe('durable command routing and scheduler concurrency', () => {
       deliveryIds: [],
       rejection: { code: 'command_expired' },
     });
-    expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(1);
+    expect(await db.selectFrom('commands').selectAll().execute()).toHaveLength(
+      1,
+    );
     expect(await db.selectFrom('events').selectAll().execute()).toHaveLength(1);
     expect(await db.selectFrom('deliveries').selectAll().execute()).toEqual([]);
   });

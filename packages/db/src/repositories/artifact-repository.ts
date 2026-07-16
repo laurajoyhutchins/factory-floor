@@ -142,11 +142,7 @@ export class ArtifactRepository {
       .returningAll()
       .executeTakeFirst();
   }
-  markStagingAbandoned(
-    db: RuntimeDb,
-    stagingRowId: string,
-    at = new Date(),
-  ) {
+  markStagingAbandoned(db: RuntimeDb, stagingRowId: string, at = new Date()) {
     return db
       .updateTable('artifact_staging')
       .set({ status: 'abandoned', abandoned_at: at, promoted_at: null })

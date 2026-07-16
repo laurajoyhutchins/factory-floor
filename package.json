@@ -8,7 +8,8 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --config vitest.config.ts",
     "test:integration": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts && pnpm demo:investigation",
@@ -34,6 +35,7 @@
     "test:python": "uv run --project packages/worker-sdk-py --locked pytest && uv run --project workers/demo-py --locked pytest",
     "test:conformance": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts tests/integration/runtime-core/observability-recovery.test.ts tests/integration/runtime-core/policy-decision.test.ts",
     "verify": "bash scripts/verify.sh",
+    "format": "prettier --write .",
     "format:check": "prettier --check .",
     "artifacts:reconcile": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/control-plane artifacts:reconcile",
     "projections:rebuild": "node scripts/run-with-env.mjs tsx scripts/rebuild-projections.mjs",
