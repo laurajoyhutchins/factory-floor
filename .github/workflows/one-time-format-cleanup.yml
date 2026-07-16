@@ -62,11 +62,9 @@ jobs:
           NODE
 
           pnpm exec prettier --write --ignore-path /dev/null \
-            .github/workflows/task1-verification.yml \
-            .prettierignore
+            .github/workflows/task1-verification.yml
           pnpm exec prettier --check --ignore-path /dev/null \
-            .github/workflows/task1-verification.yml \
-            .prettierignore
+            .github/workflows/task1-verification.yml
 
       - name: Upload permanent files
         uses: actions/upload-artifact@v4
