@@ -74,7 +74,18 @@ jobs:
           retention-days: 30
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee typecheck.log
+
+      - name: Upload typecheck log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-log-${{ github.run_number }}
+          path: typecheck.log
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Run workspace TypeScript tests
         run: pnpm test
