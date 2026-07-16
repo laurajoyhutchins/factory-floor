@@ -174,6 +174,23 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
   }
 }
 
+export async function drainProjectionCatchUp(
+  service: Pick<BoundedStartupObservabilityService, 'rebuildProjections'>,
+  batchSize: number,
+  shouldStop: () => boolean = () => false,
+  yieldControl: () => Promise<void> = () =>
+    new Promise((resolve) => setImmediate(resolve)),
+): Promise<number> {
+  let batches = 0;
+  while (!shouldStop()) {
+    const result = await service.rebuildProjections(batchSize);
+    batches += 1;
+    if (!result.pending) break;
+    await yieldControl();
+  }
+  return batches;
+}
+
 export async function assertStartupRecoveryWithinBounds(
   db: Kysely<Database>,
   now = new Date(),
@@ -253,6 +270,12 @@ export async function buildApp(
   const observability =
     deps.observabilityService ??
     (db ? new ObservabilityService(db) : undefined);
+  const startupObservability =
+    db && !deps.startupRecoveryService
+      ? new BoundedStartupObservabilityService(db)
+      : undefined;
+  let stopProjectionCatchUp = false;
+  let projectionCatchUp: Promise<void> | undefined;
 
   if (db || deps.registrationService)
     await registerRegistrationRoutes(
@@ -301,9 +324,7 @@ export async function buildApp(
     const recovery =
       deps.startupRecoveryService ??
       new StartupRecoveryService(db!, {
-        observability: db
-          ? new BoundedStartupObservabilityService(db)
-          : observability,
+        observability: startupObservability ?? observability,
         blobStore: artifactBlobStore,
       });
     app.addHook('onReady', async () => {
@@ -313,12 +334,32 @@ export async function buildApp(
         reconciliationBatchSize: 250,
       });
       app.log.info({ recovery: summary }, 'startup recovery completed');
+      if (startupObservability)
+        projectionCatchUp = drainProjectionCatchUp(
+          startupObservability,
+          250,
+          () => stopProjectionCatchUp,
+        )
+          .then((batches) => {
+            app.log.info(
+              { batches },
+              'startup projection catch-up completed',
+            );
+          })
+          .catch((error: unknown) => {
+            app.log.error(
+              { err: error },
+              'startup projection catch-up failed',
+            );
+          });
     });
   }
 
-  if (!deps.database && db)
+  if (db)
     app.addHook('onClose', async () => {
-      await db.destroy();
+      stopProjectionCatchUp = true;
+      await projectionCatchUp;
+      if (!deps.database) await db.destroy();
     });
   return app;
 }
