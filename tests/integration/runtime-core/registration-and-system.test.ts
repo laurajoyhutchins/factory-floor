@@ -12,8 +12,8 @@ import {
 } from '../../../packages/runtime-core/src/index.js';
 
 const base =
-  process.env.TEST_DATABASE_URL
-  ?? 'postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor';
+  process.env.TEST_DATABASE_URL ??
+  'postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor';
 const admin = new pg.Pool({
   connectionString: base,
   connectionTimeoutMillis: 10_000,
@@ -30,7 +30,11 @@ const schemaDocument = {
 
 function componentDocument(
   name: string,
-  ports: Array<{ name: string; direction: 'input' | 'output'; required: boolean }>,
+  ports: Array<{
+    name: string;
+    direction: 'input' | 'output';
+    required: boolean;
+  }>,
 ) {
   return {
     apiVersion: 'factoryfloor.dev/v1alpha1',
@@ -96,36 +100,55 @@ describe('registration and static system application', () => {
   });
 
   beforeEach(async () => {
-    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    expect(
+      (await resetDatabaseForDevelopment(db, 'test')).error,
+    ).toBeUndefined();
   });
 
   afterAll(async () => {
     await db.destroy();
-    await admin.query(`drop database if exists ${databaseName} with (force)`).catch(() => undefined);
+    await admin
+      .query(`drop database if exists ${databaseName}`)
+      .catch(() => undefined);
     await admin.end();
   });
 
   it('applies a registered static topology once and treats the same apply as a no-op', async () => {
     await registrations.registerArtifactSchema(schemaDocument);
-    await registrations.registerComponentDefinition(componentDocument('retrieve', [
-      { name: 'objective', direction: 'input', required: true },
-      { name: 'evidence', direction: 'output', required: true },
-    ]));
-    await registrations.registerComponentDefinition(componentDocument('verify', [
-      { name: 'evidence', direction: 'input', required: true },
-      { name: 'result', direction: 'output', required: true },
-    ]));
+    await registrations.registerComponentDefinition(
+      componentDocument('retrieve', [
+        { name: 'objective', direction: 'input', required: true },
+        { name: 'evidence', direction: 'output', required: true },
+      ]),
+    );
+    await registrations.registerComponentDefinition(
+      componentDocument('verify', [
+        { name: 'evidence', direction: 'input', required: true },
+        { name: 'result', direction: 'output', required: true },
+      ]),
+    );
     await registrations.registerTemplate(templateDocument);
 
     const first = await systems.apply(systemDocument);
     const second = await systems.apply(systemDocument);
 
     expect(first.disposition).toBe('created');
-    expect(second).toMatchObject({ disposition: 'existing', digest: first.digest });
-    expect(await db.selectFrom('regions').selectAll().execute()).toHaveLength(4);
-    expect(await db.selectFrom('topology_revisions').selectAll().execute()).toHaveLength(1);
-    expect(await db.selectFrom('component_instances').selectAll().execute()).toHaveLength(2);
-    expect(await db.selectFrom('connections').selectAll().execute()).toHaveLength(1);
+    expect(second).toMatchObject({
+      disposition: 'existing',
+      digest: first.digest,
+    });
+    expect(await db.selectFrom('regions').selectAll().execute()).toHaveLength(
+      4,
+    );
+    expect(
+      await db.selectFrom('topology_revisions').selectAll().execute(),
+    ).toHaveLength(1);
+    expect(
+      await db.selectFrom('component_instances').selectAll().execute(),
+    ).toHaveLength(2);
+    expect(
+      await db.selectFrom('connections').selectAll().execute(),
+    ).toHaveLength(1);
 
     const investigation = await db
       .selectFrom('regions')
@@ -136,12 +159,16 @@ describe('registration and static system application', () => {
   });
 
   it('rejects invalid declarations before writing anything', async () => {
-    expect(() => registrations.registerArtifactSchema({
-      ...schemaDocument,
-      spec: { schema: { type: 42 } },
-    })).toThrow(expect.objectContaining({ code: 'invalid_declaration' }));
+    expect(() =>
+      registrations.registerArtifactSchema({
+        ...schemaDocument,
+        spec: { schema: { type: 42 } },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'invalid_declaration' }));
 
-    expect(await db.selectFrom('artifact_schemas').selectAll().execute()).toEqual([]);
+    expect(
+      await db.selectFrom('artifact_schemas').selectAll().execute(),
+    ).toEqual([]);
   });
 
   it('returns the existing registration for identical content and rejects conflicting content', async () => {
@@ -154,12 +181,19 @@ describe('registration and static system application', () => {
     });
 
     expect(first.disposition).toBe('created');
-    expect(second).toMatchObject({ disposition: 'existing', digest: first.digest });
+    expect(second).toMatchObject({
+      disposition: 'existing',
+      digest: first.digest,
+    });
 
-    await expect(registrations.registerArtifactSchema({
-      ...schemaDocument,
-      spec: { schema: { type: 'string' } },
-    })).rejects.toMatchObject({ code: 'registration_conflict' });
-    expect(await db.selectFrom('artifact_schemas').selectAll().execute()).toHaveLength(1);
+    await expect(
+      registrations.registerArtifactSchema({
+        ...schemaDocument,
+        spec: { schema: { type: 'string' } },
+      }),
+    ).rejects.toMatchObject({ code: 'registration_conflict' });
+    expect(
+      await db.selectFrom('artifact_schemas').selectAll().execute(),
+    ).toHaveLength(1);
   });
 });

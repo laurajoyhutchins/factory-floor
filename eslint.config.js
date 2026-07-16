@@ -11,6 +11,13 @@ export default tseslint.config(
       'packages/worker-sdk-py/**',
     ],
   },
+  {
+    languageOptions: {
+      globals: {
+        URL: 'readonly',
+      },
+    },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
 );

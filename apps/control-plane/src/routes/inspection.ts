@@ -83,6 +83,12 @@ export async function registerInspectionRoutes(
   app.get('/api/v1/inspect/artifacts', async (request, reply) =>
     inspect(reply, () => service.listArtifacts(pageQuery(request))),
   );
+  app.get('/api/v1/inspect/resources', async (request, reply) =>
+    inspect(reply, () => service.listResources(pageQuery(request))),
+  );
+  app.get('/api/v1/inspect/policy-decisions', async (request, reply) =>
+    inspect(reply, () => service.listPolicyDecisions(pageQuery(request))),
+  );
   app.get('/api/v1/inspect/artifacts/:id/lineage', async (request, reply) => {
     const lineage = await inspect(reply, () =>
       service.artifactLineage((request.params as { id: string }).id),

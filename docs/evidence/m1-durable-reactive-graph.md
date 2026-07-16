@@ -1,77 +1,81 @@
 # Milestone 1 Durable Reactive Graph evidence
 
-Status: **CI evidence recorded; Milestone 1 acceptance remains incomplete.** The reproducible repository checks and the durable investigation vertical slice passed on the Task 11 branch. A clean Codespace replay, a live control-plane process restart during an investigation, exhaustive reference-specification conformance coverage, and several operator-facing inspection proofs remain open.
+Status: **accepted.** Repository Verification #289 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
 
-Tested implementation commit SHA: `38b73c00853787367008e3180833915ba816696b`
+## One-command acceptance
 
-Run date: 2026-07-15
+Run from a clean checkout configured from `.env.example`:
 
-Clean checkout location: GitHub Actions hosted `ubuntu-24.04` runner using the pull-request merge checkout. This is a clean CI checkout, **not** the required final Codespace acceptance run.
-
-Workflow: [Repository Verification #239](https://github.com/laurajoyhutchins/factory-floor/actions/runs/29459568697)
-
-Retained integration log: `integration-test-log-239`, artifact digest `sha256:afc9ae89c369bbf6c63b767aac20e948dd24795cb55691b40a0ce8397ac856cc`, retained through 2026-08-14.
-
-## Recorded evidence
-
-| Evidence item | Command or check | Recorded result | Status |
-|---|---|---|---|
-| Frozen dependency installation | Workflow locked install and `bash scripts/bootstrap-workspace.sh` | pnpm and uv locked environments installed; bootstrap passed | Pass |
-| PostgreSQL and MinIO readiness | `pnpm services:up` and `pnpm services:wait` | Both services became healthy and passed live readiness checks | Pass |
-| Database migration | `pnpm db:migrate` | Migration completed before integration execution; development reset also passed afterward | Pass |
-| Contract validation and generated drift | `pnpm contracts:validate` and `pnpm contracts:check` | Both checks passed | Pass |
-| Static and language test suites | lint, typecheck, workspace tests, control-plane tests, Python tests | All workflow steps passed | Pass |
-| Docker-backed integration suite | `pnpm test:integration` | 7 files and 48 tests passed, including PostgreSQL and MinIO conformance | Pass |
-| Successful investigation submission | `pnpm demo:investigation` | Demo returned `status: completed` with one durable command | Pass |
-| Three-way retrieval fan-out | Demo acceptance query | Completed components included `retrieve-a`, `retrieve-b`, and `retrieve-c` | Pass |
-| Complete fan-in and publication | Demo acceptance query | 6 of 6 executions completed; compare, verify, and synthesize all completed | Pass |
-| Verifier attempt 1 deliberately failed | Demo acceptance query | Exactly 1 failed attempt with `DEMO_FIRST_ATTEMPT_INTENTIONAL_FAILURE` | Pass |
-| Later verifier attempt succeeded | Demo acceptance query | 7 total attempts for 6 completed executions, demonstrating successful retry | Pass |
-| Both verifier attempts remained durable | Demo acceptance query | Attempt history contained the failed attempt and the later successful attempt | Pass |
-| Final outputs | Demo acceptance query | `evidence-bundle`, `result`, and `uncertainty-report` were committed | Pass |
-| No duplicate outputs or downstream deliveries | Demo acceptance query | `duplicateOutputs` and `duplicateDeliveries` were both empty | Pass |
-| Failed-attempt partial artifacts preserved | `atomic-commit.test.ts` | Integration test passed for preserving failed attempt history and staged partial artifacts before retry | Pass at service boundary; operator inspection capture remains open |
-| Atomic artifact/effect publication | `atomic-commit.test.ts` | Successful effects and staged blob promotion passed atomically and idempotently | Pass at service boundary |
-| Cancellation fencing | `observability-recovery.test.ts` | Cancellation settled once and stale-epoch result commit was rejected | Pass at service boundary |
-| Repeated recovery idempotency | `observability-recovery.test.ts` | Expired attempt recovered exactly once across repeated recovery runs | Pass at service boundary |
-| Projection replay purity | `observability-recovery.test.ts` | Every projection rebuilt from history without dispatch side effects | Pass |
-| Artifact digest, schema, and provenance shown through operator inspection | inspection capture plus reconciliation | No retained operator-facing output yet demonstrates all three fields together | Open |
-| Attributable resource entries shown through operator inspection | inspection capture | No retained operator-facing resource-ledger output yet | Open |
-| Complete command-to-artifact/event trace | execution trace inspection | Trace APIs are tested, but no retained end-to-end trace capture is recorded here | Open |
-| Live control-plane restart during investigation | process restart acceptance scenario | Startup recovery service behavior is tested, but the actual control-plane process is not restarted during the demo | Open |
-| Exhaustive conformance to every reference invariant | full conformance manifest | Current focused suites cover core invariants but do not enumerate every reference-specification invariant | Open |
-| Clean Codespace reproduction | `FACTORY_FLOOR_VERIFY_CLEAN=1 pnpm verify` from a new Codespace | Not yet executed and retained | Open |
-
-## Investigation result excerpt
-
-```json
-{
-  "status": "completed",
-  "executions": 6,
-  "attempts": 7,
-  "completedExecutions": 6,
-  "failedAttempts": 1,
-  "failedAttemptCode": "DEMO_FIRST_ATTEMPT_INTENTIONAL_FAILURE",
-  "componentNames": [
-    "compare",
-    "retrieve-a",
-    "retrieve-b",
-    "retrieve-c",
-    "synthesize",
-    "verify"
-  ],
-  "finalOutputPorts": [
-    "evidence-bundle",
-    "result",
-    "uncertainty-report"
-  ],
-  "duplicateOutputs": [],
-  "duplicateDeliveries": []
-}
+```bash
+pnpm accept:m1
 ```
 
-## Completion rule
+The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs migrations and quality gates, executes the investigation vertical slice, exercises live control-plane restart and cancellation fencing, rebuilds projections, reconciles artifacts, records a durable policy decision, collects operator-facing inspection output, sanitizes retained logs, and stops services on success, failure, interruption, or timeout.
 
-Do not mark Milestone 1 complete until a clean Codespace run is retained and the open rows above are either proven or deliberately removed from the normative acceptance requirements. Expected verifier failure alone is insufficient; successful retry, durable history, and duplicate-free publication must remain visible.
+## Implementation evidence
 
-Do not paste secrets, worker tokens, signed URLs, large raw logs, or volatile container identifiers into this document.
+- The conformance ledger enumerates exactly 18 normative reference invariants. Every invariant applicable to the static Milestone 1 runtime is automated and passed.
+- Operator inspection exposes artifact schema identity and digest, committed state, locator status, provenance, derivations, and tombstone state.
+- Operator inspection exposes resource-ledger entries by region, execution, attempt, external action when present, resource type, quantity, and unit.
+- Registered policy evaluation durably records policy identity and version, evaluator version, subject, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
+- Delivery evidence enumerates every relevant delivery and fails acceptance if one remains outside `completed`, `cancelled`, or `dead_lettered`.
+- The retained bundle is sanitized on every acceptance exit path, including failed runs.
+
+## Automated CI evidence
+
+Repository Verification runs the ordinary repository suite first and then starts a separate clean hosted runner for:
+
+```bash
+pnpm accept:m1
+```
+
+| Field                       | Accepted value                                                            |
+| --------------------------- | ------------------------------------------------------------------------- |
+| Workflow                    | Repository Verification #289                                              |
+| Workflow run ID             | `29479516913`                                                             |
+| Reviewed PR head            | `9da05cfe8347279d8777926d7fade863df8ea037`                                |
+| Actions-tested merge commit | `367482a4891b8b3a1d92185069f7c53aaa9a15cd`                                |
+| Evidence artifact           | `m1-acceptance-evidence-289`                                              |
+| Artifact ID                 | `8367989997`                                                              |
+| Artifact digest             | `sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394` |
+| Environment                 | GitHub Actions hosted Linux runner, fresh checkout                        |
+| Clean-checkout attestation  | `true`                                                                    |
+| Acceptance result           | `passed`                                                                  |
+
+The downloaded artifact was inspected before acceptance. All 15 applicable acceptance checks were true. The archive contained no raw database password, bearer token, lease token, signed token URL, or GitHub credential.
+
+## Retained operator evidence
+
+The evidence bundle records:
+
+- one accepted command;
+- six completed logical executions;
+- seven final-investigation attempts, including the deliberate verifier failure and successful replacement;
+- eight terminal deliveries with no duplicate output or downstream-delivery keys;
+- eight committed artifacts with valid digest, schema identity, provenance, and lineage;
+- resource attribution for the failed and replacement verifier attempts;
+- one durable `require_approval` policy decision and requested approval;
+- six complete execution traces and eight artifact-lineage records;
+- live-restart abandonment, replacement, recovery summary, stale-result fencing, and duplicate-free completion;
+- cancellation epoch increment, cancelled attempt and delivery, stale-result rejection, and zero committed stale outputs;
+- projection replay with unchanged delivery, execution, and external-action counts;
+- ten caught-up projection checkpoints;
+- reconciliation of eight consistent artifacts with zero unresolved records.
+
+The bundle includes `acceptance-evidence.json`, `SUMMARY.md`, and sanitized scenario logs. Private model reasoning is neither required nor retained.
+
+## Clean-environment evidence
+
+The accepted run used a separate GitHub Actions job after ordinary verification. It began from a fresh checkout with no reused `node_modules`, Python environment, database volumes, or artifact store and set `FACTORY_FLOOR_CLEAN_CHECKOUT=1`.
+
+An actual GitHub Codespace was not used. The Milestone 1 completion rule permits a comparably fresh hosted checkout, so the clean-environment criterion is satisfied without making a Codespace-specific claim.
+
+## Formatting baseline
+
+Repository-wide `pnpm format:check` remains red because `main` has broad pre-existing Prettier drift across 101 files. This is recorded as repository baseline debt rather than attributed to Task 12C. Every Task 12C file supported by Prettier passes the scoped acceptance formatting check.
+
+## Deferred post-Milestone-1 invariants
+
+- `M1-CONF-006` — capability delegation cannot exceed parent authority. Deferred because Milestone 1 uses direct capability grants and exposes no delegation surface.
+- `M1-CONF-007` — dynamic regions cannot modify ancestor topology. Deferred because dynamic child-region construction is outside Milestone 1.
+- `M1-CONF-015` — dynamic construction is explicitly bounded. Deferred because Milestone 1 uses a static committed investigation graph.

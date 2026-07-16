@@ -60,7 +60,18 @@ jobs:
         run: pnpm conformance:check
 
       - name: Lint
-        run: pnpm lint
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee lint.log
+
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-log-${{ github.run_number }}
+          path: lint.log
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Typecheck
         run: pnpm typecheck
@@ -132,6 +143,57 @@ jobs:
           name: acceptance-test-log-${{ github.run_number }}
           path: acceptance-test.log
           if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Stop development services
+        if: always()
+        run: pnpm services:clean
+
+  m1-acceptance:
+    name: Milestone 1 clean acceptance
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out reviewed commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Milestone 1 acceptance from clean checkout
+        env:
+          TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+          ARTIFACT_STORE_ROOT: .factory-floor/demo-artifacts
+          FACTORY_FLOOR_CLEAN_CHECKOUT: '1'
+        run: |
+          set -o pipefail
+          pnpm accept:m1 2>&1 | tee m1-acceptance.log
+
+      - name: Upload Milestone 1 evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-acceptance-evidence-${{ github.run_number }}
+          path: |
+            .factory-floor/evidence/m1/
+            m1-acceptance.log
+          if-no-files-found: error
           retention-days: 30
 
       - name: Stop development services

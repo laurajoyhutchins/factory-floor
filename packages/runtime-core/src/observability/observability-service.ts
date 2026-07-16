@@ -247,18 +247,99 @@ export class ObservabilityService {
   }
 
   async listArtifacts(opts: { cursor?: string; limit?: number } = {}) {
-    return this.page('artifacts', opts, [
+    const limit = normalizeLimit(opts.limit);
+    const afterId = decodeInspectionCursor(opts.cursor);
+    let query = this.db
+      .selectFrom('artifacts as artifact')
+      .innerJoin(
+        'artifact_schemas as schema',
+        'schema.id',
+        'artifact.schema_id',
+      )
+      .select([
+        'artifact.id',
+        'artifact.digest_algorithm',
+        'artifact.digest',
+        'artifact.size_bytes',
+        'artifact.schema_id',
+        'schema.name as schema_name',
+        'schema.version as schema_version',
+        'schema.content_digest as schema_digest',
+        'artifact.state',
+        'artifact.media_type',
+        'artifact.committed_locator',
+        'artifact.provenance',
+        'artifact.tombstoned_at',
+        'artifact.created_at',
+      ])
+      .orderBy('artifact.id')
+      .limit(limit + 1);
+    if (afterId) query = query.where('artifact.id', '>', afterId);
+    const rows = await query.execute();
+    const items = rows.slice(0, limit);
+    return {
+      items,
+      nextCursor:
+        rows.length > limit
+          ? encodeInspectionCursor(String(items.at(-1)!.id))
+          : null,
+    };
+  }
+
+  async listResources(opts: { cursor?: string; limit?: number } = {}) {
+    return this.page('resource_ledger', opts, [
       'id',
-      'digest_algorithm',
-      'digest',
-      'size_bytes',
-      'schema_id',
-      'state',
-      'media_type',
-      'provenance',
-      'tombstoned_at',
+      'region_id',
+      'execution_id',
+      'attempt_id',
+      'external_action_id',
+      'resource_type',
+      'quantity',
+      'unit',
+      'attributes',
       'created_at',
     ]);
+  }
+
+  async listPolicyDecisions(opts: { cursor?: string; limit?: number } = {}) {
+    const limit = normalizeLimit(opts.limit);
+    const afterId = decodeInspectionCursor(opts.cursor);
+    let query = this.db
+      .selectFrom('policy_decisions as decision')
+      .leftJoin(
+        'approvals as approval',
+        'approval.policy_decision_id',
+        'decision.id',
+      )
+      .select([
+        'decision.id',
+        'decision.policy_id',
+        'decision.policy_name',
+        'decision.policy_version',
+        'decision.evaluator_version',
+        'decision.subject_kind',
+        'decision.subject_id',
+        'decision.input_artifact_id',
+        'decision.normalized_inputs',
+        'decision.outcome',
+        'decision.reason',
+        'decision.modifications',
+        'approval.id as approval_id',
+        'approval.status as approval_status',
+        'decision.created_at',
+      ])
+      .orderBy('decision.id')
+      .limit(limit + 1);
+    if (afterId) query = query.where('decision.id', '>', afterId);
+    const rows = await query.execute();
+    const items = rows.slice(0, limit);
+    return {
+      items,
+      nextCursor:
+        rows.length > limit
+          ? encodeInspectionCursor(String(items.at(-1)!.id))
+          : null,
+    };
   }
 
   async artifactLineage(artifactId: string) {
@@ -269,7 +350,12 @@ export class ObservabilityService {
         'digest',
         'schema_id',
         'state',
+        'digest_algorithm',
+        'size_bytes',
+        'media_type',
+        'committed_locator',
         'provenance',
+        'tombstoned_at',
         'created_at',
       ])
       .where('id', '=', artifactId)
