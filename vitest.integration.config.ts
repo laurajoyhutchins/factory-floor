@@ -13,7 +13,11 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['tests/integration/**/*.test.ts', 'packages/**/*.integration.ts'],
+    include: [
+      'tests/integration/**/*.test.ts',
+      'tests/acceptance/**/*.test.ts',
+      'packages/**/*.integration.ts',
+    ],
     passWithNoTests: true,
     testTimeout: 30_000,
     hookTimeout: 30_000,

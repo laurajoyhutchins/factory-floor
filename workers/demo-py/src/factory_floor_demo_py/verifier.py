@@ -41,6 +41,10 @@ class DeterministicVerifier:
         if base.root.status == "failed":
             return base
 
+        delay_ms = int(os.environ.get("FACTORY_FLOOR_VERIFIER_DELAY_MS", "0"))
+        if delay_ms > 0:
+            await asyncio.sleep(delay_ms / 1000)
+
         payload = _payload(envelope)
         artifact = await context.stage_json(
             envelope,
