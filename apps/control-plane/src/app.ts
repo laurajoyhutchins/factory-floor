@@ -5,6 +5,8 @@ import {
   RegistrationService,
   SystemApplicationService,
   WorkerProtocolService,
+  WorkerProtocolError,
+  ProposedResultPrevalidationService,
   ObservabilityService,
   StartupRecoveryService,
 } from '@factory-floor/runtime-core';
@@ -40,6 +42,36 @@ export interface AppDependencies {
   startupRecoveryService?: StartupRecoveryService;
   runStartupRecovery?: boolean;
   controlPlaneSecurity?: ControlPlaneSecurity;
+}
+
+function withResultPrevalidation(
+  service: WorkerProtocolService,
+  prevalidation: ProposedResultPrevalidationService,
+): WorkerProtocolService {
+  return new Proxy(service, {
+    get(target, property, receiver) {
+      if (property === 'submitResult')
+        return async (
+          input: Parameters<WorkerProtocolService['submitResult']>[0],
+        ) => {
+          try {
+            await prevalidation.prevalidate(input);
+          } catch (error) {
+            throw new WorkerProtocolError(
+              'unauthorized_staging_reference',
+              error instanceof Error
+                ? error.message
+                : 'staged artifact validation failed',
+              false,
+              400,
+            );
+          }
+          return target.submitResult(input);
+        };
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 export async function buildApp(
@@ -99,21 +131,29 @@ export async function buildApp(
       deps.commandService ?? new CommandService(db!),
     );
   if (observability) await registerInspectionRoutes(app, observability);
-  if (db || deps.workerProtocolService)
+  if (db || deps.workerProtocolService) {
+    const workerProtocol =
+      deps.workerProtocolService ??
+      new WorkerProtocolService(db!, artifactBlobStore!, {
+        leaseDurationMs: Number(
+          process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
+        ),
+        baseUrl:
+          process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ??
+          process.env.CONTROL_PLANE_PUBLIC_URL ??
+          'http://127.0.0.1:3000',
+      });
     await registerWorkerRoutes(
       app,
-      deps.workerProtocolService ??
-        new WorkerProtocolService(db!, artifactBlobStore!, {
-          leaseDurationMs: Number(
-            process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
-          ),
-          baseUrl:
-            process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ??
-            process.env.CONTROL_PLANE_PUBLIC_URL ??
-            'http://127.0.0.1:3000',
-        }),
+      db && artifactBlobStore
+        ? withResultPrevalidation(
+            workerProtocol,
+            new ProposedResultPrevalidationService(db, artifactBlobStore),
+          )
+        : workerProtocol,
       deps.workerAuthorization ?? deps.workerAuthToken,
     );
+  }
 
   if (
     deps.runStartupRecovery &&
