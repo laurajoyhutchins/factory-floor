@@ -3,6 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   BoundedStartupObservabilityService,
+  assertStartupRecoveryWithinBounds,
 } from '../../../apps/control-plane/src/app.js';
 import {
   createDatabase,
@@ -72,7 +73,11 @@ describe('bounded startup projection catch-up', () => {
     const observability = new BoundedStartupObservabilityService(db);
 
     const first = await observability.rebuildProjections(2);
-    expect(first).toMatchObject({ processedEvents: 2, batches: 1, pending: true });
+    expect(first).toMatchObject({
+      processedEvents: 2,
+      batches: 1,
+      pending: true,
+    });
     expect(
       await db
         .selectFrom('projection_checkpoints')
@@ -82,7 +87,11 @@ describe('bounded startup projection catch-up', () => {
     ).toHaveLength(PROJECTION_NAMES.length);
 
     const second = await observability.rebuildProjections(2);
-    expect(second).toMatchObject({ processedEvents: 2, batches: 1, pending: true });
+    expect(second).toMatchObject({
+      processedEvents: 2,
+      batches: 1,
+      pending: true,
+    });
     expect(
       await db
         .selectFrom('projection_checkpoints')
@@ -93,6 +102,32 @@ describe('bounded startup projection catch-up', () => {
     ).toEqual({ last_sequence_number: '4' });
 
     const third = await observability.rebuildProjections(2);
-    expect(third).toMatchObject({ processedEvents: 1, batches: 1, pending: false });
+    expect(third).toMatchObject({
+      processedEvents: 1,
+      batches: 1,
+      pending: false,
+    });
+  });
+
+  it('rejects a backlog after reading only one row beyond the configured bound', async () => {
+    await db
+      .updateTable('regions')
+      .set({ lifecycle_status: 'cancelling' })
+      .where('name', '=', 'root')
+      .execute();
+
+    await expect(
+      assertStartupRecoveryWithinBounds(
+        db,
+        new Date('2026-07-16T00:00:00.000Z'),
+        {
+          expiredAttempts: 0,
+          cancellingRegions: 0,
+          stagedArtifacts: 0,
+        },
+      ),
+    ).rejects.toThrow(
+      'startup_recovery_backlog_exceeded:cancellingRegions:1:0',
+    );
   });
 });
