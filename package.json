@@ -36,7 +36,9 @@
     "format:check": "prettier --check .",
     "artifacts:reconcile": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/control-plane artifacts:reconcile",
     "projections:rebuild": "node scripts/run-with-env.mjs tsx scripts/rebuild-projections.mjs",
-    "cleanup": "bash scripts/maintain-workspace.sh clean"
+    "cleanup": "bash scripts/maintain-workspace.sh clean",
+    "acceptance:m1-live-restart": "node scripts/run-with-env.mjs node scripts/run-m1-live-restart-acceptance.mjs",
+    "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.acceptance.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
