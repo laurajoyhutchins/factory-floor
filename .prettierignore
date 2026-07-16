@@ -4,6 +4,10 @@ dist/
 coverage/
 .factory-floor/
 
+# Workflow files are maintained through the GitHub app because Actions tokens
+# cannot push workflow changes without elevated workflow permissions.
+.github/workflows/
+
 # Package-manager and generated artifacts have their own canonical producers
 pnpm-lock.yaml
 **/uv.lock
