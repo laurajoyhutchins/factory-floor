@@ -38,16 +38,16 @@
     "projections:rebuild": "node scripts/run-with-env.mjs tsx scripts/rebuild-projections.mjs",
     "cleanup": "bash scripts/maintain-workspace.sh clean",
     "acceptance:m1-live-restart": "node scripts/run-with-env.mjs node scripts/run-m1-live-restart-acceptance.mjs",
-    "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts tests/acceptance/m1-live-restart.test.ts"
+    "test:acceptance": "node scripts/run-with-env.mjs vitest run --config vitest.acceptance.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
     "@types/node": "^22.15.34",
     "@types/pg": "^8.20.0",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
+    "ajv": "^9.30.1",
+    "ajv-formats": "^3.6.2",
     "eslint": "^9.30.1",
-    "json-schema-to-typescript": "^15.0.4",
+    "json-schema-to-typescript": "^15.4.0",
     "pg": "^8.22.0",
     "prettier": "^3.6.2",
     "tsx": "^4.20.3",
