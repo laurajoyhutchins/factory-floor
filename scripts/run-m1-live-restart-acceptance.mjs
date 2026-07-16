@@ -279,9 +279,9 @@ async function collectSummary(staleAttempt) {
       limit 5`,
   );
   const projections = await query(
-    `select name, high_water_event_id, rebuilt_at
+    `select projection_name, last_event_id, updated_at
        from projection_checkpoints
-      order by name`,
+      order by projection_name`,
   );
 
   return {
@@ -327,7 +327,7 @@ async function collectSummary(staleAttempt) {
     projectionsCaughtUp:
       projections.length > 0 &&
       projections.every(
-        (row) => row.high_water_event_id !== null || row.rebuilt_at !== null,
+        (row) => row.last_event_id !== null || row.updated_at !== null,
       ),
   };
 }
