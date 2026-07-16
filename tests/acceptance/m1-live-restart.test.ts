@@ -4,6 +4,28 @@ import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 
+function parseJsonObjectAt(text: string, start: number): unknown {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(text.slice(start, index + 1));
+    }
+  }
+  throw new Error('acceptance summary JSON was not terminated');
+}
+
 describe('Milestone 1 live restart acceptance harness', () => {
   it('runs the process-level restart scenario without duplicate work', async () => {
     const { stdout } = await execFileAsync(
@@ -20,9 +42,12 @@ describe('Milestone 1 live restart acceptance harness', () => {
       },
     );
     const marker = '\n{\n  "status": "completed"';
-    const jsonStart = stdout.lastIndexOf(marker);
-    expect(jsonStart).toBeGreaterThanOrEqual(0);
-    const summary = JSON.parse(stdout.slice(jsonStart + 1));
+    const markerStart = stdout.lastIndexOf(marker);
+    expect(markerStart).toBeGreaterThanOrEqual(0);
+    const summary = parseJsonObjectAt(stdout, markerStart + 1) as Record<
+      string,
+      unknown
+    >;
     expect(summary.status).toBe('completed');
     expect(summary.executions).toBe(6);
     expect(summary.completedExecutions).toBe(6);
