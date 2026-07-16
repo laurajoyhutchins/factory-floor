@@ -100,27 +100,24 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('apps/console/src/pages/pages.tsx')
           source = path.read_text()
-          replacements = {
-              '''<Link to={`/executions/${id}`}>
-                           <CopyId value={id} />
-                         </Link>''': '''<Link to={`/executions/${id}`}>
-                           Open {id.slice(0, 8)}
-                         </Link>{' '}
-                         <CopyId value={id} />''',
-              '''<Link to={`/artifacts/${id}`}>
-                           <CopyId value={id} />
-                         </Link>''': '''<Link to={`/artifacts/${id}`}>
-                           Open {id.slice(0, 8)}
-                         </Link>{' '}
-                         <CopyId value={id} />''',
-          }
-          for old, new in replacements.items():
-              if old not in source:
-                  raise SystemExit(f'expected console markup not found: {old.splitlines()[0]}')
-              source = source.replace(old, new, 1)
+          rewrites = [
+              (
+                  r'<Link to=\{`/executions/\$\{id\}`\}>\s*<CopyId value=\{id\} />\s*</Link>',
+                  '<Link to={`/executions/${id}`}>Open {id.slice(0, 8)}</Link>{\' \'}\n                         <CopyId value={id} />',
+              ),
+              (
+                  r'<Link to=\{`/artifacts/\$\{id\}`\}>\s*<CopyId value=\{id\} />\s*</Link>',
+                  '<Link to={`/artifacts/${id}`}>Open {id.slice(0, 8)}</Link>{\' \'}\n                         <CopyId value={id} />',
+              ),
+          ]
+          for pattern, replacement in rewrites:
+              source, count = re.subn(pattern, replacement, source, count=1)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one console markup match for {pattern}, found {count}')
           path.write_text(source)
           PY
 
