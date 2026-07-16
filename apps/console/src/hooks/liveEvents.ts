@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { consoleApi } from '../api/client.js';
+import { consoleApi, inspectionHeaders } from '../api/client.js';
 
 export type StreamState =
-  'connecting' | 'live' | 'reconnecting' | 'disconnected';
+  | 'connecting'
+  | 'live'
+  | 'reconnecting'
+  | 'disconnected';
 export type RuntimeEvent = { id?: string; [key: string]: unknown };
 
 export function appendDeduped(
@@ -94,7 +97,7 @@ export function useLiveEvents(max = 50) {
         const response = await fetch(url.pathname + url.search, {
           method: 'GET',
           signal: controller.signal,
-          headers: { accept: 'text/event-stream' },
+          headers: inspectionHeaders('text/event-stream'),
         });
         if (!response.ok || !response.body)
           throw new Error(`stream_http_${response.status}`);
