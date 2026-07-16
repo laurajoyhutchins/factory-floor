@@ -23,9 +23,7 @@ describe('live event buffer', () => {
         '',
       ].join('\n'),
     );
-    expect(batch.events).toEqual([
-      { id: 'event-1', event_type: 'completed' },
-    ]);
+    expect(batch.events).toEqual([{ id: 'event-1', event_type: 'completed' }]);
     expect(batch.cursor).toBe('opaque-next==');
   });
 });
