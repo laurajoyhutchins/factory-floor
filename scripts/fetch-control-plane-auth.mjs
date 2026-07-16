@@ -1,14 +1,7 @@
 import process from 'node:process';
+import { shouldAttachControlPlaneAuthorization } from './control-plane-auth-policy.mjs';
 
 const marker = Symbol.for('factory-floor.control-plane-fetch-auth');
-
-export function shouldAttachControlPlaneAuthorization(url, baseUrl) {
-  const controlPlane = new URL(baseUrl);
-  return (
-    url.origin === controlPlane.origin &&
-    url.pathname.startsWith('/api/v1/')
-  );
-}
 
 if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
   globalThis[marker] = true;
