@@ -40,6 +40,7 @@ pnpm exec prettier --check \
   apps/control-plane/test/inspection-routes.test.ts \
   docs/conformance/durable-reactive-graph-ledger.yaml \
   docs/evidence/m1-durable-reactive-graph.md \
+  eslint.config.js \
   package.json \
   packages/runtime-core/src/index.ts \
   packages/runtime-core/src/observability/observability-service.ts \
