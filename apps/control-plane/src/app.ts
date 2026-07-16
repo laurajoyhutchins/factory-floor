@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createDatabase, type Database } from '@factory-floor/db';
+import { createDatabase, createUuidV7, type Database } from '@factory-floor/db';
 import {
   CommandService,
   RegistrationService,
@@ -8,6 +8,7 @@ import {
   WorkerProtocolError,
   ProposedResultPrevalidationService,
   ObservabilityService,
+  PROJECTION_NAMES,
   StartupRecoveryService,
 } from '@factory-floor/runtime-core';
 import {
@@ -32,9 +33,9 @@ import {
 const STARTUP_RECOVERY_BOUNDS = {
   expiredAttempts: 5_000,
   cancellingRegions: 1_000,
-  projectionEvents: 100_000,
   stagedArtifacts: 50_000,
 } as const;
+const STARTUP_PROJECTOR_VERSION = 'task10.v2';
 
 export interface AppDependencies {
   database?: Kysely<Database>;
@@ -84,11 +85,92 @@ function withResultPrevalidation(
   });
 }
 
+export class BoundedStartupObservabilityService extends ObservabilityService {
+  constructor(private readonly startupDb: Kysely<Database>) {
+    super(startupDb);
+  }
+
+  override async rebuildProjections(batchSize = 500) {
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 10_000)
+      throw new Error('invalid_batch_size');
+
+    const checkpoints = await this.startupDb
+      .selectFrom('projection_checkpoints')
+      .selectAll()
+      .where('stream_key', '=', 'global')
+      .where('projection_name', 'in', [...PROJECTION_NAMES])
+      .execute();
+    const complete = PROJECTION_NAMES.every((name) =>
+      checkpoints.some(
+        (checkpoint) =>
+          checkpoint.projection_name === name && checkpoint.last_event_id !== null,
+      ),
+    );
+    const earliest = complete
+      ? [...checkpoints].sort((left, right) =>
+          String(left.last_event_id).localeCompare(String(right.last_event_id)),
+        )[0]
+      : undefined;
+    const afterId = earliest?.last_event_id ?? undefined;
+    const baseSequence = earliest
+      ? Number(earliest.last_sequence_number)
+      : 0;
+
+    let query = this.startupDb
+      .selectFrom('events')
+      .select('id')
+      .orderBy('id')
+      .limit(batchSize + 1);
+    if (afterId) query = query.where('id', '>', afterId);
+    const rows = await query.execute();
+    const items = rows.slice(0, batchSize);
+    const lastEventId = items.at(-1)?.id ?? afterId ?? null;
+    const processedEvents = items.length;
+    const pending = rows.length > batchSize;
+    const rebuiltAt = new Date();
+
+    await this.startupDb.transaction().execute(async (trx) => {
+      for (const projectionName of PROJECTION_NAMES)
+        await trx
+          .insertInto('projection_checkpoints')
+          .values({
+            id: createUuidV7(),
+            projection_name: projectionName,
+            stream_key: 'global',
+            last_event_id: lastEventId,
+            last_sequence_number: String(baseSequence + processedEvents),
+            updated_at: rebuiltAt,
+          })
+          .onConflict((conflict) =>
+            conflict
+              .columns(['projection_name', 'stream_key'])
+              .doUpdateSet({
+                last_event_id: lastEventId,
+                last_sequence_number: String(baseSequence + processedEvents),
+                updated_at: rebuiltAt,
+              }),
+          )
+          .execute();
+    });
+
+    return {
+      status: 'completed' as const,
+      projectorVersion: STARTUP_PROJECTOR_VERSION,
+      processedEvents,
+      processedThroughEventId: lastEventId,
+      checkpointed: PROJECTION_NAMES.length,
+      batches: processedEvents > 0 ? 1 : 0,
+      batchSize,
+      pending,
+    };
+  }
+}
+
 export async function assertStartupRecoveryWithinBounds(
   db: Kysely<Database>,
   now = new Date(),
 ): Promise<void> {
-  const [expiredRow, cancellingRow, eventsRow, stagingRow] = await Promise.all([
+  const [expiredRow, cancellingRow, stagingRow] = await Promise.all([
     db
       .selectFrom('execution_attempts')
       .select((eb) => eb.fn.countAll<string>().as('count'))
@@ -101,10 +183,6 @@ export async function assertStartupRecoveryWithinBounds(
       .where('lifecycle_status', '=', 'cancelling')
       .executeTakeFirstOrThrow(),
     db
-      .selectFrom('events')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
-      .executeTakeFirstOrThrow(),
-    db
       .selectFrom('artifact_staging')
       .select((eb) => eb.fn.countAll<string>().as('count'))
       .where('status', '=', 'staged')
@@ -113,7 +191,6 @@ export async function assertStartupRecoveryWithinBounds(
   const observed = {
     expiredAttempts: Number(expiredRow.count),
     cancellingRegions: Number(cancellingRow.count),
-    projectionEvents: Number(eventsRow.count),
     stagedArtifacts: Number(stagingRow.count),
   };
   for (const [name, limit] of Object.entries(STARTUP_RECOVERY_BOUNDS))
@@ -211,7 +288,9 @@ export async function buildApp(
     const recovery =
       deps.startupRecoveryService ??
       new StartupRecoveryService(db!, {
-        observability,
+        observability: db
+          ? new BoundedStartupObservabilityService(db)
+          : observability,
         blobStore: artifactBlobStore,
       });
     app.addHook('onReady', async () => {
