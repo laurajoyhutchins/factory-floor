@@ -7,7 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: repository-verification-${{ github.ref }}
@@ -95,89 +95,6 @@ jobs:
 
       - name: Run Python tests
         run: pnpm test:python
-
-      - name: Separate navigation and copy controls
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('apps/console/src/pages/pages.tsx')
-          source = path.read_text()
-          rewrites = [
-              (
-                  r'<Link to=\{`/executions/\$\{id\}`\}>\s*<CopyId value=\{id\} />\s*</Link>',
-                  '<Link to={`/executions/${id}`}>Open {id.slice(0, 8)}</Link>{\' \'}\n                         <CopyId value={id} />',
-              ),
-              (
-                  r'<Link to=\{`/artifacts/\$\{id\}`\}>\s*<CopyId value=\{id\} />\s*</Link>',
-                  '<Link to={`/artifacts/${id}`}>Open {id.slice(0, 8)}</Link>{\' \'}\n                         <CopyId value={id} />',
-              ),
-          ]
-          for pattern, replacement in rewrites:
-              source, count = re.subn(pattern, replacement, source, count=1)
-              if count != 1:
-                  raise SystemExit(f'expected exactly one console markup match for {pattern}, found {count}')
-          path.write_text(source)
-          PY
-
-      - name: Capture pinned formatter output
-        run: |
-          pnpm prettier --write \
-            apps/console/src/api/client.ts \
-            apps/console/src/components/ui.tsx \
-            apps/console/src/hooks/liveEvents.ts \
-            apps/console/src/hooks/liveEvents.test.ts \
-            apps/console/src/main.tsx \
-            apps/console/src/pages/pages.tsx \
-            apps/console/src/pages/pages.test.tsx \
-            apps/console/src/styles.css
-
-      - name: Upload pinned formatter output
-        uses: actions/upload-artifact@v4
-        with:
-          name: formatted-console-${{ github.run_number }}
-          path: |
-            apps/console/src/api/client.ts
-            apps/console/src/components/ui.tsx
-            apps/console/src/hooks/liveEvents.ts
-            apps/console/src/hooks/liveEvents.test.ts
-            apps/console/src/main.tsx
-            apps/console/src/pages/pages.tsx
-            apps/console/src/pages/pages.test.tsx
-            apps/console/src/styles.css
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Commit pinned formatter output to pull request branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          formatted_dir="$(mktemp -d)"
-          cp --parents \
-            apps/console/src/api/client.ts \
-            apps/console/src/components/ui.tsx \
-            apps/console/src/hooks/liveEvents.ts \
-            apps/console/src/hooks/liveEvents.test.ts \
-            apps/console/src/main.tsx \
-            apps/console/src/pages/pages.tsx \
-            apps/console/src/pages/pages.test.tsx \
-            apps/console/src/styles.css \
-            "$formatted_dir"
-          git fetch origin "$HEAD_BRANCH"
-          git checkout -B "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
-          cp -R "$formatted_dir/apps" .
-          git add apps/console/src
-          if git diff --cached --quiet; then
-            echo "Formatter output already committed."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(console): separate navigation and copy controls"
-          git push origin "HEAD:$HEAD_BRANCH"
 
       - name: Check formatting
         run: pnpm format:check
