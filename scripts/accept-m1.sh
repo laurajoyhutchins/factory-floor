@@ -76,6 +76,10 @@ echo "[factory-floor] Repository-wide pnpm format:check is not an M1 gate becaus
 pnpm test:integration
 
 set -o pipefail
+ACCEPTANCE_PORT="${FACTORY_FLOOR_ACCEPTANCE_PORT:-3112}"
+ACCEPTANCE_CONTROL_PLANE_URL="http://127.0.0.1:${ACCEPTANCE_PORT}"
+FACTORY_FLOOR_CONTROL_PLANE_URL="$ACCEPTANCE_CONTROL_PLANE_URL" \
+CONTROL_PLANE_PUBLIC_URL="$ACCEPTANCE_CONTROL_PLANE_URL" \
 pnpm acceptance:m1-live-restart 2>&1 | tee "$FACTORY_FLOOR_EVIDENCE_DIR/restart.log"
 
 pnpm services:clean
