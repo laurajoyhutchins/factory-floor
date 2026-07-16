@@ -10,6 +10,7 @@ export * from './scheduling/lease.js';
 export * from './scheduling/scheduler-service.js';
 export * from './registration/registration-service.js';
 export * from './systems/system-application-service.js';
+export * from './policies/policy-decision-service.js';
 export * from './artifacts/errors.js';
 export * from './artifacts/artifact-validation-service.js';
 export * from './artifacts/artifact-publication-service.js';
