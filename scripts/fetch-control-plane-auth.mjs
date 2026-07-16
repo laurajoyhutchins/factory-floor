@@ -2,10 +2,17 @@ import process from 'node:process';
 
 const marker = Symbol.for('factory-floor.control-plane-fetch-auth');
 
+export function shouldAttachControlPlaneAuthorization(url, baseUrl) {
+  const controlPlane = new URL(baseUrl);
+  return (
+    url.origin === controlPlane.origin &&
+    url.pathname.startsWith('/api/v1/')
+  );
+}
+
 if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
   globalThis[marker] = true;
   const originalFetch = globalThis.fetch.bind(globalThis);
-  const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
   const baseUrl =
     process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ??
     process.env.CONTROL_PLANE_PUBLIC_URL ??
@@ -22,8 +29,7 @@ if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
     const headers = new globalThis.Headers(init.headers ?? request?.headers);
 
     if (
-      localHosts.has(url.hostname) &&
-      url.pathname.startsWith('/api/v1/') &&
+      shouldAttachControlPlaneAuthorization(url, baseUrl) &&
       !headers.has('authorization')
     ) {
       const inspectionRead =
