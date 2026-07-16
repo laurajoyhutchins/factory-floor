@@ -81,42 +81,37 @@ function withResultPrevalidation(
   });
 }
 
-async function countRows(
-  query: ReturnType<Kysely<Database>['selectFrom']>,
-): Promise<number> {
-  const row = await query
-    .select((eb) => eb.fn.countAll<string>().as('count'))
-    .executeTakeFirstOrThrow();
-  return Number(row.count);
-}
-
 export async function assertStartupRecoveryWithinBounds(
   db: Kysely<Database>,
   now = new Date(),
 ): Promise<void> {
-  const [expiredAttempts, cancellingRegions, projectionEvents, stagedArtifacts] =
-    await Promise.all([
-      countRows(
-        db
-          .selectFrom('execution_attempts')
-          .where('status', 'in', ['leased', 'running'])
-          .where('lease_expires_at', '<=', now),
-      ),
-      countRows(
-        db
-          .selectFrom('regions')
-          .where('lifecycle_status', '=', 'cancelling'),
-      ),
-      countRows(db.selectFrom('events')),
-      countRows(
-        db.selectFrom('artifact_staging').where('status', '=', 'staged'),
-      ),
-    ]);
+  const [expiredRow, cancellingRow, eventsRow, stagingRow] = await Promise.all([
+    db
+      .selectFrom('execution_attempts')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('status', 'in', ['leased', 'running'])
+      .where('lease_expires_at', '<=', now)
+      .executeTakeFirstOrThrow(),
+    db
+      .selectFrom('regions')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('lifecycle_status', '=', 'cancelling')
+      .executeTakeFirstOrThrow(),
+    db
+      .selectFrom('events')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .executeTakeFirstOrThrow(),
+    db
+      .selectFrom('artifact_staging')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('status', '=', 'staged')
+      .executeTakeFirstOrThrow(),
+  ]);
   const observed = {
-    expiredAttempts,
-    cancellingRegions,
-    projectionEvents,
-    stagedArtifacts,
+    expiredAttempts: Number(expiredRow.count),
+    cancellingRegions: Number(cancellingRow.count),
+    projectionEvents: Number(eventsRow.count),
+    stagedArtifacts: Number(stagingRow.count),
   };
   for (const [name, limit] of Object.entries(STARTUP_RECOVERY_BOUNDS))
     if (observed[name as keyof typeof observed] > limit)
