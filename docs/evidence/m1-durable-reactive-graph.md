@@ -29,18 +29,18 @@ Repository Verification runs the ordinary repository suite first and then starts
 pnpm accept:m1
 ```
 
-| Field | Accepted value |
-| --- | --- |
-| Workflow | Repository Verification #289 |
-| Workflow run ID | `29479516913` |
-| Reviewed PR head | `9da05cfe8347279d8777926d7fade863df8ea037` |
-| Actions-tested merge commit | `367482a4891b8b3a1d92185069f7c53aaa9a15cd` |
-| Evidence artifact | `m1-acceptance-evidence-289` |
-| Artifact ID | `8367989997` |
-| Artifact digest | `sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394` |
-| Environment | GitHub Actions hosted Linux runner, fresh checkout |
-| Clean-checkout attestation | `true` |
-| Acceptance result | `passed` |
+| Field                       | Accepted value                                                            |
+| --------------------------- | ------------------------------------------------------------------------- |
+| Workflow                    | Repository Verification #289                                              |
+| Workflow run ID             | `29479516913`                                                             |
+| Reviewed PR head            | `9da05cfe8347279d8777926d7fade863df8ea037`                                |
+| Actions-tested merge commit | `367482a4891b8b3a1d92185069f7c53aaa9a15cd`                                |
+| Evidence artifact           | `m1-acceptance-evidence-289`                                              |
+| Artifact ID                 | `8367989997`                                                              |
+| Artifact digest             | `sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394` |
+| Environment                 | GitHub Actions hosted Linux runner, fresh checkout                        |
+| Clean-checkout attestation  | `true`                                                                    |
+| Acceptance result           | `passed`                                                                  |
 
 The downloaded artifact was inspected before acceptance. All 15 applicable acceptance checks were true. The archive contained no raw database password, bearer token, lease token, signed token URL, or GitHub credential.
 
