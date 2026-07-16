@@ -30,7 +30,10 @@ describe('ff authentication', () => {
         '--json',
       ]),
     ).toBe(0);
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+    const firstCall = (
+      fetchMock.mock.calls as unknown as [unknown, RequestInit][]
+    )[0]!;
+    expect(firstCall[1]).toMatchObject({
       headers: { authorization: 'Bearer operator-secret' },
     });
   });
@@ -70,7 +73,10 @@ describe('ff authentication', () => {
         '--json',
       ]),
     ).toBe(0);
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+    const firstCall = (
+      fetchMock.mock.calls as unknown as [unknown, RequestInit][]
+    )[0]!;
+    expect(firstCall[1]).toMatchObject({
       method: 'POST',
       headers: {
         'content-type': 'application/json',
