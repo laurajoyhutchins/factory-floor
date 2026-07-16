@@ -100,7 +100,9 @@ describe('registration and static system application', () => {
   });
 
   beforeEach(async () => {
-    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    expect(
+      (await resetDatabaseForDevelopment(db, 'test')).error,
+    ).toBeUndefined();
   });
 
   afterAll(async () => {
@@ -135,16 +137,18 @@ describe('registration and static system application', () => {
       disposition: 'existing',
       digest: first.digest,
     });
-    expect(await db.selectFrom('regions').selectAll().execute()).toHaveLength(4);
+    expect(await db.selectFrom('regions').selectAll().execute()).toHaveLength(
+      4,
+    );
     expect(
       await db.selectFrom('topology_revisions').selectAll().execute(),
     ).toHaveLength(1);
     expect(
       await db.selectFrom('component_instances').selectAll().execute(),
     ).toHaveLength(2);
-    expect(await db.selectFrom('connections').selectAll().execute()).toHaveLength(
-      1,
-    );
+    expect(
+      await db.selectFrom('connections').selectAll().execute(),
+    ).toHaveLength(1);
 
     const investigation = await db
       .selectFrom('regions')
@@ -162,9 +166,9 @@ describe('registration and static system application', () => {
       }),
     ).toThrow(expect.objectContaining({ code: 'invalid_declaration' }));
 
-    expect(await db.selectFrom('artifact_schemas').selectAll().execute()).toEqual(
-      [],
-    );
+    expect(
+      await db.selectFrom('artifact_schemas').selectAll().execute(),
+    ).toEqual([]);
   });
 
   it('returns the existing registration for identical content and rejects conflicting content', async () => {
