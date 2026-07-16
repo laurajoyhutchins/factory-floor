@@ -108,7 +108,7 @@ export async function registerInspectionRoutes(
   app.get('/api/v1/inspect/projections', async (_request, reply) =>
     inspect(reply, async () => ({ items: await service.projectionStatus() })),
   );
-  app.post('/api/v1/inspect/projections/rebuild', async (request, reply) =>
+  app.post('/api/v1/admin/projections/rebuild', async (request, reply) =>
     inspect(reply, () =>
       service.rebuildProjections(
         Number(
