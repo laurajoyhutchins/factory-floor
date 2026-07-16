@@ -159,7 +159,7 @@ export async function registerWorkerRoutes(
   authorization: string | WorkerAuthorization | undefined =
     process.env.WORKER_API_BEARER_TOKEN,
 ): Promise<void> {
-  const authenticatedWorkers = new WeakMap<FastifyRequest, string>();
+  const authenticatedWorkers = new WeakMap<FastifyRequest, string[]>();
   await app.register(
     async (workerApp) => {
       for (const schema of protocolSchemas()) workerApp.addSchema(schema);
@@ -182,14 +182,14 @@ export async function registerWorkerRoutes(
               .send(authError(request.id, 'invalid worker bearer token'));
           return;
         }
-        const worker = Object.entries(authorization?.workers ?? {}).find(
-          ([, entry]) => tokenMatches(value, entry.token),
-        );
-        if (!worker)
+        const workerIds = Object.entries(authorization?.workers ?? {})
+          .filter(([, entry]) => tokenMatches(value, entry.token))
+          .map(([workerId]) => workerId);
+        if (workerIds.length === 0)
           return reply
             .code(403)
             .send(authError(request.id, 'invalid worker bearer token'));
-        authenticatedWorkers.set(request, worker[0]);
+        authenticatedWorkers.set(request, workerIds);
       });
 
       workerApp.addHook('preValidation', async (request) => {
@@ -252,11 +252,11 @@ export async function registerWorkerRoutes(
             WorkerProtocolService['claim']
           >[0] & { protocolVersion?: string };
           if (typeof authorization !== 'string') {
-            const workerId = authenticatedWorkers.get(request);
-            const allowed = workerId
-              ? authorization?.workers[workerId]
+            const workerIds = authenticatedWorkers.get(request) ?? [];
+            const allowed = workerIds.includes(input.workerId)
+              ? authorization?.workers[input.workerId]
               : undefined;
-            if (!allowed || input.workerId !== workerId)
+            if (!allowed)
               throw new WorkerProtocolError(
                 'capability_denied',
                 'worker token is not authorized for this worker identity',
