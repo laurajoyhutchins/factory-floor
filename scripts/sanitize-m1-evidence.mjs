@@ -13,7 +13,10 @@ function sanitize(text) {
     .replace(/("leaseToken"\s*:\s*")[^"]*(")/gi, '$1[REDACTED]$2')
     .replace(/("lease_token"\s*:\s*")[^"]*(")/gi, '$1[REDACTED]$2')
     .replace(/(token=)[^&\s"']+/gi, '$1[REDACTED]')
-    .replace(/(authorization\s*[:=]\s*["']?Bearer\s+)[^\s"',}]+/gi, '$1[REDACTED]');
+    .replace(
+      /(authorization\s*[:=]\s*["']?Bearer\s+)[^\s"',}]+/gi,
+      '$1[REDACTED]',
+    );
 }
 
 async function filesAt(path) {
@@ -30,7 +33,9 @@ async function filesAt(path) {
 
 const targets = process.argv.slice(2);
 if (targets.length === 0)
-  throw new Error('provide at least one evidence file or directory to sanitize');
+  throw new Error(
+    'provide at least one evidence file or directory to sanitize',
+  );
 
 let changed = 0;
 for (const target of targets) {
