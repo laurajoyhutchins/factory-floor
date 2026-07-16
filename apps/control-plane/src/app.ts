@@ -3,14 +3,14 @@ import { createDatabase, createUuidV7, type Database } from '@factory-floor/db';
 import {
   ArtifactDomainError,
   CommandService,
-  RegistrationService,
-  SystemApplicationService,
-  WorkerProtocolService,
-  WorkerProtocolError,
-  ProposedResultPrevalidationService,
   ObservabilityService,
   PROJECTION_NAMES,
+  ProposedResultPrevalidationService,
+  RegistrationService,
   StartupRecoveryService,
+  SystemApplicationService,
+  WorkerProtocolError,
+  WorkerProtocolService,
 } from '@factory-floor/runtime-core';
 import {
   FilesystemArtifactBlobStore,
@@ -31,11 +31,17 @@ import {
   type ControlPlaneSecurity,
 } from './security.js';
 
-const STARTUP_RECOVERY_BOUNDS = {
+export interface StartupRecoveryBounds {
+  expiredAttempts: number;
+  cancellingRegions: number;
+  stagedArtifacts: number;
+}
+
+const STARTUP_RECOVERY_BOUNDS: StartupRecoveryBounds = {
   expiredAttempts: 5_000,
   cancellingRegions: 1_000,
   stagedArtifacts: 50_000,
-} as const;
+};
 const STARTUP_PROJECTOR_VERSION = 'task10.v2';
 
 export interface AppDependencies {
@@ -104,7 +110,8 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
     const complete = PROJECTION_NAMES.every((name) =>
       checkpoints.some(
         (checkpoint) =>
-          checkpoint.projection_name === name && checkpoint.last_event_id !== null,
+          checkpoint.projection_name === name &&
+          checkpoint.last_event_id !== null,
       ),
     );
     const earliest = complete
@@ -170,34 +177,36 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
 export async function assertStartupRecoveryWithinBounds(
   db: Kysely<Database>,
   now = new Date(),
+  bounds: StartupRecoveryBounds = STARTUP_RECOVERY_BOUNDS,
 ): Promise<void> {
-  const [expiredAttempts, cancellingRegions, stagedArtifacts] = await Promise.all([
-    db
-      .selectFrom('execution_attempts')
-      .select('id')
-      .where('status', 'in', ['leased', 'running'])
-      .where('lease_expires_at', '<=', now)
-      .limit(STARTUP_RECOVERY_BOUNDS.expiredAttempts + 1)
-      .execute(),
-    db
-      .selectFrom('regions')
-      .select('id')
-      .where('lifecycle_status', '=', 'cancelling')
-      .limit(STARTUP_RECOVERY_BOUNDS.cancellingRegions + 1)
-      .execute(),
-    db
-      .selectFrom('artifact_staging')
-      .select('id')
-      .where('status', '=', 'staged')
-      .limit(STARTUP_RECOVERY_BOUNDS.stagedArtifacts + 1)
-      .execute(),
-  ]);
+  const [expiredAttempts, cancellingRegions, stagedArtifacts] =
+    await Promise.all([
+      db
+        .selectFrom('execution_attempts')
+        .select('id')
+        .where('status', 'in', ['leased', 'running'])
+        .where('lease_expires_at', '<=', now)
+        .limit(bounds.expiredAttempts + 1)
+        .execute(),
+      db
+        .selectFrom('regions')
+        .select('id')
+        .where('lifecycle_status', '=', 'cancelling')
+        .limit(bounds.cancellingRegions + 1)
+        .execute(),
+      db
+        .selectFrom('artifact_staging')
+        .select('id')
+        .where('status', '=', 'staged')
+        .limit(bounds.stagedArtifacts + 1)
+        .execute(),
+    ]);
   const observed = {
     expiredAttempts: expiredAttempts.length,
     cancellingRegions: cancellingRegions.length,
     stagedArtifacts: stagedArtifacts.length,
   };
-  for (const [name, limit] of Object.entries(STARTUP_RECOVERY_BOUNDS))
+  for (const [name, limit] of Object.entries(bounds))
     if (observed[name as keyof typeof observed] > limit)
       throw new Error(
         `startup_recovery_backlog_exceeded:${name}:${observed[name as keyof typeof observed]}:${limit}`,
