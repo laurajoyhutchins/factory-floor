@@ -28,6 +28,7 @@ function parseJsonObjectAt(text: string, start: number): unknown {
 
 describe('Milestone 1 live restart acceptance harness', () => {
   it('runs the process-level restart scenario without duplicate work', async () => {
+    const controlPlaneUrl = 'http://127.0.0.1:3113';
     const { stdout } = await execFileAsync(
       'node',
       ['scripts/run-m1-live-restart-acceptance.mjs'],
@@ -38,6 +39,8 @@ describe('Milestone 1 live restart acceptance harness', () => {
           ...process.env,
           FACTORY_FLOOR_ACCEPTANCE_PORT: '3113',
           FACTORY_FLOOR_ACCEPTANCE_LEASE_MS: '2000',
+          FACTORY_FLOOR_CONTROL_PLANE_URL: controlPlaneUrl,
+          CONTROL_PLANE_PUBLIC_URL: controlPlaneUrl,
         },
       },
     );
