@@ -109,14 +109,23 @@ jobs:
       - name: Check formatting
         run: |
           set -o pipefail
-          pnpm format:check 2>&1 | tee format.log
+          if pnpm format:check 2>&1 | tee format.log; then
+            exit 0
+          fi
+          pnpm format
+          git diff --name-only --diff-filter=ACMRT > formatted-files.txt
+          tar -czf formatted-files.tar.gz -T formatted-files.txt
+          exit 1
 
-      - name: Upload formatting log
+      - name: Upload formatting diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: format-log-${{ github.run_number }}
-          path: format.log
+          path: |
+            format.log
+            formatted-files.txt
+            formatted-files.tar.gz
           if-no-files-found: ignore
           retention-days: 30
 
