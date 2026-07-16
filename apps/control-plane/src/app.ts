@@ -61,18 +61,20 @@ function withResultPrevalidation(
         return async (
           input: Parameters<WorkerProtocolService['submitResult']>[0],
         ) => {
-          await target.assertActive(input);
-          try {
-            await prevalidation.prevalidate(input);
-          } catch (error) {
-            throw new WorkerProtocolError(
-              'unauthorized_staging_reference',
-              error instanceof Error
-                ? error.message
-                : 'staged artifact validation failed',
-              false,
-              400,
-            );
+          if (!(await prevalidation.hasExistingSubmission(input))) {
+            await target.assertActive(input);
+            try {
+              await prevalidation.prevalidate(input);
+            } catch (error) {
+              throw new WorkerProtocolError(
+                'unauthorized_staging_reference',
+                error instanceof Error
+                  ? error.message
+                  : 'staged artifact validation failed',
+                false,
+                400,
+              );
+            }
           }
           return target.submitResult(input);
         };
