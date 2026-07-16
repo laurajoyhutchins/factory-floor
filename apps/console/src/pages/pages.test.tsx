@@ -1,48 +1,62 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
-import {
-  Overview,
-  ExecutionDetail,
-  ArtifactDetail,
-  Topology,
-  NotFound,
-} from './pages.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as client from '../api/client.js';
-function wrap(ui: React.ReactElement, path = '/') {
+import {
+  ArtifactDetail,
+  ExecutionDetail,
+  Executions,
+  NotFound,
+  Overview,
+  Topology,
+  buildLineageGraph,
+  buildTopologyGraph,
+} from './pages.js';
+
+function wrap(ui: React.ReactElement, path = '/', route = '*') {
   return render(
     <QueryClientProvider
       client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        new QueryClient({
+          defaultOptions: { queries: { retry: false, refetchInterval: false } },
+        })
       }
     >
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/" element={ui} />
-          <Route path="/executions/:executionId" element={ui} />
-          <Route path="/artifacts/:artifactId" element={ui} />
-          <Route path="/topology" element={ui} />
-          <Route path="/artifacts/:artifactId" element={ui} />
-          <Route path="/topology" element={ui} />
-          <Route path="/nope" element={ui} />
+          <Route path={route} element={ui} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('console views', () => {
-  it('renders stale projection overview', async () => {
-    vi.spyOn(client.consoleApi, 'health').mockResolvedValue({
-      status: 'ok',
-      service: 'control-plane',
-    });
+  it('renders projection-backed overview metrics and stale state', async () => {
     vi.spyOn(client.consoleApi, 'projections').mockResolvedValue({
       items: [
         {
-          projection_name: 'queue-depth',
-          last_sequence_number: '1',
-          staleness_ms: 9999,
+          projectionName: 'queue-depth',
+          lastSequenceNumber: '1',
+          stalenessMs: 9_999,
+          updatedAt: '2026-07-16T12:00:00Z',
+          snapshot: { counts: { completed: 6 } },
+        },
+        {
+          projectionName: 'retry-failure-counts',
+          stalenessMs: 9_999,
+          updatedAt: '2026-07-16T12:00:00Z',
+          snapshot: {
+            failedAttempts: 1,
+            replacementAttempts: 1,
+            deadLetteredDeliveries: 0,
+          },
         },
       ],
     });
@@ -50,77 +64,132 @@ describe('console views', () => {
       items: [],
       nextCursor: null,
     });
-    wrap(<Overview />);
-    expect(await screen.findByText('queue-depth')).toBeInTheDocument();
-    expect(screen.getByText(/9999ms stale/)).toBeInTheDocument();
+    wrap(<Overview healthStatus="ok" liveState="live" />);
+    expect(await screen.findByText('Delivery queue')).toBeInTheDocument();
+    expect(screen.getByText('completed: 6')).toBeInTheDocument();
+    expect(screen.getByText('1 failed attempts')).toBeInTheDocument();
+    expect(screen.getByText(/maximum reported staleness 9999 ms/)).toBeInTheDocument();
   });
-  it('preserves failed attempt history in timeline', async () => {
+
+  it('preserves failed attempt history and replacement success', async () => {
     vi.spyOn(client.consoleApi, 'execution').mockResolvedValue({
-      causal_chain: {
+      execution: { id: 'ex1', status: 'completed' },
+      causalChain: {
         attempts: [
           {
             id: 'a1',
-            attempt_number: 1,
+            attemptNumber: 1,
             status: 'failed',
             failure: { message: 'verifier failed' },
           },
-          { id: 'a2', attempt_number: 2, status: 'completed' },
+          { id: 'a2', attemptNumber: 2, status: 'completed' },
         ],
+        inputs: [],
         outputs: [],
         events: [],
-        downstream_deliveries: [],
+        downstreamDeliveries: [],
       },
     });
-    wrap(<ExecutionDetail />, '/executions/ex1');
-    expect(await screen.findByText(/attempt 1 failed/)).toBeInTheDocument();
-    expect(screen.getByText(/replacement attempt/)).toBeInTheDocument();
+    wrap(<ExecutionDetail />, '/executions/ex1', '/executions/:executionId');
+    expect(await screen.findByText('Attempt 1')).toBeInTheDocument();
+    expect(screen.getByText('failed')).toBeInTheDocument();
+    expect(screen.getByText('Replacement attempt')).toBeInTheDocument();
+    expect(screen.getByText('completed')).toBeInTheDocument();
   });
-  it('renders artifact lineage text', async () => {
-    vi.spyOn(client.consoleApi, 'artifactLineage').mockResolvedValue({
-      artifact: { id: 'art' },
-      derivations: [{ id: 'd1', source_artifact_id: 'a', artifact_id: 'b' }],
+
+  it('loads another opaque execution page without synthesizing a cursor', async () => {
+    vi.spyOn(client.consoleApi, 'attempts').mockResolvedValue({
+      items: [],
+      nextCursor: null,
     });
-    wrap(<ArtifactDetail />, '/artifacts/art');
-    expect(await screen.findByText('Derivations')).toBeInTheDocument();
-    expect(screen.getByText('d1')).toBeInTheDocument();
+    const executions = vi
+      .spyOn(client.consoleApi, 'executions')
+      .mockImplementation(async (options) =>
+        options?.cursor
+          ? { items: [{ id: 'ex-2', status: 'completed' }], nextCursor: null }
+          : {
+              items: [{ id: 'ex-1', status: 'running' }],
+              nextCursor: 'opaque-next==',
+            },
+      );
+    wrap(<Executions />, '/executions', '/executions');
+    expect(await screen.findByLabelText('Copy ex-1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(await screen.findByLabelText('Copy ex-2')).toBeInTheDocument();
+    expect(executions.mock.calls[1]?.[0]?.cursor).toBe('opaque-next==');
   });
-  it('maps topology nodes and edges', async () => {
-    vi.spyOn(client.consoleApi, 'topology').mockResolvedValue({
+
+  it('builds directed artifact lineage edges and text', async () => {
+    const data = {
+      artifact: { id: 'b' },
+      derivations: [
+        {
+          id: 'd1',
+          sourceArtifactId: 'a',
+          artifactId: 'b',
+          executionId: 'ex1',
+        },
+      ],
+    };
+    const graph = buildLineageGraph(data);
+    expect(graph.nodes.map((node) => node.id)).toEqual(['a', 'b']);
+    expect(graph.edges).toEqual([
+      expect.objectContaining({ source: 'a', target: 'b' }),
+    ]);
+    vi.spyOn(client.consoleApi, 'artifactLineage').mockResolvedValue(data);
+    wrap(<ArtifactDetail />, '/artifacts/b', '/artifacts/:artifactId');
+    expect(await screen.findByText('Text relationships')).toBeInTheDocument();
+    expect(screen.getByLabelText('Copy a')).toBeInTheDocument();
+    expect(screen.getByLabelText('Copy b')).toBeInTheDocument();
+  });
+
+  it('maps active topology nodes, ports, and directed connections', async () => {
+    const topology = {
       regions: [
         {
           id: 'r',
           name: 'investigation',
-          lifecycle_status: 'running',
-          active_topology_revision: { revision_number: 1 },
+          lifecycleStatus: 'running',
+          activeTopologyRevision: { revisionNumber: 1 },
         },
       ],
       components: [
         {
           id: 'c1',
+          regionId: 'r',
           name: 'retrieve',
-          lifecycle_status: 'running',
-          definition: { name: 'retriever' },
+          lifecycleStatus: 'running',
+          definition: { name: 'retriever', version: '1' },
+          ports: [{ direction: 'output', name: 'evidence' }],
         },
         {
           id: 'c2',
+          regionId: 'r',
           name: 'verify',
-          lifecycle_status: 'running',
-          definition: { name: 'verifier' },
+          lifecycleStatus: 'running',
+          definition: { name: 'verifier', version: '1' },
+          ports: [{ direction: 'input', name: 'evidence' }],
         },
       ],
       connections: [
         {
           id: 'edge',
-          source_component_id: 'c1',
-          source_port_name: 'out',
-          target_component_id: 'c2',
-          target_port_name: 'in',
+          sourceComponentId: 'c1',
+          sourcePortName: 'evidence',
+          targetComponentId: 'c2',
+          targetPortName: 'evidence',
         },
       ],
-    });
-    wrap(<Topology />, '/topology');
+    };
+    const graph = buildTopologyGraph(topology);
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.edges[0]).toMatchObject({ source: 'c1', target: 'c2' });
+    vi.spyOn(client.consoleApi, 'topology').mockResolvedValue(topology);
+    wrap(<Topology />, '/topology', '/topology');
     expect(await screen.findByText(/2 components/)).toBeInTheDocument();
+    expect(screen.getAllByText(/evidence/).length).toBeGreaterThan(0);
   });
+
   it('renders route not found behavior', () => {
     wrap(<NotFound />, '/nope');
     expect(screen.getByRole('alert')).toHaveTextContent('not found');
