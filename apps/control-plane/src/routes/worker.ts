@@ -85,7 +85,7 @@ export function workerAuthorizationFromEnv(
     );
   return {
     workers: {
-      '*': { token, capabilities },
+      [configuredWorkerId]: { token, capabilities },
     },
   };
 }
