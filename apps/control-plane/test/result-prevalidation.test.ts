@@ -52,7 +52,9 @@ describe('worker result prevalidation boundary', () => {
       new ArtifactDomainError('invalid_json', 'artifact is not valid JSON'),
     );
 
-    await expect(service.submitResult(proposedResult as never)).rejects.toMatchObject({
+    await expect(
+      service.submitResult(proposedResult as never),
+    ).rejects.toMatchObject({
       name: WorkerProtocolError.name,
       code: 'unauthorized_staging_reference',
       retryable: false,
