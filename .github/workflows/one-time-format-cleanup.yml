@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/reduce-repository-tech-debt
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
