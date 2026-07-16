@@ -17,6 +17,74 @@ const contractRoot = join(
 const contractId = (name: string) =>
   `https://factory-floor.local/contracts/${name}.schema.json`;
 
+export interface WorkerAuthorization {
+  workers: Record<
+    string,
+    {
+      token: string;
+      capabilities: string[];
+    }
+  >;
+}
+
+export function workerAuthorizationFromEnv(
+  env: Record<string, string | undefined>,
+): WorkerAuthorization {
+  const encoded = env.WORKER_AUTHORIZATION_JSON?.trim();
+  if (encoded) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(encoded);
+    } catch {
+      throw new Error('WORKER_AUTHORIZATION_JSON must be valid JSON');
+    }
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    )
+      throw new Error('WORKER_AUTHORIZATION_JSON must be an object');
+    const workers: WorkerAuthorization['workers'] = {};
+    for (const [workerId, value] of Object.entries(parsed)) {
+      if (
+        !workerId.trim() ||
+        typeof value !== 'object' ||
+        value === null ||
+        Array.isArray(value)
+      )
+        throw new Error('worker authorization entries are invalid');
+      const entry = value as { token?: unknown; capabilities?: unknown };
+      if (
+        typeof entry.token !== 'string' ||
+        !entry.token.trim() ||
+        !Array.isArray(entry.capabilities) ||
+        !entry.capabilities.every(
+          (capability) => typeof capability === 'string' && capability.trim(),
+        )
+      )
+        throw new Error('worker authorization entries are invalid');
+      workers[workerId] = {
+        token: entry.token,
+        capabilities: [...new Set(entry.capabilities)],
+      };
+    }
+    if (Object.keys(workers).length === 0)
+      throw new Error('WORKER_AUTHORIZATION_JSON must authorize a worker');
+    return { workers };
+  }
+
+  const workerId = env.FACTORY_FLOOR_WORKER_ID?.trim();
+  const token = env.WORKER_API_BEARER_TOKEN?.trim();
+  const capabilities = env.FACTORY_FLOOR_WORKER_CAPABILITIES?.split(',')
+    .map((capability) => capability.trim())
+    .filter(Boolean);
+  if (!workerId || !token || !capabilities?.length)
+    throw new Error(
+      'configure WORKER_AUTHORIZATION_JSON or FACTORY_FLOOR_WORKER_ID, WORKER_API_BEARER_TOKEN, and FACTORY_FLOOR_WORKER_CAPABILITIES',
+    );
+  return { workers: { [workerId]: { token, capabilities } } };
+}
+
 function protocolSchemas(): Record<string, unknown>[] {
   return readdirSync(contractRoot, { recursive: true })
     .filter((name) => String(name).endsWith('.schema.json'))
@@ -87,8 +155,10 @@ function workerError(
 export async function registerWorkerRoutes(
   app: FastifyInstance,
   service: WorkerProtocolService,
-  token = process.env.WORKER_API_BEARER_TOKEN,
+  authorization: string | WorkerAuthorization | undefined =
+    process.env.WORKER_API_BEARER_TOKEN,
 ): Promise<void> {
+  const authenticatedWorkers = new WeakMap<FastifyRequest, string>();
   await app.register(
     async (workerApp) => {
       for (const schema of protocolSchemas()) workerApp.addSchema(schema);
@@ -104,10 +174,21 @@ export async function registerWorkerRoutes(
           return reply
             .code(401)
             .send(authError(request.id, 'missing worker bearer token'));
-        if (!token || !tokenMatches(value, token))
+        if (typeof authorization === 'string') {
+          if (!tokenMatches(value, authorization))
+            return reply
+              .code(403)
+              .send(authError(request.id, 'invalid worker bearer token'));
+          return;
+        }
+        const worker = Object.entries(authorization?.workers ?? {}).find(
+          ([, entry]) => tokenMatches(value, entry.token),
+        );
+        if (!worker)
           return reply
             .code(403)
             .send(authError(request.id, 'invalid worker bearer token'));
+        authenticatedWorkers.set(request, worker[0]);
       });
 
       workerApp.addHook('preValidation', async (request) => {
@@ -165,10 +246,33 @@ export async function registerWorkerRoutes(
       workerApp.post(
         '/claim',
         { schema: { body: { $ref: contractId('worker/claim-request') } } },
-        async (request) =>
-          service.claim(
-            request.body as Parameters<WorkerProtocolService['claim']>[0],
-          ),
+        async (request) => {
+          const input = request.body as Parameters<
+            WorkerProtocolService['claim']
+          >[0] & { protocolVersion?: string };
+          if (typeof authorization !== 'string') {
+            const workerId = authenticatedWorkers.get(request);
+            const allowed = workerId
+              ? authorization?.workers[workerId]
+              : undefined;
+            if (!allowed || input.workerId !== workerId)
+              throw new WorkerProtocolError(
+                'capability_denied',
+                'worker token is not authorized for this worker identity',
+                false,
+                403,
+              );
+            const delegated = new Set(allowed.capabilities);
+            if (input.capabilities.some((capability) => !delegated.has(capability)))
+              throw new WorkerProtocolError(
+                'capability_denied',
+                'worker requested an undelegated component selector',
+                false,
+                403,
+              );
+          }
+          return service.claim(input);
+        },
       );
       workerApp.post(
         '/heartbeat',
