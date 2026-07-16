@@ -1,14 +1,28 @@
 import { createHash } from 'node:crypto';
 import Ajv2020Import from 'ajv/dist/2020.js';
-import type { ErrorObject } from 'ajv';
+import type { ErrorObject, ValidateFunction } from 'ajv';
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
 import type { ArtifactRepository } from '@factory-floor/db';
 import type { RuntimeDb } from '@factory-floor/db';
 import { ArtifactDomainError } from './errors.js';
 
+const VALIDATION_RECEIPT_LIMIT = 1_024;
+const validationReceipts = new Map<string, string>();
+const compiledValidators = new Map<string, ValidateFunction>();
+
 export function isJsonMediaType(mediaType: string): boolean {
   const base = mediaType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
   return base === 'application/json' || base.endsWith('+json');
+}
+
+function rememberReceipt(stagingRowId: string, fingerprint: string) {
+  validationReceipts.delete(stagingRowId);
+  validationReceipts.set(stagingRowId, fingerprint);
+  while (validationReceipts.size > VALIDATION_RECEIPT_LIMIT) {
+    const oldest = validationReceipts.keys().next().value as string | undefined;
+    if (!oldest) break;
+    validationReceipts.delete(oldest);
+  }
 }
 
 export class ArtifactValidationService {
@@ -50,6 +64,19 @@ export class ArtifactValidationService {
         'unsupported_media_type',
         'artifact media type is not JSON',
       );
+
+    const fingerprint = [
+      row.id,
+      row.staged_ref,
+      row.digest,
+      row.size_bytes,
+      row.schema_id,
+      row.media_type,
+      schema.content_digest,
+    ].join(':');
+    if (validationReceipts.get(row.id) === fingerprint)
+      return { row, schema, instance: undefined, cached: true as const };
+
     const stream = await this.deps.blobStore.readStaged(row.staged_ref);
     const chunks: Buffer[] = [];
     const hash = createHash('sha256');
@@ -88,8 +115,13 @@ export class ArtifactValidationService {
       );
     }
     const Ajv2020 = Ajv2020Import.default ?? Ajv2020Import;
-    const ajv = new Ajv2020({ allErrors: true, strict: false });
-    const validate = ajv.compile(schema.schema as object);
+    let validate = compiledValidators.get(schema.content_digest);
+    if (!validate) {
+      validate = new Ajv2020({ allErrors: true, strict: false }).compile(
+        schema.schema as object,
+      );
+      compiledValidators.set(schema.content_digest, validate);
+    }
     if (!validate(instance))
       throw new ArtifactDomainError(
         'schema_validation_failed',
@@ -100,6 +132,7 @@ export class ArtifactValidationService {
           message: error.message,
         })),
       );
-    return { row, schema, instance };
+    rememberReceipt(row.id, fingerprint);
+    return { row, schema, instance, cached: false as const };
   }
 }
