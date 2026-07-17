@@ -44,7 +44,10 @@ function services() {
       inspectRunTrace: vi.fn(async () => ({ run: { id: 'run-1' } })),
       listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
       readArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
-      listPendingApprovals: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listPendingApprovals: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+      })),
     },
   };
 }
