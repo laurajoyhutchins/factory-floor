@@ -768,12 +768,20 @@ export class WorkerProtocolService {
     });
     try {
       const commitInput = {
-        ...input,
+        protocolVersion: input.protocolVersion,
+        executionId: input.executionId,
+        attemptId: input.attemptId,
+        leaseToken: input.leaseToken,
         lifecycleEpoch: attempt.regionFencingEpoch,
+        status: input.status,
         stagedArtifacts: stagedArtifacts.map(toWorkerV1StagedArtifact),
-        proposedState: proposedState
-          ? toWorkerV1StagedArtifact(proposedState)
-          : undefined,
+        proposedEvents: input.proposedEvents,
+        externalActionProposals: input.externalActionProposals,
+        resourceUsage: input.resourceUsage,
+        ...(proposedState
+          ? { proposedState: toWorkerV1StagedArtifact(proposedState) }
+          : {}),
+        ...(input.failure === undefined ? {} : { failure: input.failure }),
       };
       await new ExecutionCommitService(
         this.db,
