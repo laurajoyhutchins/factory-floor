@@ -57,8 +57,8 @@ pnpm exec prettier --check \
   apps/cli/src/index.ts \
   apps/control-plane/src/routes/inspection.ts \
   apps/control-plane/test/inspection-routes.test.ts \
-  docs/conformance/durable-reactive-graph-ledger.yaml \
-  docs/evidence/m1-durable-reactive-graph.md \
+  docs/reference/conformance-ledger.yaml \
+  docs/reference/acceptance/m1-durable-reactive-graph.md \
   eslint.config.js \
   package.json \
   packages/runtime-core/src/index.ts \

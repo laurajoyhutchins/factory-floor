@@ -4,8 +4,7 @@ import process from 'node:process';
 import YAML from 'yaml';
 
 const repoRoot = process.cwd();
-const ledgerPath =
-  process.argv[2] ?? 'docs/conformance/durable-reactive-graph-ledger.yaml';
+const ledgerPath = process.argv[2] ?? 'docs/reference/conformance-ledger.yaml';
 const absoluteLedgerPath = isAbsolute(ledgerPath)
   ? ledgerPath
   : join(repoRoot, ledgerPath);

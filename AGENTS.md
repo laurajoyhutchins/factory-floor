@@ -3,12 +3,12 @@
 Treat the repository documents as authoritative and read them in this order before implementation work:
 
 1. `README.md`
-2. `docs/specs/reference-implementation-v0.1.md`
-3. `docs/specs/architecture-decisions-v0.1.md`
+2. `docs/reference/runtime-contract.md`
+3. `docs/explanation/architecture-decisions.md`
 4. `examples/investigation-system.yaml`
 5. `examples/investigation-system-target.yaml`
-6. `docs/product/operator-console-brief-v0.1.md`
-7. `docs/plans/2026-07-14-factory-floor-mvp.md`
+6. `docs/explanation/operator-console.md`
+7. `docs/README.md`
 8. `CODEX_KICKOFF_PROMPT.md`
 
 ## Environment bootstrap
@@ -25,7 +25,7 @@ Codex Cloud environments should configure their setup command as:
 bash scripts/codex-cloud-setup.sh
 ```
 
-Do not create a second, unversioned copy of the setup logic in an agent prompt or environment UI. See `docs/development/environments.md` for the environment contract.
+Do not create a second, unversioned copy of the setup logic in an agent prompt or environment UI. See `docs/how-to/development-environment.md` for the environment contract.
 
 ## Workspace maintenance
 
@@ -37,7 +37,7 @@ Do not create a second, unversioned copy of the setup logic in an agent prompt o
 
 ## Mission
 
-Deliver Milestone 1, **Durable Reactive Graph**, as a complete tested vertical slice before expanding scope.
+Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new architecture work under Milestone 2 or later.
 
 ## Non-negotiable constraints
 
@@ -49,12 +49,12 @@ Deliver Milestone 1, **Durable Reactive Graph**, as a complete tested vertical s
 - Artifacts are immutable and content-addressed.
 - Preserve capability, provenance, lifecycle-epoch, retry-history, and atomic-commit semantics.
 - Do not introduce Kafka, Temporal, Kubernetes operators, microservices, GraphQL, or a drag-and-drop builder in Milestone 1.
-- Do not begin the visual console until the Milestone 1 acceptance scenario passes.
+- Keep the released operator console read-only and preserve the Milestone 1 acceptance invariants while expanding scope.
 
 ## Working method
 
 - Work on a feature branch or isolated worktree.
-- Follow the implementation plan task-by-task and update its checkboxes.
+- Follow the current approved task plan task-by-task. Do not put active agent plans or scratch work under `docs/`.
 - Use test-driven development: failing test, minimal implementation, passing test, commit.
 - Keep commits small, intentional, and conventional.
 - Preserve module boundaries; unrelated modules must not query one another's tables directly.

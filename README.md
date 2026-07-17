@@ -8,15 +8,14 @@ The first implementation is intentionally conservative. It is a transactional mo
 
 ## Start here
 
-Read the design bundle in this order:
+Use the [documentation index](docs/README.md) for the authoritative reader-facing docs, organized by Diátaxis quadrant. The main entry points are:
 
-1. [`docs/specs/reference-implementation-v0.1.md`](docs/specs/reference-implementation-v0.1.md)
-2. [`docs/specs/architecture-decisions-v0.1.md`](docs/specs/architecture-decisions-v0.1.md)
-3. [`examples/investigation-system.yaml`](examples/investigation-system.yaml) — Milestone 1 static graph
-4. [`examples/investigation-system-target.yaml`](examples/investigation-system-target.yaml) — later dynamic-region target
-5. [`docs/product/operator-console-brief-v0.1.md`](docs/product/operator-console-brief-v0.1.md)
-6. [`docs/plans/2026-07-14-factory-floor-mvp.md`](docs/plans/2026-07-14-factory-floor-mvp.md)
-7. [`AGENTS.md`](AGENTS.md) and [`CODEX_KICKOFF_PROMPT.md`](CODEX_KICKOFF_PROMPT.md)
+1. [`docs/reference/runtime-contract.md`](docs/reference/runtime-contract.md)
+2. [`docs/explanation/architecture.md`](docs/explanation/architecture.md)
+3. [`docs/explanation/architecture-decisions.md`](docs/explanation/architecture-decisions.md)
+4. [`examples/investigation-system.yaml`](examples/investigation-system.yaml) — Milestone 1 static graph
+5. [`examples/investigation-system-target.yaml`](examples/investigation-system-target.yaml) — later dynamic-region target
+6. [`docs/explanation/operator-console.md`](docs/explanation/operator-console.md)
 
 ## Fixed stack
 
@@ -41,9 +40,9 @@ bash scripts/bootstrap-workspace.sh
 
 The script validates Node 22 and Python 3.12, activates pnpm 10.12.1, installs `uv`, uses lockfiles when present, synchronizes project dependencies, and prints the resolved environment.
 
-See [`docs/development/environments.md`](docs/development/environments.md) for the full environment contract and troubleshooting guidance.
+See [`docs/how-to/development-environment.md`](docs/how-to/development-environment.md) for the full environment contract and troubleshooting guidance.
 
-For the Milestone 1 clean-checkout command map, service startup, demo, inspection, artifact reconciliation, projection rebuild, and troubleshooting workflow, see [`docs/development/milestone-1-runbook.md`](docs/development/milestone-1-runbook.md).
+For environment setup, the investigation demo, inspection, artifact reconciliation, projection rebuild, and troubleshooting, see the [how-to guides](docs/README.md#how-to).
 
 ### Workspace maintenance
 
@@ -116,9 +115,9 @@ GitHub Codespaces creates the SSH authentication material automatically. No repo
 
 From Codex or another remote agent, use the Codespace selected by `gh codespace ssh` as the working machine and `/workspaces/factory-floor` as the repository root.
 
-## Immediate target
+## Current release
 
-Milestone 1 is a complete durable vertical slice:
+Milestone 1 is the released durable vertical slice:
 
 ```text
 submit command

@@ -1,6 +1,8 @@
-# Codex Kickoff Prompt
+# Codex Kickoff Prompt (legacy bootstrap handoff)
 
 Copy the text below into Codex after placing this handoff bundle at the root of a new or empty repository.
+
+For the existing v0.1 repository, use `AGENTS.md` and [`docs/README.md`](docs/README.md) as the current entry points. This handoff remains only for bootstrapping a new or empty repository.
 
 ---
 
@@ -9,12 +11,11 @@ You are the lead implementation agent for **Factory Floor**, a composable runtim
 The repository contains an approved design bundle. Treat these files as authoritative and read them in this order before changing anything:
 
 1. `README.md`
-2. `docs/specs/reference-implementation-v0.1.md`
-3. `docs/specs/architecture-decisions-v0.1.md`
+2. `docs/reference/runtime-contract.md`
+3. `docs/explanation/architecture-decisions.md`
 4. `examples/investigation-system.yaml`
 5. `examples/investigation-system-target.yaml`
-6. `docs/product/operator-console-brief-v0.1.md`
-7. `docs/plans/2026-07-14-factory-floor-mvp.md`
+6. `docs/explanation/operator-console.md`
 
 ## Mission
 

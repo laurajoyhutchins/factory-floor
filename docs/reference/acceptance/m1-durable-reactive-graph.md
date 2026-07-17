@@ -1,6 +1,9 @@
-# Milestone 1 Durable Reactive Graph evidence
+# Milestone 1 acceptance evidence
 
-Status: **accepted and released as `v0.1.0`.** Repository Verification #314 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
+**Type:** Reference record
+**Status:** Frozen; accepted and released as `v0.1.0`
+
+Repository Verification #314 reproduced every applicable Milestone 1 requirement from a fresh GitHub Actions hosted checkout and retained a sanitized operator evidence bundle. Capability delegation and dynamic child-region construction remain explicitly deferred beyond the static Milestone 1 scope.
 
 ## Canonical acceptance command
 
@@ -10,7 +13,7 @@ Run from a clean checkout:
 pnpm accept:m1
 ```
 
-The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs migrations and quality gates, executes the investigation vertical slice, exercises live control-plane restart and cancellation fencing, rebuilds projections, reconciles artifacts, records a durable policy decision, collects operator-facing inspection output, sanitizes retained logs, and stops services on success, failure, interruption, or timeout.
+The command bootstraps the workspace, validates contracts and conformance structure, starts clean PostgreSQL and MinIO services, runs quality gates, executes the investigation vertical slice, exercises live control-plane restart and cancellation fencing, rebuilds projections, reconciles artifacts, records a durable policy decision, collects operator-facing inspection output, sanitizes retained logs, and stops services on success, failure, interruption, or timeout.
 
 ## Canonical retained evidence
 
@@ -32,7 +35,7 @@ Both workflow jobs passed. Ordinary verification included contract validation, g
 
 - The conformance ledger enumerates exactly 18 normative reference invariants. Every invariant applicable to the static Milestone 1 runtime is automated and passed.
 - Operator inspection exposes artifact schema identity and digest, committed state, locator status, provenance, derivations, and tombstone state.
-- Operator inspection exposes resource-ledger entries by region, execution, attempt, external action when present, resource type, quantity, and unit.
+- Operator inspection exposes resource-ledger entries by region, execution, attempt, external action when present, resource type, quantity, unit, and attributes.
 - Registered policy evaluation durably records policy identity and version, evaluator version, subject, normalized inputs, referenced artifact, outcome, reason, modifications, and approval relationship.
 - Delivery evidence enumerates every relevant delivery and fails acceptance if one remains outside `completed`, `cancelled`, or `dead_lettered`.
 - The retained bundle is sanitized on every acceptance exit path, including failed runs.
@@ -46,14 +49,14 @@ The evidence bundle records:
 - seven final-investigation attempts, including the deliberate verifier failure and successful replacement;
 - eight terminal deliveries with no duplicate output or downstream-delivery keys;
 - eight committed artifacts with valid digest, schema identity, provenance, and lineage;
-- resource attribution for the failed and replacement verifier attempts;
+- resource attribution for failed and replacement verifier attempts;
 - one durable `require_approval` policy decision and requested approval;
-- six complete execution traces and eight artifact-lineage records;
+- complete execution traces and artifact-lineage records;
 - live-restart abandonment, replacement, recovery summary, stale-result fencing, and duplicate-free completion;
 - cancellation epoch increment, cancelled attempt and delivery, stale-result rejection, and zero committed stale outputs;
 - projection replay with unchanged delivery, execution, and external-action counts;
-- ten caught-up projection checkpoints;
-- reconciliation of eight consistent artifacts with zero unresolved records.
+- caught-up projection checkpoints;
+- reconciliation of consistent artifacts with zero unresolved records.
 
 The bundle includes `acceptance-evidence.json`, `SUMMARY.md`, and sanitized scenario logs. Private model reasoning is neither required nor retained.
 
@@ -65,6 +68,6 @@ An actual GitHub Codespace was not used. The Milestone 1 completion rule permits
 
 ## Deferred post-Milestone-1 invariants
 
-- `M1-CONF-006` — capability delegation cannot exceed parent authority. Deferred because Milestone 1 uses direct capability grants and exposes no delegation surface.
-- `M1-CONF-007` — dynamic regions cannot modify ancestor topology. Deferred because dynamic child-region construction is outside Milestone 1.
-- `M1-CONF-015` — dynamic construction is explicitly bounded. Deferred because Milestone 1 uses a static committed investigation graph.
+- `M1-CONF-006`: capability delegation cannot exceed parent authority. Deferred because Milestone 1 uses direct capability grants and exposes no delegation surface.
+- `M1-CONF-007`: dynamic regions cannot modify ancestor topology. Deferred because dynamic child-region construction is outside Milestone 1.
+- `M1-CONF-015`: dynamic construction is explicitly bounded. Deferred because Milestone 1 uses a static committed investigation graph.
