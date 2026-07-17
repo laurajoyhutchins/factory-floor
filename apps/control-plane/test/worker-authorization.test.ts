@@ -30,18 +30,14 @@ describe('worker authorization', () => {
       retryAfterMs: 250,
     }));
     const app = Fastify();
-    await registerWorkerRoutes(
-      app,
-      { claim } as never,
-      {
-        workers: {
-          'worker-a': {
-            token: 'worker-a-secret',
-            capabilities: ['retrieve@1'],
-          },
+    await registerWorkerRoutes(app, { claim } as never, {
+      workers: {
+        'worker-a': {
+          token: 'worker-a-secret',
+          capabilities: ['retrieve@1'],
         },
       },
-    );
+    });
 
     const wrongIdentity = await app.inject({
       method: 'POST',

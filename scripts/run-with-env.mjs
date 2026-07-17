@@ -15,10 +15,8 @@ if (!command) {
   process.exit(2);
 }
 
-const authPreload = new URL(
-  './fetch-control-plane-auth.mjs',
-  import.meta.url,
-).href;
+const authPreload = new URL('./fetch-control-plane-auth.mjs', import.meta.url)
+  .href;
 const inheritedNodeOptions = process.env.NODE_OPTIONS ?? '';
 const nodeOptions = inheritedNodeOptions.includes(authPreload)
   ? inheritedNodeOptions

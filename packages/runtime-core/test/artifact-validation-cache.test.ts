@@ -39,13 +39,17 @@ describe('artifact validation receipts', () => {
       maxJsonBytes: 1_024n,
     });
 
-    await expect(service.validateStagedArtifact(row.id)).resolves.toMatchObject({
-      cached: false,
-      instance: { ok: true },
-    });
-    await expect(service.validateStagedArtifact(row.id)).resolves.toMatchObject({
-      cached: true,
-    });
+    await expect(service.validateStagedArtifact(row.id)).resolves.toMatchObject(
+      {
+        cached: false,
+        instance: { ok: true },
+      },
+    );
+    await expect(service.validateStagedArtifact(row.id)).resolves.toMatchObject(
+      {
+        cached: true,
+      },
+    );
     expect(readStaged).toHaveBeenCalledTimes(1);
   });
 });

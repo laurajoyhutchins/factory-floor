@@ -174,7 +174,11 @@ describe('scheduler fairness', () => {
       .execute();
     await db
       .deleteFrom('deliveries')
-      .where('id', '=', older.find((row) => row.target_port_name === 'context')!.id)
+      .where(
+        'id',
+        '=',
+        older.find((row) => row.target_port_name === 'context')!.id,
+      )
       .execute();
     await db
       .updateTable('deliveries')
@@ -196,11 +200,15 @@ describe('scheduler fairness', () => {
     const leasedCorrelations = await db
       .selectFrom('deliveries')
       .select('correlation_id')
-      .where('id', 'in', scheduled!.inputs.map((input) => input.deliveryId))
+      .where(
+        'id',
+        'in',
+        scheduled!.inputs.map((input) => input.deliveryId),
+      )
       .execute();
-    expect(new Set(leasedCorrelations.map((row) => row.correlation_id))).toEqual(
-      new Set(['newer-complete']),
-    );
+    expect(
+      new Set(leasedCorrelations.map((row) => row.correlation_id)),
+    ).toEqual(new Set(['newer-complete']));
     expect(
       await db
         .selectFrom('deliveries')

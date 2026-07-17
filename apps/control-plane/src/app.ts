@@ -120,9 +120,7 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
         )[0]
       : undefined;
     const afterId = earliest?.last_event_id ?? undefined;
-    const baseSequence = earliest
-      ? Number(earliest.last_sequence_number)
-      : 0;
+    const baseSequence = earliest ? Number(earliest.last_sequence_number) : 0;
 
     let query = this.startupDb
       .selectFrom('events')
@@ -150,13 +148,11 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
             updated_at: rebuiltAt,
           })
           .onConflict((conflict) =>
-            conflict
-              .columns(['projection_name', 'stream_key'])
-              .doUpdateSet({
-                last_event_id: lastEventId,
-                last_sequence_number: String(baseSequence + processedEvents),
-                updated_at: rebuiltAt,
-              }),
+            conflict.columns(['projection_name', 'stream_key']).doUpdateSet({
+              last_event_id: lastEventId,
+              last_sequence_number: String(baseSequence + processedEvents),
+              updated_at: rebuiltAt,
+            }),
           )
           .execute();
     });
@@ -297,9 +293,7 @@ export async function buildApp(
     const workerProtocol =
       deps.workerProtocolService ??
       new WorkerProtocolService(db!, artifactBlobStore!, {
-        leaseDurationMs: Number(
-          process.env.WORKER_LEASE_DURATION_MS ?? 60_000,
-        ),
+        leaseDurationMs: Number(process.env.WORKER_LEASE_DURATION_MS ?? 60_000),
         baseUrl:
           process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ??
           process.env.CONTROL_PLANE_PUBLIC_URL ??
@@ -341,16 +335,10 @@ export async function buildApp(
           () => stopProjectionCatchUp,
         )
           .then((batches) => {
-            app.log.info(
-              { batches },
-              'startup projection catch-up completed',
-            );
+            app.log.info({ batches }, 'startup projection catch-up completed');
           })
           .catch((error: unknown) => {
-            app.log.error(
-              { err: error },
-              'startup projection catch-up failed',
-            );
+            app.log.error({ err: error }, 'startup projection catch-up failed');
           });
     });
   }

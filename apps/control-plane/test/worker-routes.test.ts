@@ -41,6 +41,7 @@ function createService() {
         };
       },
     ),
+    assertActive: vi.fn(async () => undefined),
     submitResult: vi.fn(async () => ({
       protocolVersion: '1.0',
       accepted: true,

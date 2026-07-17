@@ -3,6 +3,10 @@ import { URL } from 'node:url';
 
 const server =
   process.env.FACTORY_FLOOR_CONTROL_PLANE_URL ?? 'http://127.0.0.1:3000';
+const adminToken = process.env.CONTROL_PLANE_ADMIN_TOKEN?.trim();
+if (!adminToken) {
+  throw new Error('CONTROL_PLANE_ADMIN_TOKEN is required');
+}
 const batchSize = Number(
   process.env.FACTORY_FLOOR_PROJECTION_BATCH_SIZE ?? 500,
 );
@@ -13,10 +17,13 @@ if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 10_000) {
 }
 
 const response = await globalThis.fetch(
-  new URL('/api/v1/inspect/projections/rebuild', server),
+  new URL('/api/v1/admin/projections/rebuild', server),
   {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${adminToken}`,
+    },
     body: JSON.stringify({ batchSize }),
     signal: globalThis.AbortSignal.timeout(30_000),
   },

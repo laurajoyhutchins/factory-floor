@@ -138,7 +138,13 @@ describe('attempt and delivery lease coherence', () => {
   });
 
   it('renews input deliveries atomically and recovery preserves the live lease', async () => {
-    await new CommandService(db).submit({
+    const commands = new CommandService(
+      db,
+      undefined,
+      undefined,
+      () => new Date(now),
+    );
+    await commands.submit({
       region: '/investigation',
       commandType: 'investigation.start',
       source: { kind: 'user', subject: 'lease-test' },
@@ -146,6 +152,11 @@ describe('attempt and delivery lease coherence', () => {
       correlationId: 'lease-coherence',
       idempotencyKey: 'lease-coherence',
     });
+    await db
+      .updateTable('deliveries')
+      .set({ available_at: now })
+      .where('correlation_id', '=', 'lease-coherence')
+      .execute();
     const workers = new WorkerProtocolService(
       db,
       undefined,
