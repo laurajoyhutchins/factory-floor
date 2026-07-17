@@ -13,7 +13,13 @@ import {
 } from '@factory-floor/artifact-store';
 import { encodeCapabilityGrantHandle } from '../capabilities/capability-handle.js';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
-import { SchedulerService } from '../scheduling/scheduler-service.js';
+import { ExecutionLeaseService } from '../scheduling/scheduler-service.js';
+import type {
+  ComponentSelector,
+  RegionFencingEpoch,
+  StagingRef,
+  WorkerId,
+} from '../terminology.js';
 import {
   ExecutionCommitError,
   ExecutionCommitService,
@@ -54,12 +60,12 @@ interface AttemptIdentity {
   executionId: string;
   attemptId: string;
   leaseToken: string;
-  lifecycleEpoch: number;
+  regionFencingEpoch: RegionFencingEpoch | number;
 }
 
 interface ClaimInput {
   workerId: string;
-  capabilities: string[];
+  componentSelectors: ComponentSelector[] | string[];
 }
 
 interface StageInput extends AttemptIdentity {
@@ -71,7 +77,7 @@ interface StageInput extends AttemptIdentity {
 }
 
 interface StagedArtifactInput {
-  stagingId: string;
+  stagingRef: StagingRef | string;
   portName: string;
   digest: string;
   sizeBytes: number;
@@ -95,8 +101,8 @@ interface ActiveAttemptRow {
   attempt_status: string;
   lease_token: string | null;
   lease_expires_at: Date | null;
-  execution_lifecycle_epoch: number;
-  region_lifecycle_epoch: number;
+  execution_region_fencing_epoch: number;
+  current_region_fencing_epoch: number;
   lifecycle_status: string;
   component_instance_id: string;
 }
@@ -110,13 +116,13 @@ export class WorkerProtocolService {
   ) {}
 
   async claim(input: ClaimInput) {
-    const scheduled = await new SchedulerService(
+    const scheduled = await new ExecutionLeaseService(
       this.db,
       this.clock,
-    ).pollForExecution({
-      owner: input.workerId,
+    ).leaseNextAttempt({
+      workerId: input.workerId as WorkerId,
       leaseDurationMs: this.options.leaseDurationMs,
-      capabilities: input.capabilities,
+      componentSelectors: input.componentSelectors,
     });
     if (!scheduled)
       return {
@@ -246,8 +252,8 @@ export class WorkerProtocolService {
         'a.status as attempt_status',
         'a.lease_token',
         'a.lease_expires_at',
-        'e.lifecycle_epoch as execution_lifecycle_epoch',
-        'r.lifecycle_epoch as region_lifecycle_epoch',
+        'e.lifecycle_epoch as execution_region_fencing_epoch',
+        'r.lifecycle_epoch as current_region_fencing_epoch',
         'r.lifecycle_status',
         'e.component_instance_id',
       ])
@@ -271,8 +277,8 @@ export class WorkerProtocolService {
         409,
       );
     if (
-      row.execution_lifecycle_epoch !== input.lifecycleEpoch ||
-      row.region_lifecycle_epoch !== input.lifecycleEpoch
+      row.execution_region_fencing_epoch !== input.regionFencingEpoch ||
+      row.current_region_fencing_epoch !== input.regionFencingEpoch
     )
       throw new WorkerProtocolError(
         'stale_lifecycle_epoch',
@@ -329,8 +335,8 @@ export class WorkerProtocolService {
         'a.status as attempt_status',
         'a.lease_token',
         'a.lease_expires_at',
-        'e.lifecycle_epoch as execution_lifecycle_epoch',
-        'r.lifecycle_epoch as region_lifecycle_epoch',
+        'e.lifecycle_epoch as execution_region_fencing_epoch',
+        'r.lifecycle_epoch as current_region_fencing_epoch',
         'r.lifecycle_status',
       ])
       .where('a.id', '=', input.attemptId)
@@ -345,14 +351,14 @@ export class WorkerProtocolService {
       row.lease_token !== input.leaseToken ||
       !row.lease_expires_at ||
       row.lease_expires_at <= this.clock() ||
-      row.execution_lifecycle_epoch !== input.lifecycleEpoch
+      row.execution_region_fencing_epoch !== input.regionFencingEpoch
     )
       return {
         protocolVersion: '1.0' as const,
         state: 'lease_no_longer_valid' as const,
       };
     if (
-      row.region_lifecycle_epoch !== input.lifecycleEpoch ||
+      row.current_region_fencing_epoch !== input.regionFencingEpoch ||
       row.lifecycle_status === 'cancelling' ||
       row.lifecycle_status === 'cancelled'
     )
@@ -402,7 +408,7 @@ export class WorkerProtocolService {
           staged_ref: stagedRef,
           execution_id: input.executionId,
           attempt_id: input.attemptId,
-          lifecycle_epoch: input.lifecycleEpoch,
+          lifecycle_epoch: input.regionFencingEpoch,
           port_name: input.portName,
           schema_id: port.schema_id,
           media_type: input.mediaType,
@@ -422,7 +428,7 @@ export class WorkerProtocolService {
           executionId: input.executionId,
           attemptId: input.attemptId,
           leaseToken: input.leaseToken,
-          lifecycleEpoch: input.lifecycleEpoch,
+          lifecycleEpoch: input.regionFencingEpoch,
         }),
         expiresAt: expiresAt.toISOString(),
       };
@@ -444,7 +450,7 @@ export class WorkerProtocolService {
       .where('staged_ref', '=', stagedRef)
       .where('execution_id', '=', input.executionId)
       .where('attempt_id', '=', input.attemptId)
-      .where('lifecycle_epoch', '=', input.lifecycleEpoch)
+      .where('lifecycle_epoch', '=', input.regionFencingEpoch)
       .executeTakeFirst();
     if (!authorization || authorization.expires_at <= this.clock())
       throw new WorkerProtocolError(
@@ -497,7 +503,7 @@ export class WorkerProtocolService {
         !current ||
         current.execution_id !== input.executionId ||
         current.attempt_id !== input.attemptId ||
-        current.lifecycle_epoch !== input.lifecycleEpoch ||
+        current.lifecycle_epoch !== input.regionFencingEpoch ||
         current.expires_at <= this.clock()
       )
         throw new WorkerProtocolError(
@@ -586,7 +592,7 @@ export class WorkerProtocolService {
           'schema.content_digest as schema_digest',
         ])
         .where('s.attempt_id', '=', attemptId)
-        .where('s.staged_ref', '=', artifact.stagingId)
+        .where('s.staged_ref', '=', artifact.stagingRef)
         .executeTakeFirst();
       if (
         !row ||
@@ -642,11 +648,29 @@ export class WorkerProtocolService {
       return { duplicate: false as const };
     });
     try {
+      const commitInput = {
+        ...input,
+        lifecycleEpoch: input.regionFencingEpoch,
+        stagedArtifacts: input.stagedArtifacts.map((artifact) => ({
+          ...artifact,
+          stagingId: artifact.stagingRef,
+        })),
+        proposedState: input.proposedState
+          ? {
+              ...input.proposedState,
+              stagingId: input.proposedState.stagingRef,
+            }
+          : undefined,
+      };
       await new ExecutionCommitService(
         this.db,
         this.blobStore,
         this.clock,
-      ).commit(input as Parameters<ExecutionCommitService['commit']>[0]);
+      ).commit(
+        commitInput as unknown as Parameters<
+          ExecutionCommitService['commit']
+        >[0],
+      );
     } catch (error) {
       if (error instanceof ExecutionCommitError)
         throw new WorkerProtocolError(

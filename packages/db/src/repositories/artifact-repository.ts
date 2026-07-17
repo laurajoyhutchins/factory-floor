@@ -1,4 +1,4 @@
-import type { RuntimeDb, Json } from '../database.js';
+import type { ArtifactStagingState, RuntimeDb, Json } from '../database.js';
 import { createUuidV7 } from '../ids.js';
 
 export class ArtifactRepository {
@@ -152,7 +152,7 @@ export class ArtifactRepository {
   }
   listReconciliationCandidates(
     db: RuntimeDb,
-    input: { status?: string; before?: Date; limit: number },
+    input: { status?: ArtifactStagingState; before?: Date; limit: number },
   ) {
     let query = db
       .selectFrom('artifact_staging')

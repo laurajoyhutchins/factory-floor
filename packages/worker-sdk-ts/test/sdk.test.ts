@@ -292,7 +292,7 @@ describe('WorkerProtocolClient', () => {
     registry.register('retrieve', '1', async () => {
       throw new Error('unused');
     });
-    expect(registry.capabilities()).toEqual(['retrieve@1']);
+    expect(registry.supportedComponentSelectors()).toEqual(['retrieve@1']);
     expect(new TextDecoder().decode(canonicalJson({ b: 1, a: 2 }))).toBe(
       '{"a":2,"b":1}',
     );

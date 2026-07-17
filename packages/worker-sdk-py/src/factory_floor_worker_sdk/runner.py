@@ -5,7 +5,10 @@ import signal
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
-from factory_floor_contracts.failure_descriptor_schema import Category, FailureDescriptor
+from factory_floor_contracts.failure_descriptor_schema import (
+    Category,
+    FailureDescriptor,
+)
 from factory_floor_contracts.invocation_envelope_schema import InvocationEnvelope
 from factory_floor_contracts.proposed_result_schema import (
     ProposedResult,
@@ -13,7 +16,9 @@ from factory_floor_contracts.proposed_result_schema import (
 )
 from factory_floor_contracts.resource_usage_schema import ResourceUsage
 from factory_floor_contracts.staged_artifact_schema import StagedArtifact
-from factory_floor_contracts.worker.capability_request_schema import WorkerCapabilityRequest
+from factory_floor_contracts.worker.capability_request_schema import (
+    WorkerCapabilityRequest,
+)
 from factory_floor_contracts.worker.claim_response_schema import WorkerClaimResponse2
 
 from .artifacts import stage_bytes, stage_json
@@ -143,8 +148,10 @@ class WorkerRunner:
             except NotImplementedError:
                 pass
 
-    async def run_forever(self, capabilities: list[str] | None = None) -> None:
-        selectors = sorted(capabilities if capabilities is not None else self.components)
+    async def run_forever(self, component_selectors: list[str] | None = None) -> None:
+        selectors = sorted(
+            component_selectors if component_selectors is not None else self.components
+        )
         while not self._stop.is_set():
             await self._reap_completed()
             if len(self._active) >= self.concurrency:

@@ -22,7 +22,7 @@ export interface WorkerAuthorization {
     string,
     {
       token: string;
-      capabilities: string[];
+      componentSelectors: string[];
     }
   >;
 }
@@ -49,20 +49,17 @@ export function workerAuthorizationFromEnv(
         Array.isArray(value)
       )
         throw new Error('worker authorization entries are invalid');
-      const entry = value as { token?: unknown; capabilities?: unknown };
-      if (
-        typeof entry.token !== 'string' ||
-        !entry.token.trim() ||
-        !Array.isArray(entry.capabilities) ||
-        !entry.capabilities.every(
-          (capability) => typeof capability === 'string' && capability.trim(),
-        )
-      )
+      const entry = value as {
+        token?: unknown;
+        componentSelectors?: unknown;
+        capabilities?: unknown;
+      };
+      const componentSelectors = parseSelectorKeys(entry);
+      if (typeof entry.token !== 'string' || !entry.token.trim())
         throw new Error('worker authorization entries are invalid');
-      const capabilities = entry.capabilities as string[];
       workers[workerId] = {
         token: entry.token,
-        capabilities: [...new Set(capabilities)],
+        componentSelectors,
       };
     }
     if (Object.keys(workers).length === 0)
@@ -72,18 +69,81 @@ export function workerAuthorizationFromEnv(
 
   const configuredWorkerId = env.FACTORY_FLOOR_WORKER_ID?.trim();
   const token = env.WORKER_API_BEARER_TOKEN?.trim();
-  const capabilities = env.FACTORY_FLOOR_WORKER_CAPABILITIES?.split(',')
-    .map((capability) => capability.trim())
-    .filter(Boolean);
-  if (!configuredWorkerId || !token || !capabilities?.length)
+  const selectorSource =
+    env.FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS ??
+    env.FACTORY_FLOOR_WORKER_CAPABILITIES;
+  const componentSelectors = normalizeSelectors(
+    selectorSource?.split(',') ?? [],
+  );
+  if (!configuredWorkerId || !token || !componentSelectors.length)
     throw new Error(
-      'configure WORKER_AUTHORIZATION_JSON or FACTORY_FLOOR_WORKER_ID, WORKER_API_BEARER_TOKEN, and FACTORY_FLOOR_WORKER_CAPABILITIES',
+      'configure WORKER_AUTHORIZATION_JSON or FACTORY_FLOOR_WORKER_ID, WORKER_API_BEARER_TOKEN, and FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS (or deprecated FACTORY_FLOOR_WORKER_CAPABILITIES)',
     );
   return {
     workers: {
-      [configuredWorkerId]: { token, capabilities },
+      [configuredWorkerId]: { token, componentSelectors },
     },
   };
+}
+
+function normalizeSelectors(values: readonly unknown[]): string[] {
+  if (
+    !values.every(
+      (componentSelector) =>
+        typeof componentSelector === 'string' && componentSelector.trim(),
+    )
+  )
+    throw new Error('worker authorization entries are invalid');
+  return [
+    ...new Set(values.map((value) => String(value).trim()).filter(Boolean)),
+  ];
+}
+
+function sameSelectors(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function parseSelectorKeys(
+  entry: {
+    componentSelectors?: unknown;
+    capabilities?: unknown;
+  },
+  options: { allowEmpty?: boolean } = {},
+): string[] {
+  const canonical = entry.componentSelectors;
+  const legacy = entry.capabilities;
+  const canonicalSelectors =
+    canonical === undefined
+      ? undefined
+      : normalizeSelectors(Array.isArray(canonical) ? canonical : [undefined]);
+  const legacySelectors =
+    legacy === undefined
+      ? undefined
+      : normalizeSelectors(Array.isArray(legacy) ? legacy : [undefined]);
+  if (
+    canonicalSelectors &&
+    legacySelectors &&
+    !sameSelectors(canonicalSelectors, legacySelectors)
+  )
+    throw new Error(
+      'worker authorization entry has conflicting componentSelectors and capabilities',
+    );
+  const selectors = canonicalSelectors ?? legacySelectors;
+  if (!selectors || (!options.allowEmpty && selectors.length === 0))
+    throw new Error('worker authorization entries are invalid');
+  return selectors;
+}
+
+function workerClaimInput(input: {
+  workerId: string;
+  capabilities?: string[];
+  componentSelectors?: string[];
+}) {
+  const componentSelectors = parseSelectorKeys(input, { allowEmpty: true });
+  return { workerId: input.workerId, componentSelectors };
 }
 
 function protocolSchemas(): Record<string, unknown>[] {
@@ -267,10 +327,11 @@ export async function registerWorkerRoutes(
                 false,
                 403,
               );
-            const delegated = new Set(allowed.capabilities);
+            const claimInput = workerClaimInput(input);
+            const delegated = new Set(allowed.componentSelectors);
             if (
-              input.capabilities.some(
-                (capability) => !delegated.has(capability),
+              claimInput.componentSelectors.some(
+                (componentSelector) => !delegated.has(componentSelector),
               )
             )
               throw new WorkerProtocolError(
@@ -280,7 +341,7 @@ export async function registerWorkerRoutes(
                 403,
               );
           }
-          return service.claim(input);
+          return service.claim(workerClaimInput(input));
         },
       );
       workerApp.post(

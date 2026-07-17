@@ -11,13 +11,14 @@ describe('worker authorization', () => {
       workerAuthorizationFromEnv({
         FACTORY_FLOOR_WORKER_ID: 'worker-a',
         WORKER_API_BEARER_TOKEN: 'worker-a-secret',
-        FACTORY_FLOOR_WORKER_CAPABILITIES: 'retrieve@1,verify@1',
+        FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS:
+          ' retrieve@1, verify@1,retrieve@1 ',
       }),
     ).toEqual({
       workers: {
         'worker-a': {
           token: 'worker-a-secret',
-          capabilities: ['retrieve@1', 'verify@1'],
+          componentSelectors: ['retrieve@1', 'verify@1'],
         },
       },
     });
@@ -34,7 +35,7 @@ describe('worker authorization', () => {
       workers: {
         'worker-a': {
           token: 'worker-a-secret',
-          capabilities: ['retrieve@1'],
+          componentSelectors: ['retrieve@1'],
         },
       },
     });
@@ -46,7 +47,7 @@ describe('worker authorization', () => {
       payload: {
         protocolVersion: '1.0',
         workerId: 'worker-b',
-        capabilities: ['retrieve@1'],
+        componentSelectors: ['retrieve@1'],
       },
     });
     expect(wrongIdentity.statusCode).toBe(403);
@@ -58,7 +59,7 @@ describe('worker authorization', () => {
       payload: {
         protocolVersion: '1.0',
         workerId: 'worker-a',
-        capabilities: ['verify@1'],
+        componentSelectors: ['verify@1'],
       },
     });
     expect(undelegated.statusCode).toBe(403);
@@ -70,16 +71,75 @@ describe('worker authorization', () => {
       payload: {
         protocolVersion: '1.0',
         workerId: 'worker-a',
-        capabilities: ['retrieve@1'],
+        componentSelectors: ['retrieve@1'],
       },
     });
     expect(allowed.statusCode).toBe(200);
     expect(claim).toHaveBeenCalledWith({
-      protocolVersion: '1.0',
       workerId: 'worker-a',
-      capabilities: ['retrieve@1'],
+      componentSelectors: ['retrieve@1'],
     });
 
     await app.close();
+  });
+
+  it('accepts deprecated selector environment and canonical authorization JSON', () => {
+    expect(
+      workerAuthorizationFromEnv({
+        FACTORY_FLOOR_WORKER_ID: 'worker-a',
+        WORKER_API_BEARER_TOKEN: 'worker-a-secret',
+        FACTORY_FLOOR_WORKER_CAPABILITIES: 'retrieve@1, retrieve@1, verify@1',
+      }),
+    ).toEqual({
+      workers: {
+        'worker-a': {
+          token: 'worker-a-secret',
+          componentSelectors: ['retrieve@1', 'verify@1'],
+        },
+      },
+    });
+
+    expect(
+      workerAuthorizationFromEnv({
+        WORKER_AUTHORIZATION_JSON: JSON.stringify({
+          'worker-a': {
+            token: 'worker-a-secret',
+            componentSelectors: [' retrieve@1 ', 'retrieve@1', 'verify@1'],
+          },
+        }),
+      }),
+    ).toEqual({
+      workers: {
+        'worker-a': {
+          token: 'worker-a-secret',
+          componentSelectors: ['retrieve@1', 'verify@1'],
+        },
+      },
+    });
+  });
+
+  it('accepts legacy authorization JSON but rejects conflicting selector keys', () => {
+    expect(
+      workerAuthorizationFromEnv({
+        WORKER_AUTHORIZATION_JSON: JSON.stringify({
+          'worker-a': {
+            token: 'worker-a-secret',
+            capabilities: ['retrieve@1'],
+          },
+        }),
+      }).workers['worker-a']?.componentSelectors,
+    ).toEqual(['retrieve@1']);
+
+    expect(() =>
+      workerAuthorizationFromEnv({
+        WORKER_AUTHORIZATION_JSON: JSON.stringify({
+          'worker-a': {
+            token: 'worker-a-secret',
+            componentSelectors: ['retrieve@1'],
+            capabilities: ['verify@1'],
+          },
+        }),
+      }),
+    ).toThrow(/conflicting componentSelectors and capabilities/);
   });
 });

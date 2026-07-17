@@ -143,7 +143,7 @@ export class WorkerProtocolClient {
   }
 
   async claim(
-    capabilities: string[],
+    componentSelectors: string[],
     options: {
       signal?: AbortSignal;
       traceContext?: Record<string, string>;
@@ -153,7 +153,7 @@ export class WorkerProtocolClient {
     const body: WorkerClaimRequest = {
       protocolVersion: WORKER_PROTOCOL_VERSION,
       workerId: this.workerId,
-      capabilities,
+      componentSelectors,
     };
     const response = await this.withRetry(
       () =>
@@ -623,8 +623,13 @@ export class ComponentRegistry {
     return this.components.get(`${name}@${version}`);
   }
 
-  capabilities(): string[] {
+  supportedComponentSelectors(): string[] {
     return [...this.components.keys()].sort();
+  }
+
+  /** @deprecated Use supportedComponentSelectors(). */
+  capabilities(): string[] {
+    return this.supportedComponentSelectors();
   }
 }
 
@@ -661,7 +666,9 @@ export class WorkerRunner {
     while (!this.stopping && !signal?.aborted) {
       while (active.size < this.options.concurrency) {
         const claim = await this.options.client
-          .claim(this.options.registry.capabilities(), { signal })
+          .claim(this.options.registry.supportedComponentSelectors(), {
+            signal,
+          })
           .catch((error) => {
             this.options.logger('claim_failed', {
               error: redactSensitive(String(error)),

@@ -5,13 +5,47 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "protocolVersion": { "const": "1.0" },
-    "workerId": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "capabilities": {
+    "protocolVersion": {
+      "const": "1.0"
+    },
+    "workerId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "componentSelectors": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "maxItems": 64
+    },
+    "capabilities": {
+      "description": "Deprecated v1 compatibility name for componentSelectors.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
       "maxItems": 64
     }
   },
-  "required": ["protocolVersion", "workerId", "capabilities"]
+  "required": ["protocolVersion", "workerId"],
+  "anyOf": [
+    {
+      "properties": {
+        "componentSelectors": {}
+      },
+      "required": ["componentSelectors"]
+    },
+    {
+      "properties": {
+        "capabilities": {}
+      },
+      "required": ["capabilities"]
+    }
+  ]
 }

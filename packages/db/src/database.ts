@@ -15,6 +15,53 @@ type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
 type Jsonb = ColumnType<Json, Json, Json>;
 type BigIntString = ColumnType<string, string, string>;
 
+export type RegionLifecycleState =
+  | 'declared'
+  | 'starting'
+  | 'ready'
+  | 'running'
+  | 'completing'
+  | 'completed'
+  | 'blocked'
+  | 'suspended'
+  | 'cancelling'
+  | 'cancelled'
+  | 'failed';
+export type ComponentInstanceLifecycleState =
+  'declared' | 'ready' | 'running' | 'blocked' | 'completed' | 'failed';
+export type CommandState =
+  'accepted' | 'rejected' | 'completed' | 'cancelled' | 'expired';
+export type DeliveryState =
+  'ready' | 'leased' | 'completed' | 'failed' | 'dead_lettered' | 'cancelled';
+export type ExecutionState =
+  'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type ExecutionAttemptState =
+  | 'pending'
+  | 'leased'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'abandoned';
+export type ArtifactState = 'staged' | 'committed' | 'tombstoned';
+export type ArtifactStagingState = 'staged' | 'promoted' | 'abandoned';
+export type CapabilityGrantState = 'active' | 'revoked';
+export type ApprovalState = 'requested' | 'approved' | 'denied' | 'cancelled';
+export type ExternalActionState =
+  | 'proposed'
+  | 'policy_checked'
+  | 'awaiting_approval'
+  | 'authorized'
+  | 'dispatching'
+  | 'acknowledged'
+  | 'reconciled'
+  | 'denied'
+  | 'failed'
+  | 'cancelled'
+  | 'indeterminate';
+export type ExternalActionAttemptState =
+  'pending' | 'dispatching' | 'acknowledged' | 'failed' | 'indeterminate';
+
 type Row = { id: string; created_at: Generated<Timestamp> };
 type Versioned = Row & {
   name: string;
@@ -38,7 +85,7 @@ export interface Database {
   regions: Row & {
     parent_region_id: string | null;
     name: string;
-    lifecycle_status: Generated<string>;
+    lifecycle_status: Generated<RegionLifecycleState>;
     lifecycle_epoch: Generated<number>;
     active_topology_revision_id: string | null;
   };
@@ -55,7 +102,7 @@ export interface Database {
     component_definition_id: string;
     name: string;
     configuration: Jsonb;
-    lifecycle_status: Generated<string>;
+    lifecycle_status: Generated<ComponentInstanceLifecycleState>;
   };
   connections: Row & {
     topology_revision_id: string;
@@ -68,7 +115,7 @@ export interface Database {
     region_id: string;
     command_type: string;
     payload: Jsonb;
-    status: Generated<string>;
+    status: Generated<CommandState>;
     source: Jsonb;
     request_digest: string;
     rejection: Jsonb | null;
@@ -107,7 +154,7 @@ export interface Database {
     correlation_id: string;
     input_payload: Jsonb;
     input_payload_digest: string;
-    status: Generated<string>;
+    status: Generated<DeliveryState>;
     available_at: Generated<Timestamp>;
     lease_owner: string | null;
     lease_token: string | null;
@@ -121,7 +168,7 @@ export interface Database {
     topology_revision_id: string;
     lifecycle_epoch: Generated<number>;
     input_set_digest: string;
-    status: Generated<string>;
+    status: Generated<ExecutionState>;
     completed_at: Timestamp | null;
     failed_at: Timestamp | null;
     failure: Jsonb | null;
@@ -129,7 +176,7 @@ export interface Database {
   execution_attempts: Row & {
     execution_id: string;
     attempt_number: number;
-    status: string;
+    status: ExecutionAttemptState;
     lease_owner: string | null;
     lease_token: string | null;
     lease_expires_at: Timestamp | null;
@@ -156,7 +203,7 @@ export interface Database {
     digest: string;
     size_bytes: BigIntString;
     schema_id: string;
-    state: string;
+    state: ArtifactState;
     media_type: string;
     committed_locator: string | null;
     provenance: Jsonb;
@@ -178,7 +225,7 @@ export interface Database {
     schema_id: string;
     media_type: string;
     locator: string;
-    status: string;
+    status: ArtifactStagingState;
     metadata: Jsonb;
     artifact_id: string | null;
     promoted_at: Timestamp | null;
@@ -191,7 +238,7 @@ export interface Database {
   capability_grants: Row & {
     capability_id: string;
     grantee_component_definition_id: string;
-    status: string;
+    status: CapabilityGrantState;
     granted_at: Timestamp;
     revoked_at: Timestamp | null;
   };
@@ -210,7 +257,7 @@ export interface Database {
   };
   approvals: Row & {
     policy_decision_id: string;
-    status: string;
+    status: ApprovalState;
     requested_at: Timestamp;
     decided_at: Timestamp | null;
     decided_by: string | null;
@@ -228,13 +275,13 @@ export interface Database {
     approval_id: string | null;
     action_type: string;
     risk: string;
-    status: string;
+    status: ExternalActionState;
     idempotency_key: string;
   };
   external_action_attempts: Row & {
     external_action_id: string;
     attempt_number: number;
-    status: string;
+    status: ExternalActionAttemptState;
     requested_at: Timestamp;
     completed_at: Timestamp | null;
     response: Jsonb | null;
