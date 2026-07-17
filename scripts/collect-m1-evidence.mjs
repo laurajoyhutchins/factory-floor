@@ -14,6 +14,11 @@ const startedAt =
   process.env.FACTORY_FLOOR_ACCEPTANCE_STARTED_AT ?? new Date().toISOString();
 const port = Number(process.env.FACTORY_FLOOR_EVIDENCE_PORT ?? 3115);
 const baseUrl = `http://127.0.0.1:${port}`;
+const operatorToken = process.env.CONTROL_PLANE_OPERATOR_TOKEN?.trim();
+if (!operatorToken) {
+  throw new Error('CONTROL_PLANE_OPERATOR_TOKEN is required');
+}
+const inspectionHeaders = { authorization: `Bearer ${operatorToken}` };
 const useProcessGroups = process.platform !== 'win32';
 let controlPlane;
 
@@ -93,7 +98,9 @@ async function query(sql, params = []) {
 }
 
 async function inspect(path) {
-  const response = await globalThis.fetch(`${baseUrl}${path}`);
+  const response = await globalThis.fetch(`${baseUrl}${path}`, {
+    headers: inspectionHeaders,
+  });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok)
     throw new Error(
@@ -109,7 +116,9 @@ async function inspectAll(path) {
     const url = new URL(path, baseUrl);
     url.searchParams.set('limit', '100');
     if (cursor) url.searchParams.set('cursor', cursor);
-    const response = await globalThis.fetch(url);
+    const response = await globalThis.fetch(url, {
+      headers: inspectionHeaders,
+    });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok)
       throw new Error(
