@@ -148,10 +148,20 @@ class WorkerRunner:
             except NotImplementedError:
                 pass
 
-    async def run_forever(self, component_selectors: list[str] | None = None) -> None:
-        selectors = sorted(
-            component_selectors if component_selectors is not None else self.components
-        )
+    async def run_forever(
+        self,
+        component_selectors: list[str] | None = None,
+        *,
+        capabilities: list[str] | None = None,
+    ) -> None:
+        if (
+            component_selectors is not None
+            and capabilities is not None
+            and set(component_selectors) != set(capabilities)
+        ):
+            raise ValueError("component_selectors conflicts with capabilities")
+        selected = component_selectors if component_selectors is not None else capabilities
+        selectors = sorted(selected if selected is not None else self.components)
         while not self._stop.is_set():
             await self._reap_completed()
             if len(self._active) >= self.concurrency:
