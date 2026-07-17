@@ -6,7 +6,7 @@ import {
 } from '../src/security.js';
 
 describe('control-plane HTTP security', () => {
-  it('keeps health public and separates operator reads from admin writes', async () => {
+  it('keeps health public and separates operator scope from admin writes', async () => {
     const app = Fastify();
     registerControlPlaneSecurity(app, {
       operatorToken: 'operator-secret',
@@ -14,6 +14,7 @@ describe('control-plane HTTP security', () => {
     });
     app.get('/health', async () => ({ status: 'ok' }));
     app.get('/api/v1/inspect/events', async () => ({ items: [] }));
+    app.post('/api/v1/operator/tasks', async () => ({ accepted: true }));
     app.post('/api/v1/commands', async () => ({ accepted: true }));
 
     await expect(
@@ -28,6 +29,13 @@ describe('control-plane HTTP security', () => {
       app.inject({
         method: 'GET',
         url: '/api/v1/inspect/events',
+        headers: { authorization: 'Bearer operator-secret' },
+      }),
+    ).resolves.toMatchObject({ statusCode: 200 });
+    await expect(
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/operator/tasks',
         headers: { authorization: 'Bearer operator-secret' },
       }),
     ).resolves.toMatchObject({ statusCode: 200 });
