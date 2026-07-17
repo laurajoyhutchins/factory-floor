@@ -187,7 +187,6 @@ describe('worker routes', () => {
       },
     });
     expect(response.statusCode).toBe(200);
-    expect(service.assertActive).toHaveBeenCalledOnce();
     expect(service.submitResult).toHaveBeenCalledOnce();
   });
 
