@@ -16,14 +16,22 @@ from factory_floor_contracts.proposed_result_schema import ProposedResult
 from factory_floor_contracts.worker.cancellation_response_schema import (
     WorkerCancellationResponse,
 )
-from factory_floor_contracts.worker.capability_request_schema import WorkerCapabilityRequest
+from factory_floor_contracts.worker.capability_request_schema import (
+    WorkerCapabilityRequest,
+)
 from factory_floor_contracts.worker.capability_response_schema import (
     WorkerCapabilityResponse,
 )
-from factory_floor_contracts.worker.claim_request_schema import Capability, WorkerClaimRequest
+from factory_floor_contracts.worker.claim_request_schema import (
+    ComponentSelector,
+    WorkerClaimRequest,
+    WorkerClaimRequest1,
+)
 from factory_floor_contracts.worker.claim_response_schema import WorkerClaimResponse
 from factory_floor_contracts.worker.error_schema import WorkerError
-from factory_floor_contracts.worker.heartbeat_response_schema import WorkerHeartbeatResponse
+from factory_floor_contracts.worker.heartbeat_response_schema import (
+    WorkerHeartbeatResponse,
+)
 from factory_floor_contracts.worker.heartbeat_schema import WorkerHeartbeat
 from factory_floor_contracts.worker.stage_request_schema import WorkerStageRequest
 from factory_floor_contracts.worker.stage_response_schema import WorkerStageResponse
@@ -132,9 +140,7 @@ class WorkerClient:
         last: Exception | None = None
         for index, base_delay in enumerate(delays):
             if index:
-                await self._sleep(
-                    min(1.0, base_delay + self._rand() * base_delay)
-                )
+                await self._sleep(min(1.0, base_delay + self._rand() * base_delay))
             try:
                 data = (
                     body.model_dump(mode="json", by_alias=True, exclude_none=True)
@@ -184,11 +190,29 @@ class WorkerClient:
         assert last is not None
         raise last
 
-    async def claim(self, capabilities: list[str]) -> WorkerClaimResponse:
+    async def claim(
+        self,
+        component_selectors: list[str] | None = None,
+        *,
+        capabilities: list[str] | None = None,
+    ) -> WorkerClaimResponse:
+        if (
+            component_selectors is not None
+            and capabilities is not None
+            and set(component_selectors) != set(capabilities)
+        ):
+            raise ValueError("component_selectors conflicts with capabilities")
+        selectors = component_selectors if component_selectors is not None else capabilities
+        if selectors is None:
+            raise ValueError("component_selectors is required")
         request = WorkerClaimRequest(
-            protocolVersion=PROTOCOL_VERSION,
-            workerId=self.config.worker_id,
-            capabilities=[Capability(capability) for capability in capabilities],
+            WorkerClaimRequest1(
+                protocolVersion=PROTOCOL_VERSION,
+                workerId=self.config.worker_id,
+                componentSelectors=[
+                    ComponentSelector(selector) for selector in selectors
+                ],
+            )
         )
         return await self._json(
             "POST",

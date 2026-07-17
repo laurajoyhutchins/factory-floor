@@ -65,7 +65,7 @@ async function run(name: string, payload: unknown) {
 
 describe('deterministic demo components', () => {
   it('registers retrieve compare and synthesize', () => {
-    expect(createDemoRegistry().capabilities()).toEqual([
+    expect(createDemoRegistry().supportedComponentSelectors()).toEqual([
       'compare@1',
       'retrieve@1',
       'synthesize@1',

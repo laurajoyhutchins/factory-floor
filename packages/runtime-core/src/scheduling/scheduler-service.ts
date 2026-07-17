@@ -3,45 +3,64 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import { createUuidV7, type Database } from '@factory-floor/db';
 import { inputSetDigest, type InputIdentity } from '../commands/identity.js';
 import { generateLeaseToken, validateLeaseDuration } from './lease.js';
+import type {
+  ComponentSelector,
+  LeaseToken,
+  WorkerId,
+} from '../terminology.js';
 
 const CANDIDATE_GROUP_LIMIT = 50;
 const INCOMPLETE_GROUP_RECHECK_MS = 250;
 
+export interface LeaseNextAttemptOptions {
+  workerId: WorkerId | string;
+  leaseDurationMs: number;
+  componentSelectors?: readonly (ComponentSelector | string)[];
+}
+/** @deprecated Use LeaseNextAttemptOptions. */
 export interface PollForExecutionOptions {
   owner: string;
   leaseDurationMs: number;
   capabilities?: readonly string[];
 }
-export interface ScheduledAttempt {
+export interface LeasedExecutionAttempt {
   executionId: string;
   attemptId: string;
   attemptNumber: number;
-  leaseToken: string;
+  leaseToken: LeaseToken | string;
   leaseExpiresAt: string;
   inputs: { portName: string; deliveryId: string; payload: unknown }[];
 }
 
-export class SchedulerService {
+/** @deprecated Use ExecutionLeaseService. */
+export type ScheduledAttempt = LeasedExecutionAttempt;
+
+export class ExecutionLeaseService {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly clock = () => new Date(),
   ) {}
 
-  async pollForExecution(
-    options: PollForExecutionOptions,
-  ): Promise<ScheduledAttempt | null> {
+  async leaseNextAttempt(
+    options: LeaseNextAttemptOptions,
+  ): Promise<LeasedExecutionAttempt | null> {
     validateLeaseDuration(options.leaseDurationMs);
-    if (options.capabilities !== undefined && options.capabilities.length === 0)
+    if (
+      options.componentSelectors !== undefined &&
+      options.componentSelectors.length === 0
+    )
       return null;
     const now = this.clock();
     const requestedLeaseExpiresAt = new Date(
       now.getTime() + options.leaseDurationMs,
     );
-    const capabilityPredicate =
-      options.capabilities === undefined
+    const componentSelectorPredicate =
+      options.componentSelectors === undefined
         ? sql<boolean>`true`
         : sql<boolean>`concat(cd.name, '@', cd.version) in (${sql.join(
-            options.capabilities.map((capability) => sql`${capability}`),
+            options.componentSelectors.map(
+              (componentSelector) => sql`${componentSelector}`,
+            ),
           )})`;
 
     return this.db.transaction().execute(async (trx) => {
@@ -63,7 +82,7 @@ export class SchedulerService {
           join component_definitions cd on cd.id = ci.component_definition_id
           where d.status = 'ready'
             and d.available_at <= ${now}
-            and ${capabilityPredicate}
+            and ${componentSelectorPredicate}
         ) candidate
         where candidate.group_rank = 1
         order by candidate.available_at, candidate.created_at, candidate.id
@@ -89,10 +108,10 @@ export class SchedulerService {
   private async tryCandidate(
     trx: Transaction<Database>,
     candidate: any,
-    options: PollForExecutionOptions,
+    options: LeaseNextAttemptOptions,
     now: Date,
     requestedLeaseExpiresAt: Date,
-  ): Promise<ScheduledAttempt | null> {
+  ): Promise<LeasedExecutionAttempt | null> {
     const groupKey = [
       candidate.region_id,
       candidate.topology_revision_id,
@@ -334,7 +353,7 @@ export class SchedulerService {
           execution_id: execution.id,
           attempt_number: 1,
           status: 'leased',
-          lease_owner: options.owner,
+          lease_owner: String(options.workerId),
           lease_token: generateLeaseToken(),
           lease_expires_at: requestedLeaseExpiresAt,
           started_at: now,
@@ -346,7 +365,7 @@ export class SchedulerService {
         .updateTable('execution_attempts')
         .set({
           status: 'leased',
-          lease_owner: options.owner,
+          lease_owner: String(options.workerId),
           lease_token: generateLeaseToken(),
           lease_expires_at: requestedLeaseExpiresAt,
           started_at: now,
@@ -359,7 +378,7 @@ export class SchedulerService {
       .updateTable('deliveries')
       .set({
         status: 'leased',
-        lease_owner: options.owner,
+        lease_owner: String(options.workerId),
         lease_token: attempt.lease_token,
         lease_expires_at: attempt.lease_expires_at,
         attempts_count: sql`attempts_count + 1` as any,
@@ -392,5 +411,19 @@ export class SchedulerService {
       .where('status', 'in', ['leased', 'running'])
       .where('lease_expires_at', '<', now)
       .execute();
+  }
+}
+
+/** @deprecated Use ExecutionLeaseService. */
+export class SchedulerService extends ExecutionLeaseService {
+  /** @deprecated Use leaseNextAttempt({ workerId, componentSelectors }). */
+  pollForExecution(
+    options: PollForExecutionOptions,
+  ): Promise<LeasedExecutionAttempt | null> {
+    return this.leaseNextAttempt({
+      workerId: options.owner,
+      leaseDurationMs: options.leaseDurationMs,
+      componentSelectors: options.capabilities,
+    });
   }
 }

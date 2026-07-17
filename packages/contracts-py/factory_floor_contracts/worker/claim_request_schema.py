@@ -8,14 +8,43 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel, constr
 
 
+class ComponentSelector(RootModel[constr(min_length=1, max_length=128)]):
+    root: constr(min_length=1, max_length=128)
+
+
 class Capability(RootModel[constr(min_length=1, max_length=128)]):
     root: constr(min_length=1, max_length=128)
 
 
-class WorkerClaimRequest(BaseModel):
+class WorkerClaimRequest1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     protocolVersion: Literal['1.0']
     workerId: constr(min_length=1, max_length=128)
-    capabilities: list[Capability] = Field(..., max_length=64)
+    componentSelectors: list[ComponentSelector] = Field(..., max_length=64)
+    capabilities: list[Capability] | None = Field(
+        None,
+        description='Deprecated v1 compatibility name for componentSelectors.',
+        max_length=64,
+    )
+
+
+class WorkerClaimRequest2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    protocolVersion: Literal['1.0']
+    workerId: constr(min_length=1, max_length=128)
+    componentSelectors: list[ComponentSelector] | None = Field(None, max_length=64)
+    capabilities: list[Capability] = Field(
+        ...,
+        description='Deprecated v1 compatibility name for componentSelectors.',
+        max_length=64,
+    )
+
+
+class WorkerClaimRequest(RootModel[WorkerClaimRequest1 | WorkerClaimRequest2]):
+    root: WorkerClaimRequest1 | WorkerClaimRequest2 = Field(
+        ..., title='WorkerClaimRequest'
+    )

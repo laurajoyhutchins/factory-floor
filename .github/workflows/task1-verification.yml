@@ -15,7 +15,7 @@ env:
   WORKER_API_BEARER_TOKEN: factory_floor_ci_worker_token
   FACTORY_FLOOR_WORKER_TOKEN: factory_floor_ci_worker_token
   FACTORY_FLOOR_WORKER_ID: demo-worker
-  FACTORY_FLOOR_WORKER_CAPABILITIES: retrieve@1,compare@1,synthesize@1,verify@1
+  FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS: retrieve@1,compare@1,synthesize@1,verify@1
   WORKER_AUTHORIZATION_JSON: '{"demo-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1","verify@1"]},"demo-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"demo-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]},"acceptance-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"acceptance-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]}}'
   VITE_FACTORY_FLOOR_OPERATOR_TOKEN: factory_floor_ci_operator_token
 
