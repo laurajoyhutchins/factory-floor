@@ -1,7 +1,11 @@
 import { normalize } from './adapters.js';
 
 export type ApiFailureKind =
-  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
+  | 'transport'
+  | 'http'
+  | 'malformed-response'
+  | 'not-found'
+  | 'aborted';
 
 export class ApiError extends Error {
   constructor(
@@ -34,6 +38,15 @@ const paths = {
   stream: '/api/v1/inspect/stream',
 } as const;
 
+const operatorToken = import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim();
+
+export function inspectionHeaders(accept: string): Record<string, string> {
+  return {
+    accept,
+    ...(operatorToken ? { authorization: `Bearer ${operatorToken}` } : {}),
+  };
+}
+
 function isRecord(value: unknown): value is InspectionRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -62,7 +75,7 @@ async function getJson(path: string, signal?: AbortSignal): Promise<unknown> {
     response = await fetch(path, {
       method: 'GET',
       signal,
-      headers: { accept: 'application/json' },
+      headers: inspectionHeaders('application/json'),
     });
   } catch (error) {
     if ((error as Error).name === 'AbortError')

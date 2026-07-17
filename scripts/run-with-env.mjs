@@ -15,12 +15,20 @@ if (!command) {
   process.exit(2);
 }
 
+const authPreload = new URL(
+  './fetch-control-plane-auth.mjs',
+  import.meta.url,
+).href;
+const inheritedNodeOptions = process.env.NODE_OPTIONS ?? '';
+const nodeOptions = inheritedNodeOptions.includes(authPreload)
+  ? inheritedNodeOptions
+  : [inheritedNodeOptions, `--import=${authPreload}`].filter(Boolean).join(' ');
 const useProcessGroup = process.platform !== 'win32';
 const child = spawn(command, args, {
   stdio: 'inherit',
   shell: false,
   detached: useProcessGroup,
-  env: process.env,
+  env: { ...process.env, NODE_OPTIONS: nodeOptions },
 });
 let forceTimer;
 

@@ -9,6 +9,16 @@ on:
 permissions:
   contents: read
 
+env:
+  CONTROL_PLANE_OPERATOR_TOKEN: factory_floor_ci_operator_token
+  CONTROL_PLANE_ADMIN_TOKEN: factory_floor_ci_admin_token
+  WORKER_API_BEARER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_TOKEN: factory_floor_ci_worker_token
+  FACTORY_FLOOR_WORKER_ID: demo-worker
+  FACTORY_FLOOR_WORKER_CAPABILITIES: retrieve@1,compare@1,synthesize@1,verify@1
+  WORKER_AUTHORIZATION_JSON: '{"demo-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1","verify@1"]},"demo-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"demo-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]},"acceptance-ts-worker":{"token":"factory_floor_ci_worker_token","capabilities":["retrieve@1","compare@1","synthesize@1"]},"acceptance-py-worker":{"token":"factory_floor_ci_worker_token","capabilities":["verify@1"]}}'
+  VITE_FACTORY_FLOOR_OPERATOR_TOKEN: factory_floor_ci_operator_token
+
 concurrency:
   group: repository-verification-${{ github.ref }}
   cancel-in-progress: true
@@ -97,7 +107,27 @@ jobs:
         run: pnpm test:python
 
       - name: Check formatting
-        run: pnpm format:check
+        run: |
+          set -o pipefail
+          if pnpm format:check 2>&1 | tee format.log; then
+            exit 0
+          fi
+          pnpm format
+          git diff --name-only --diff-filter=ACMRT > formatted-files.txt
+          tar -czf formatted-files.tar.gz -T formatted-files.txt
+          exit 1
+
+      - name: Upload formatting diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: format-log-${{ github.run_number }}
+          path: |
+            format.log
+            formatted-files.txt
+            formatted-files.tar.gz
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Validate Compose configuration
         run: docker compose config
