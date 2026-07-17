@@ -214,6 +214,9 @@ export interface Database {
     requested_at: Timestamp;
     decided_at: Timestamp | null;
     decided_by: string | null;
+    decision_reason: string | null;
+    decision_client_request_id: string | null;
+    decision_request_digest: string | null;
   };
   external_actions: Row & {
     execution_id: string;
