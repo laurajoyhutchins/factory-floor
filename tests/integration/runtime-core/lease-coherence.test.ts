@@ -152,6 +152,11 @@ describe('attempt and delivery lease coherence', () => {
       correlationId: 'lease-coherence',
       idempotencyKey: 'lease-coherence',
     });
+    await db
+      .updateTable('deliveries')
+      .set({ available_at: now })
+      .where('correlation_id', '=', 'lease-coherence')
+      .execute();
     const workers = new WorkerProtocolService(
       db,
       undefined,
