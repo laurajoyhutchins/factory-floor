@@ -99,8 +99,10 @@ interface StagedArtifactInput {
   schemaDigest: string;
 }
 
-interface CanonicalStagedArtifactInput
-  extends Omit<StagedArtifactInput, 'stagingRef' | 'stagingId'> {
+interface CanonicalStagedArtifactInput extends Omit<
+  StagedArtifactInput,
+  'stagingRef' | 'stagingId'
+> {
   stagingRef: StagingRef | string;
 }
 
@@ -129,7 +131,9 @@ function invalidRequest(message: string): never {
   throw new WorkerProtocolError('invalid_request', message, false, 400);
 }
 
-function normalizeAttemptIdentity(input: AttemptIdentityInput): AttemptIdentity {
+function normalizeAttemptIdentity(
+  input: AttemptIdentityInput,
+): AttemptIdentity {
   if (
     input.regionFencingEpoch !== undefined &&
     input.lifecycleEpoch !== undefined &&
