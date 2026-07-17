@@ -34,17 +34,17 @@ The principal ID is written into durable task, approval, and cancellation audit 
 
 ## Operator endpoints
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/operator/status` | Factory health and active-work summary |
-| `POST` | `/api/v1/operator/tasks` | Submit a development task |
-| `GET` | `/api/v1/operator/runs/:runId` | Read canonical run status |
-| `GET` | `/api/v1/operator/runs/:runId/trace` | Read the bounded durable run trace |
-| `GET` | `/api/v1/operator/runs/:runId/artifacts` | List artifacts produced by the run |
-| `GET` | `/api/v1/operator/artifacts/:artifactId` | Read bounded textual artifact content |
-| `GET` | `/api/v1/operator/approvals` | List pending approvals |
-| `POST` | `/api/v1/operator/approvals/:approvalId/decision` | Approve or reject a pending action |
-| `POST` | `/api/v1/operator/runs/:runId/cancel` | Cancel only the selected run graph |
+| Method | Path                                              | Purpose                                |
+| ------ | ------------------------------------------------- | -------------------------------------- |
+| `GET`  | `/api/v1/operator/status`                         | Factory health and active-work summary |
+| `POST` | `/api/v1/operator/tasks`                          | Submit a development task              |
+| `GET`  | `/api/v1/operator/runs/:runId`                    | Read canonical run status              |
+| `GET`  | `/api/v1/operator/runs/:runId/trace`              | Read the bounded durable run trace     |
+| `GET`  | `/api/v1/operator/runs/:runId/artifacts`          | List artifacts produced by the run     |
+| `GET`  | `/api/v1/operator/artifacts/:artifactId`          | Read bounded textual artifact content  |
+| `GET`  | `/api/v1/operator/approvals`                      | List pending approvals                 |
+| `POST` | `/api/v1/operator/approvals/:approvalId/decision` | Approve or reject a pending action     |
+| `POST` | `/api/v1/operator/runs/:runId/cancel`             | Cancel only the selected run graph     |
 
 List endpoints accept `limit` and opaque `cursor` query parameters. Artifact reads accept `maxBytes`, bounded by the runtime to 1 MiB.
 
