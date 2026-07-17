@@ -52,10 +52,7 @@ function operatorContext(request: FastifyRequest): OperatorContext {
   };
 }
 
-function requiredParam(
-  request: FastifyRequest,
-  name: string,
-): string {
+function requiredParam(request: FastifyRequest, name: string): string {
   const params = isRecord(request.params) ? request.params : {};
   const value = params[name];
   if (typeof value !== 'string' || value.trim() === '')
@@ -174,36 +171,30 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get(
-    '/api/v1/operator/runs/:runId/artifacts',
-    async (request, reply) => {
-      try {
-        return await queries.listRunArtifacts(
-          operatorContext(request),
-          requiredParam(request, 'runId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
+  app.get('/api/v1/operator/runs/:runId/artifacts', async (request, reply) => {
+    try {
+      return await queries.listRunArtifacts(
+        operatorContext(request),
+        requiredParam(request, 'runId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
 
-  app.get(
-    '/api/v1/operator/artifacts/:artifactId',
-    async (request, reply) => {
-      try {
-        const maxBytes = artifactByteLimit(request);
-        return await queries.readArtifact(
-          operatorContext(request),
-          requiredParam(request, 'artifactId'),
-          maxBytes,
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
+  app.get('/api/v1/operator/artifacts/:artifactId', async (request, reply) => {
+    try {
+      const maxBytes = artifactByteLimit(request);
+      return await queries.readArtifact(
+        operatorContext(request),
+        requiredParam(request, 'artifactId'),
+        maxBytes,
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
 
   app.get('/api/v1/operator/approvals', async (request, reply) => {
     try {
