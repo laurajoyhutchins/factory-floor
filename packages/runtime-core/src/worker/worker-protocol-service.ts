@@ -136,8 +136,7 @@ function normalizeAttemptIdentity(input: AttemptIdentityInput): AttemptIdentity 
     input.regionFencingEpoch !== input.lifecycleEpoch
   )
     invalidRequest('regionFencingEpoch conflicts with lifecycleEpoch');
-  const regionFencingEpoch =
-    input.regionFencingEpoch ?? input.lifecycleEpoch;
+  const regionFencingEpoch = input.regionFencingEpoch ?? input.lifecycleEpoch;
   if (
     regionFencingEpoch === undefined ||
     !Number.isInteger(regionFencingEpoch) ||
@@ -201,11 +200,8 @@ function normalizeStagedArtifact(
     invalidRequest('stagingRef conflicts with stagingId');
   const stagingRef = artifact.stagingRef ?? artifact.stagingId;
   if (!stagingRef)
-    invalidRequest(
-      'stagingRef (or worker protocol v1 stagingId) is required',
-    );
-  const { stagingId: _stagingId, ...canonical } = artifact;
-  return { ...canonical, stagingRef };
+    invalidRequest('stagingRef (or worker protocol v1 stagingId) is required');
+  return { ...artifact, stagingRef };
 }
 
 function toWorkerV1StagedArtifact(artifact: CanonicalStagedArtifactInput) {
@@ -767,9 +763,8 @@ export class WorkerProtocolService {
       return { duplicate: false as const };
     });
     try {
-      const { regionFencingEpoch: _regionFencingEpoch, ...wireInput } = input;
       const commitInput = {
-        ...wireInput,
+        ...input,
         lifecycleEpoch: attempt.regionFencingEpoch,
         stagedArtifacts: stagedArtifacts.map(toWorkerV1StagedArtifact),
         proposedState: proposedState
