@@ -74,9 +74,9 @@ interface AttemptIdentity {
 
 interface ClaimInput {
   workerId: string;
-  componentSelectors?: readonly (ComponentSelector | string)[];
+  componentSelectors?: (ComponentSelector | string)[];
   /** @deprecated Worker protocol v1 name. */
-  capabilities?: readonly string[];
+  capabilities?: string[];
 }
 
 interface StageInput extends AttemptIdentityInput {
