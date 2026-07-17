@@ -138,7 +138,13 @@ describe('attempt and delivery lease coherence', () => {
   });
 
   it('renews input deliveries atomically and recovery preserves the live lease', async () => {
-    await new CommandService(db).submit({
+    const commands = new CommandService(
+      db,
+      undefined,
+      undefined,
+      () => new Date(now),
+    );
+    await commands.submit({
       region: '/investigation',
       commandType: 'investigation.start',
       source: { kind: 'user', subject: 'lease-test' },
