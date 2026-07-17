@@ -165,11 +165,7 @@ export class SchedulerService {
     const ports = await trx
       .selectFrom('port_definitions')
       .selectAll()
-      .where(
-        'component_definition_id',
-        '=',
-        component.component_definition_id,
-      )
+      .where('component_definition_id', '=', component.component_definition_id)
       .where('direction', '=', 'input')
       .orderBy('name')
       .execute();

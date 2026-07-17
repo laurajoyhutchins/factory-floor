@@ -38,11 +38,7 @@ export function workerAuthorizationFromEnv(
     } catch {
       throw new Error('WORKER_AUTHORIZATION_JSON must be valid JSON');
     }
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      Array.isArray(parsed)
-    )
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
       throw new Error('WORKER_AUTHORIZATION_JSON must be an object');
     const workers: WorkerAuthorization['workers'] = {};
     for (const [workerId, value] of Object.entries(parsed)) {
@@ -160,8 +156,8 @@ function workerError(
 export async function registerWorkerRoutes(
   app: FastifyInstance,
   service: WorkerProtocolService,
-  authorization: string | WorkerAuthorization | undefined =
-    process.env.WORKER_API_BEARER_TOKEN,
+  authorization: string | WorkerAuthorization | undefined = process.env
+    .WORKER_API_BEARER_TOKEN,
 ): Promise<void> {
   const authenticatedWorkers = new WeakMap<FastifyRequest, string[]>();
   await app.register(

@@ -18,7 +18,9 @@ if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
         ? input
         : undefined;
     const url = new URL(request?.url ?? String(input), baseUrl);
-    const method = String(init.method ?? request?.method ?? 'GET').toUpperCase();
+    const method = String(
+      init.method ?? request?.method ?? 'GET',
+    ).toUpperCase();
     const headers = new globalThis.Headers(init.headers ?? request?.headers);
 
     if (
@@ -29,8 +31,8 @@ if (!globalThis[marker] && typeof globalThis.fetch === 'function') {
         (method === 'GET' || method === 'HEAD') &&
         url.pathname.startsWith('/api/v1/inspect/');
       const token = inspectionRead
-        ? process.env.CONTROL_PLANE_OPERATOR_TOKEN ??
-          process.env.CONTROL_PLANE_ADMIN_TOKEN
+        ? (process.env.CONTROL_PLANE_OPERATOR_TOKEN ??
+          process.env.CONTROL_PLANE_ADMIN_TOKEN)
         : process.env.CONTROL_PLANE_ADMIN_TOKEN;
       if (token) headers.set('authorization', `Bearer ${token}`);
     }

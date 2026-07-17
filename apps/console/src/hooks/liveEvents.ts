@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { consoleApi, inspectionHeaders } from '../api/client.js';
 
 export type StreamState =
-  | 'connecting'
-  | 'live'
-  | 'reconnecting'
-  | 'disconnected';
+  'connecting' | 'live' | 'reconnecting' | 'disconnected';
 export type RuntimeEvent = { id?: string; [key: string]: unknown };
 
 export function appendDeduped(

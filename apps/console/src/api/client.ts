@@ -1,11 +1,7 @@
 import { normalize } from './adapters.js';
 
 export type ApiFailureKind =
-  | 'transport'
-  | 'http'
-  | 'malformed-response'
-  | 'not-found'
-  | 'aborted';
+  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
 
 export class ApiError extends Error {
   constructor(

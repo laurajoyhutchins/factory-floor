@@ -39,10 +39,7 @@ function wrapped(prevalidationError: Error) {
   return {
     service,
     prevalidation,
-    wrapped: withResultPrevalidation(
-      service as never,
-      prevalidation as never,
-    ),
+    wrapped: withResultPrevalidation(service as never, prevalidation as never),
   };
 }
 
