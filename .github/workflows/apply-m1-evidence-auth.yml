@@ -1,0 +1,76 @@
+name: Apply M1 evidence authentication
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'fix/post-pr25-formatting'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/post-pr25-formatting
+
+      - name: Patch evidence collector
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/collect-m1-evidence.mjs')
+          text = path.read_text()
+          text = text.replace(
+              "const baseUrl = `http://127.0.0.1:${port}`;\nconst useProcessGroups",
+              "const baseUrl = `http://127.0.0.1:${port}`;\n"
+              "const operatorToken = process.env.CONTROL_PLANE_OPERATOR_TOKEN?.trim();\n"
+              "if (!operatorToken) {\n"
+              "  throw new Error('CONTROL_PLANE_OPERATOR_TOKEN is required');\n"
+              "}\n"
+              "const inspectionHeaders = { authorization: `Bearer ${operatorToken}` };\n"
+              "const useProcessGroups",
+          )
+          text = text.replace(
+              "const response = await globalThis.fetch(`${baseUrl}${path}`);",
+              "const response = await globalThis.fetch(`${baseUrl}${path}`, {\n"
+              "    headers: inspectionHeaders,\n"
+              "  });",
+          )
+          text = text.replace(
+              "const response = await globalThis.fetch(url);",
+              "const response = await globalThis.fetch(url, {\n"
+              "      headers: inspectionHeaders,\n"
+              "    });",
+          )
+          path.write_text(text)
+          PY
+          rm .github/workflows/apply-m1-evidence-auth.yml
+          git diff --check
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Format patched script
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+          pnpm exec prettier --write scripts/collect-m1-evidence.mjs
+          pnpm exec prettier --check scripts/collect-m1-evidence.mjs
+
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: authenticate acceptance evidence inspection"
+          git push origin HEAD:fix/post-pr25-formatting
