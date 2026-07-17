@@ -21,3 +21,7 @@ export * from './worker/worker-protocol-service.js';
 export * from './commit/execution-commit-service.js';
 export * from './observability/observability-service.js';
 export * from './observability/recovery-service.js';
+export * from './operator/types.js';
+export * from './operator/errors.js';
+export * from './operator/operator-command-service.js';
+export * from './operator/operator-query-service.js';
