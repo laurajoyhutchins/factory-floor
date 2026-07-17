@@ -190,13 +190,27 @@ class WorkerClient:
         assert last is not None
         raise last
 
-    async def claim(self, component_selectors: list[str]) -> WorkerClaimResponse:
+    async def claim(
+        self,
+        component_selectors: list[str] | None = None,
+        *,
+        capabilities: list[str] | None = None,
+    ) -> WorkerClaimResponse:
+        if (
+            component_selectors is not None
+            and capabilities is not None
+            and set(component_selectors) != set(capabilities)
+        ):
+            raise ValueError("component_selectors conflicts with capabilities")
+        selectors = component_selectors if component_selectors is not None else capabilities
+        if selectors is None:
+            raise ValueError("component_selectors is required")
         request = WorkerClaimRequest(
             WorkerClaimRequest1(
                 protocolVersion=PROTOCOL_VERSION,
                 workerId=self.config.worker_id,
                 componentSelectors=[
-                    ComponentSelector(selector) for selector in component_selectors
+                    ComponentSelector(selector) for selector in selectors
                 ],
             )
         )
