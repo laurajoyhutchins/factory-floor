@@ -1,9 +1,6 @@
 name: Apply post-PR 25 formatting
 
 on:
-  push:
-    branches:
-      - fix/post-pr25-formatting
   pull_request:
     branches:
       - main
@@ -52,24 +49,7 @@ jobs:
           set -euo pipefail
           pnpm format
           rm .github/workflows/apply-post-pr25-formatting.yml
-
-          cat > expected-files.txt <<'EOF'
-          apps/console/src/api/client.ts
-          apps/console/src/hooks/liveEvents.ts
-          apps/control-plane/src/app.ts
-          apps/control-plane/src/routes/worker.ts
-          apps/control-plane/test/result-prevalidation.test.ts
-          apps/control-plane/test/worker-authorization.test.ts
-          packages/runtime-core/src/scheduling/scheduler-service.ts
-          packages/runtime-core/test/artifact-validation-cache.test.ts
-          scripts/control-plane-auth-policy.test.mjs
-          scripts/fetch-control-plane-auth.mjs
-          scripts/run-with-env.mjs
-          tests/integration/runtime-core/scheduler-fairness.test.ts
-          EOF
-          sort -o expected-files.txt expected-files.txt
-          git diff --name-only --diff-filter=ACMRT | sort > actual-files.txt
-          diff -u expected-files.txt actual-files.txt
+          git diff --name-only --diff-filter=ACMRT
           git diff --check
 
       - name: Verify formatting and daemon-independent gates
@@ -84,7 +64,6 @@ jobs:
       - name: Commit formatting-only changes
         run: |
           set -euo pipefail
-          rm -f expected-files.txt actual-files.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
