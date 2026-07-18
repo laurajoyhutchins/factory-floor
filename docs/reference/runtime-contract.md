@@ -96,7 +96,7 @@ External writes follow a durable reconciled state machine from proposal through 
 
 ## APIs, CLI, recovery, and security
 
-HTTP endpoints are under `/api/v1` and include registration, system/topology application, command submission/cancellation, inspection, worker protocol, capability invocation, and resumable SSE. The `ff` CLI supports startup, registration, system application, command submission, inspection, artifact lineage, cancellation, and approval decisions; human-readable output is default and `--json` is supported.
+Operator and administrative HTTP endpoints are under `/api/v1` and include registration, system and topology application, command submission and cancellation, inspection, and resumable SSE. Authenticated worker protocol endpoints are separately rooted at `/worker/v1` and cover claim, heartbeat, cancellation observation, artifact staging and upload, proposed-result submission, and capability invocation. The `ff` CLI supports startup, registration, system application, command submission, inspection, artifact lineage, cancellation, and approval decisions; human-readable output is default and `--json` is supported.
 
 On startup the control plane verifies migrations, abandons expired attempts, makes retryable work available, resumes projection checkpoints, reconciles staged and promoted blobs, reconciles uncertain external actions, resumes cancellation, and emits a durable recovery summary. Historical projection replay never dispatches workers or repeats external actions.
 
