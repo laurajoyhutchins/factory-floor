@@ -1,6 +1,6 @@
 version: 2
 milestone: M1 Durable Reactive Graph
-reference: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+reference: docs/reference/runtime-contract.md#conformance-invariants
 completionRule: The ledger is structurally complete when every normative reference invariant is represented. Milestone acceptance additionally requires every applicable invariant and acceptance criterion to be verified as passed.
 
 invariants:
@@ -8,7 +8,7 @@ invariants:
     id: M1-CONF-001
     group: Identity and attribution
     requirement: Every component instance belongs to exactly one region.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -21,7 +21,7 @@ invariants:
     id: M1-CONF-002
     group: Identity and attribution
     requirement: Every event has an attributable source and region.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -34,7 +34,7 @@ invariants:
     id: M1-CONF-003
     group: Artifact integrity and provenance
     requirement: Every artifact is immutable.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -47,7 +47,7 @@ invariants:
     id: M1-CONF-004
     group: Artifact integrity and provenance
     requirement: Every committed artifact has schema identity and provenance.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -60,7 +60,7 @@ invariants:
     id: M1-CONF-005
     group: Authority and policy
     requirement: Every external action requires a valid capability grant.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -71,7 +71,7 @@ invariants:
     id: M1-CONF-006
     group: Authority and policy
     requirement: Delegated authority cannot exceed parent authority.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: deferred
     verification: deferred
     rationale: Milestone 1 uses direct capability grants and does not expose capability delegation.
@@ -81,7 +81,7 @@ invariants:
     id: M1-CONF-007
     group: Dynamic construction
     requirement: Dynamic regions cannot modify ancestor topology.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: deferred
     verification: deferred
     rationale: Dynamic child-region construction is explicitly outside Milestone 1, which uses a static investigation region.
@@ -91,7 +91,7 @@ invariants:
     id: M1-CONF-008
     group: Lifecycle and recovery
     requirement: Cancellation propagates and stale epochs cannot commit normal outputs.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -104,7 +104,7 @@ invariants:
     id: M1-CONF-009
     group: Authority and policy
     requirement: Policy decisions are durable.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -119,7 +119,7 @@ invariants:
     id: M1-CONF-010
     group: Lifecycle and recovery
     requirement: Failed attempts remain visible after retry.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -132,7 +132,7 @@ invariants:
     id: M1-CONF-011
     group: Resource and delivery accounting
     requirement: Resource consumption is attributable to attempt, execution, and region.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -145,7 +145,7 @@ invariants:
     id: M1-CONF-012
     group: Resource and delivery accounting
     requirement: No delivery is silently discarded.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -160,7 +160,7 @@ invariants:
     id: M1-CONF-013
     group: Replay and side-effect safety
     requirement: Historical replay never repeats external side effects.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -173,7 +173,7 @@ invariants:
     id: M1-CONF-014
     group: Trust boundaries
     requirement: Enforcement does not depend on worker compliance.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -186,7 +186,7 @@ invariants:
     id: M1-CONF-015
     group: Dynamic construction
     requirement: Dynamic construction is explicitly bounded.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: deferred
     verification: deferred
     rationale: Milestone 1 has no dynamic construction surface; the static graph is bounded by its committed declaration.
@@ -196,7 +196,7 @@ invariants:
     id: M1-CONF-016
     group: Trust boundaries
     requirement: Workers cannot publish runtime truth directly.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -209,7 +209,7 @@ invariants:
     id: M1-CONF-017
     group: Atomicity and idempotency
     requirement: A successful result becomes visible atomically.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -220,7 +220,7 @@ invariants:
     id: M1-CONF-018
     group: Atomicity and idempotency
     requirement: Duplicate delivery or completion cannot duplicate committed outputs.
-    source: docs/specs/reference-implementation-v0.1.md#19-conformance-invariants
+    source: docs/reference/runtime-contract.md#conformance-invariants
     coverage: automated
     verification: passed
     evidence:
@@ -245,13 +245,13 @@ acceptanceCriteria:
     coverage: manual
     verification: passed
     manualAcceptance:
-      proof: Repository Verification #289 retained and inspection-validated artifact m1-acceptance-evidence-289 (artifact ID 8367989997, digest sha256:eeea4e2b894b3b09ae28276c3db3625ff0add93229c1f0f4eb9c46a425d31394). All 15 applicable checks passed and retained logs were sanitized.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+      proof: Repository Verification #314 retained and inspection-validated artifact m1-acceptance-evidence-314 (artifact ID 8378976443, digest sha256:6a837091662bb3fb02222b20a5f8dd9a89cb9c21a1b6e145086fe401a793ffa3). All 15 applicable checks passed and retained logs were sanitized.
+      tracking: docs/reference/acceptance/m1-durable-reactive-graph.md
 
   - id: M1-ACCEPT-CLEAN-ENVIRONMENT
     requirement: Reproduce all applicable Milestone 1 checks from a clean Codespace or comparably fresh hosted checkout with no reused dependencies, database volumes, or artifact store.
     coverage: manual
     verification: passed
     manualAcceptance:
-      proof: Repository Verification #289 run ID 29479516913 completed pnpm accept:m1 on a separate fresh GitHub Actions hosted Linux checkout with cleanCheckoutAttested true. An actual Codespace was not claimed.
-      tracking: docs/evidence/m1-durable-reactive-graph.md
+      proof: Repository Verification #314 run ID 29506777040 completed pnpm accept:m1 on a separate fresh GitHub Actions hosted Linux checkout with cleanCheckoutAttested true. An actual Codespace was not claimed.
+      tracking: docs/reference/acceptance/m1-durable-reactive-graph.md

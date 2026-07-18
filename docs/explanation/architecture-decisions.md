@@ -1,33 +1,34 @@
-# Factory Floor Architecture Decisions v0.1
+# Factory Floor architecture decisions
 
-**Date:** 2026-07-14  
-**Status:** Accepted for the reference implementation
+**Type:** Explanation
+**Status:** Accepted for the v0.1 reference implementation
+**Decision record:** ADR-001 through ADR-015
 
-These decisions close the design questions required to begin implementation. Changes require an explicit ADR rather than silent drift.
+These decisions explain why the reference implementation has its current boundaries. Changing one requires an explicit new decision rather than silent drift.
 
 ## ADR-001: Transactional modular monolith
 
 **Decision:** Build one control-plane deployable with internal modules sharing PostgreSQL transactions.
 
-**Reason:** The central problem is semantic correctness across events, artifacts, attempts, topology, and accounting. A modular monolith provides a real atomic commit boundary and keeps infrastructure from obscuring the model.
+**Reason:** Semantic correctness spans events, artifacts, attempts, topology, and accounting. A modular monolith provides a real atomic commit boundary without hiding the model behind infrastructure.
 
-**Consequences:** Modules must have explicit interfaces and no table access outside their owning repository layer. Logical boundaries should remain extractable later.
+**Consequences:** Modules use explicit interfaces and do not query one another's tables directly. Logical boundaries remain extractable later.
 
 ## ADR-002: Split TypeScript control plane and external workers
 
-**Decision:** TypeScript owns authoritative runtime logic. TypeScript and Python workers run as separate processes and communicate through a versioned protocol.
+**Decision:** TypeScript owns authoritative runtime logic. TypeScript and Python workers run as separate processes through a versioned protocol.
 
-**Reason:** TypeScript provides strong API and UI ergonomics. Python provides the scientific and model ecosystem. Process isolation allows dependency, failure, and resource boundaries.
+**Reason:** TypeScript provides API and UI ergonomics while Python provides the scientific and model ecosystem. Process isolation gives dependency, failure, and resource boundaries.
 
-**Consequences:** No embedded Python interpreter in the control plane. No shared process memory as durable state.
+**Consequences:** No embedded Python interpreter and no shared process memory as durable state.
 
 ## ADR-003: PostgreSQL is the coordination source of truth
 
 **Decision:** Use PostgreSQL for event records, deliveries, leases, executions, attempts, topology, capabilities, policy decisions, approvals, accounting, and projection checkpoints.
 
-**Reason:** PostgreSQL supplies transactions, row locks, `SKIP LOCKED`, indexing, JSONB, and operational maturity without introducing a broker.
+**Reason:** PostgreSQL supplies transactions, row locks, `SKIP LOCKED`, indexing, JSONB, and operational maturity without a separate broker.
 
-**Consequences:** The event stream is a durable table, not a claim that the database is a globally ordered log. Ordering is defined per region or selected stream key.
+**Consequences:** The event stream is a durable table, not a globally ordered log. Ordering is defined per region or selected stream key.
 
 ## ADR-004: Separate commands, events, deliveries, executions, and attempts
 
@@ -35,11 +36,11 @@ These decisions close the design questions required to begin implementation. Cha
 
 **Reason:** Retries, fan-out, queue leases, deduplication, replay, and competing consumers have different identities and lifecycles.
 
-**Consequences:** APIs and traces must expose the distinctions rather than collapsing them into “runs.”
+**Consequences:** APIs and traces expose these distinctions rather than collapsing them into generic runs.
 
 ## ADR-005: Workers propose; control plane commits
 
-**Decision:** Workers may stage artifacts and submit proposed results. Only the control plane may finalize artifacts, append authoritative events, update state, create downstream deliveries, account resources, or authorize external actions.
+**Decision:** Workers may stage artifacts and submit proposed results. Only the control plane finalizes artifacts, appends authoritative events, updates state, creates downstream deliveries, accounts resources, and authorizes external actions.
 
 **Reason:** Runtime invariants cannot depend on worker compliance.
 
@@ -49,7 +50,7 @@ These decisions close the design questions required to begin implementation. Cha
 
 **Decision:** One PostgreSQL transaction publishes all metadata effects of a successful attempt.
 
-**Reason:** The user-visible result must not contain committed events without artifacts, completed executions without accounting, or downstream deliveries without durable outputs.
+**Reason:** Users must not observe committed events without artifacts, completed executions without accounting, or downstream deliveries without durable outputs.
 
 **Consequences:** Blob bytes are staged before commit and promoted idempotently after commit. Reconciliation handles promotion failure.
 
@@ -57,15 +58,15 @@ These decisions close the design questions required to begin implementation. Cha
 
 **Decision:** JSON Schema Draft 2020-12 defines envelopes, artifacts, configuration, templates, and policy inputs.
 
-**Reason:** It is language-neutral and supports validation before interpretation.
+**Reason:** It is language-neutral and validates data before interpretation.
 
-**Consequences:** TypeScript and Python types are generated. Runtime acceptance depends on schema validation, not static types alone.
+**Consequences:** TypeScript and Python types are generated, but runtime acceptance depends on schema validation rather than static types alone.
 
 ## ADR-008: Immutable, versioned topology
 
 **Decision:** Every accepted local graph change creates a complete topology revision.
 
-**Reason:** Executions must be explainable under the graph that dispatched them, and replay cannot depend on current topology.
+**Reason:** Executions must remain explainable under the graph that dispatched them, and replay cannot depend on current topology.
 
 **Consequences:** Existing executions retain their revision. Dynamic regions cannot change ancestor revisions.
 
@@ -115,12 +116,12 @@ These decisions close the design questions required to begin implementation. Cha
 
 **Reason:** The first console needs one-way durable update notifications, not general bidirectional sessions.
 
-**Consequences:** Commands and approvals remain ordinary HTTP requests. A later ADR may introduce WebSockets.
+**Consequences:** Commands and approvals remain ordinary HTTP requests. A later decision may introduce WebSockets.
 
 ## ADR-015: No Kafka, Temporal, or Kubernetes operator in v0.1
 
 **Decision:** Do not add them to the first implementation.
 
-**Reason:** Each would introduce a second execution or coordination model before Factory Floor’s own semantics are proven.
+**Reason:** Each would introduce a second execution or coordination model before Factory Floor's own semantics are proven.
 
 **Consequences:** Reconsider only after conformance tests, profiling, and operational evidence demonstrate a specific need.
