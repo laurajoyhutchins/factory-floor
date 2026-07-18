@@ -1,6 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ActivitySessionService } from '@factory-floor/runtime-core';
 import {
+  ActivitySessionError,
+  ActivitySessionService,
+} from '../activity-session-service.js';
+import {
+  ServiceAuthError,
   verifyServiceRequest,
   type ServiceAuthConfig,
 } from '../service-auth.js';
@@ -26,7 +30,7 @@ function requiredString(value: Record<string, unknown>, field: string): string {
   const result = value[field];
   if (typeof result !== 'string' || result.trim() === '')
     throw new RouteValidationError(`${field}_required`);
-  return result;
+  return result.trim();
 }
 
 function optionalString(
@@ -35,8 +39,13 @@ function optionalString(
 ): string | undefined {
   const result = value[field];
   return typeof result === 'string' && result.trim() !== ''
-    ? result
+    ? result.trim()
     : undefined;
+}
+
+function serviceAuthHeader(request: FastifyRequest): string | undefined {
+  const header = request.headers['x-factory-floor-service-auth'];
+  return typeof header === 'string' ? header : undefined;
 }
 
 async function requireServiceAuth(
@@ -47,41 +56,32 @@ async function requireServiceAuth(
   try {
     await verifyServiceRequest(
       config,
+      'agent-to-ff',
       request.method,
       request.url.split('?', 1)[0] ?? request.url,
-      request.body,
-      request.headers['x-factory-floor-service-auth'] as string | undefined,
+      request.serviceAuthRawBody ?? Buffer.alloc(0),
+      serviceAuthHeader(request),
     );
     return true;
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'message' in error && (error as Record<string, unknown>).name === 'ServiceAuthError') {
-      const authErr = error as { statusCode?: number; message: string };
-      await reply.code(authErr.statusCode ?? 401).send({
-        error: { code: authErr.message, message: authErr.message },
+    if (error instanceof ServiceAuthError) {
+      await reply.code(error.statusCode).send({
+        error: { code: error.message, message: error.message },
       });
       return false;
     }
+    request.log.error(error);
     await reply.code(401).send({
-      error: { code: 'service_auth_denied', message: 'Service authentication denied' },
+      error: {
+        code: 'service_auth_denied',
+        message: 'Service authentication denied',
+      },
     });
     return false;
   }
 }
 
-function parseCreateSessionRequest(
-  request: FastifyRequest,
-): {
-  applicationId: string;
-  instanceId: string;
-  installationId: string;
-  guildId?: string;
-  channelId?: string;
-  threadId?: string;
-  launchId: string;
-  principalId: string;
-  adapter: string;
-  boundRunId?: string;
-} {
+function parseCreateSessionRequest(request: FastifyRequest) {
   const body = bodyRecord(request);
   return {
     applicationId: requiredString(body, 'applicationId'),
@@ -97,6 +97,36 @@ function parseCreateSessionRequest(
   };
 }
 
+function sessionErrorReply(
+  error: unknown,
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  if (error instanceof RouteValidationError)
+    return reply.code(400).send({
+      error: { code: error.message, message: error.message },
+    });
+
+  if (error instanceof ActivitySessionError) {
+    const statusCode =
+      error.message === 'instance_binding_mismatch'
+        ? 409
+        : error.message === 'instance_closed' ||
+            error.message === 'instance_expired'
+          ? 410
+          : 500;
+    if (statusCode === 500) request.log.error(error);
+    return reply.code(statusCode).send({
+      error: { code: error.message, message: error.message },
+    });
+  }
+
+  request.log.error(error);
+  return reply.code(500).send({
+    error: { code: 'internal_error', message: 'Internal error' },
+  });
+}
+
 export async function registerActivityRoutes(
   app: FastifyInstance,
   sessionService: ActivitySessionService,
@@ -108,28 +138,24 @@ export async function registerActivityRoutes(
   app.post(
     '/api/v1/discord/activity/sessions',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const authed = await requireServiceAuth(request, reply, config);
-      if (!authed) return;
+      const authenticated = await requireServiceAuth(request, reply, config);
+      if (!authenticated) return;
 
       try {
-        const sessionRequest = parseCreateSessionRequest(request);
-        const result = await sessionService.createOrJoinSession(sessionRequest);
-        return reply.code(201).send({
-          instanceBindingId: result.instanceBindingId,
-          sessionToken: result.session.sessionId,
-          expiresAt: result.session.expiresAt.toISOString(),
-          idleExpiresAt: result.session.idleExpiresAt.toISOString(),
-        });
-      } catch (error: unknown) {
-        if (error instanceof RouteValidationError) {
-          return reply.code(400).send({
-            error: { code: error.message, message: error.message },
+        const result = await sessionService.createOrJoinSession(
+          parseCreateSessionRequest(request),
+        );
+        return reply
+          .header('cache-control', 'no-store')
+          .code(201)
+          .send({
+            instanceBindingId: result.instanceBindingId,
+            sessionToken: result.session.sessionToken,
+            expiresAt: result.session.expiresAt.toISOString(),
+            idleExpiresAt: result.session.idleExpiresAt.toISOString(),
           });
-        }
-        request.log.error(error);
-        return reply.code(500).send({
-          error: { code: 'internal_error', message: 'Internal error' },
-        });
+      } catch (error: unknown) {
+        return sessionErrorReply(error, request, reply);
       }
     },
   );
@@ -137,36 +163,27 @@ export async function registerActivityRoutes(
   app.post(
     '/api/v1/discord/activity/sessions/refresh',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const authed = await requireServiceAuth(request, reply, config);
-      if (!authed) return;
+      const authenticated = await requireServiceAuth(request, reply, config);
+      if (!authenticated) return;
 
       try {
-        const body = bodyRecord(request);
-        const sessionToken = requiredString(body, 'sessionToken');
+        const sessionToken = requiredString(bodyRecord(request), 'sessionToken');
         const result = await sessionService.refreshSession(sessionToken);
-        if (!result) {
+        if (!result)
           return reply.code(404).send({
             error: {
               code: 'session_not_found',
               message: 'Session not found or expired',
             },
           });
-        }
-        return reply.send({
-          sessionToken: result.sessionId,
+
+        return reply.header('cache-control', 'no-store').send({
+          sessionToken: result.sessionToken,
           expiresAt: result.expiresAt.toISOString(),
           idleExpiresAt: result.idleExpiresAt.toISOString(),
         });
       } catch (error: unknown) {
-        if (error instanceof RouteValidationError) {
-          return reply.code(400).send({
-            error: { code: error.message, message: error.message },
-          });
-        }
-        request.log.error(error);
-        return reply.code(500).send({
-          error: { code: 'internal_error', message: 'Internal error' },
-        });
+        return sessionErrorReply(error, request, reply);
       }
     },
   );
@@ -174,24 +191,15 @@ export async function registerActivityRoutes(
   app.post(
     '/api/v1/discord/activity/sessions/revoke',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const authed = await requireServiceAuth(request, reply, config);
-      if (!authed) return;
+      const authenticated = await requireServiceAuth(request, reply, config);
+      if (!authenticated) return;
 
       try {
-        const body = bodyRecord(request);
-        const sessionToken = requiredString(body, 'sessionToken');
+        const sessionToken = requiredString(bodyRecord(request), 'sessionToken');
         await sessionService.revokeSession(sessionToken);
         return reply.code(204).send();
       } catch (error: unknown) {
-        if (error instanceof RouteValidationError) {
-          return reply.code(400).send({
-            error: { code: error.message, message: error.message },
-          });
-        }
-        request.log.error(error);
-        return reply.code(500).send({
-          error: { code: 'internal_error', message: 'Internal error' },
-        });
+        return sessionErrorReply(error, request, reply);
       }
     },
   );
