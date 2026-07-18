@@ -4,6 +4,8 @@ import {
   ArtifactDomainError,
   CommandService,
   ObservabilityService,
+  OperatorCommandService,
+  OperatorQueryService,
   PROJECTION_NAMES,
   ProposedResultPrevalidationService,
   RegistrationService,
@@ -26,6 +28,7 @@ import {
   type WorkerAuthorization,
 } from './routes/worker.js';
 import { registerInspectionRoutes } from './routes/inspection.js';
+import { registerOperatorRoutes } from './routes/operator.js';
 import {
   registerControlPlaneSecurity,
   type ControlPlaneSecurity,
@@ -49,6 +52,8 @@ export interface AppDependencies {
   registrationService?: RegistrationService;
   systemApplicationService?: SystemApplicationService;
   commandService?: CommandService;
+  operatorCommandService?: OperatorCommandService;
+  operatorQueryService?: OperatorQueryService;
   workerProtocolService?: WorkerProtocolService;
   artifactBlobStore?: ArtifactBlobStore;
   workerAuthToken?: string;
@@ -288,6 +293,14 @@ export async function buildApp(
       app,
       deps.commandService ?? new CommandService(db!),
     );
+  const operatorCommands =
+    deps.operatorCommandService ??
+    (db ? new OperatorCommandService(db) : undefined);
+  const operatorQueries =
+    deps.operatorQueryService ??
+    (db ? new OperatorQueryService(db, artifactBlobStore) : undefined);
+  if (operatorCommands && operatorQueries)
+    await registerOperatorRoutes(app, operatorCommands, operatorQueries);
   if (observability) await registerInspectionRoutes(app, observability);
   if (db || deps.workerProtocolService) {
     const workerProtocol =
