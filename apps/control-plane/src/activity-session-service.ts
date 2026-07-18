@@ -1,10 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Kysely } from 'kysely';
-import {
-  createUuidV7,
-  type Database,
-  type Json,
-} from '@factory-floor/db';
+import { createUuidV7, type Database, type Json } from '@factory-floor/db';
 
 export interface ActivitySessionRequest {
   applicationId: string;
@@ -93,11 +89,7 @@ export class ActivitySessionService {
       if (existing) {
         if (!existing.expires_at || !existing.adapter)
           throw new ActivitySessionError('instance_binding_invalid');
-        assertBindingMatches(
-          existing as ExistingBinding,
-          request,
-          now,
-        );
+        assertBindingMatches(existing as ExistingBinding, request, now);
         const expiresAt = new Date(now.getTime() + BINDING_TTL_MS);
         await trx
           .updateTable('activity_instance_bindings')
@@ -262,7 +254,10 @@ export class ActivitySessionService {
     });
   }
 
-  async revokeSession(sessionToken: string, now = new Date()): Promise<boolean> {
+  async revokeSession(
+    sessionToken: string,
+    now = new Date(),
+  ): Promise<boolean> {
     const digest = createHash('sha256').update(sessionToken).digest('hex');
     const result = await this.db
       .updateTable('activity_sessions')
