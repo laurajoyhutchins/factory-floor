@@ -39,19 +39,40 @@ bash scripts/maintain-workspace.sh all
 
 Use `clean` only for transient build and test caches. Use `reset` only after diagnosing a damaged dependency installation. Maintenance does not modify Git state, delete `.env`, remove runtime data, or delete Docker volumes.
 
-## Verify dependencies and services
+## Verify without Docker
+
+Use the canonical fast stages for code and generated-content verification:
 
 ```bash
-pnpm services:status
-pnpm services:logs
-pnpm contracts:validate
-pnpm contracts:check
-pnpm format:check
-pnpm lint
-pnpm typecheck
+pnpm verify:static
+pnpm verify:unit
+pnpm verify:fast
 ```
 
-For service-backed verification, use `pnpm verify` or the [investigation run guide](run-investigation.md). Set `FACTORY_FLOOR_VERIFY_CLEAN=1` only when you intentionally need fresh service volumes.
+`verify:static` validates contracts, generated-code drift, the conformance ledger, lint, types, and formatting. `verify:unit` runs the root TypeScript and TSX projects, locked Python tests, and the console production build. JavaScript unit tests run without inherited database URLs, so caller service configuration cannot silently turn them into integration tests. `verify:fast` runs both stages and is the closest local reproduction of the pull request's fast CI job.
+
+The root Vitest project includes the console's `.test.tsx` component tests while preserving its jsdom setup. The root TypeScript project references the console, and the unit stage retains its production build as a permanent gate.
+
+## Verify services and the complete repository
+
+For service-backed verification, run the stages in order:
+
+```bash
+pnpm verify:services
+pnpm verify:integration
+pnpm verify:acceptance
+pnpm services:clean
+```
+
+`verify:services` validates Compose, starts PostgreSQL and MinIO, waits for health, and runs migrations. `verify:integration` prepares workspace build output, runs Docker-backed integration and investigation-demo checks, runs conformance-focused tests, and resets the development database through the guarded command. `verify:acceptance` runs live-restart acceptance against the prepared services.
+
+To run the complete sequence with automatic service cleanup, use:
+
+```bash
+pnpm verify
+```
+
+Set `FACTORY_FLOOR_VERIFY_CLEAN=1` only when you intentionally need fresh service volumes. See the [investigation run guide](run-investigation.md) for the operator-facing demo and inspection workflow.
 
 ## Environment boundaries
 
