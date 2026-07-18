@@ -61,11 +61,15 @@ function verificationKeys(
     direction === 'agent-to-ff'
       ? keys.previousAgentToFactoryKey
       : keys.previousFactoryToAgentKey;
-  return previous ? [currentKey(keys, direction), previous] : [currentKey(keys, direction)];
+  return previous
+    ? [currentKey(keys, direction), previous]
+    : [currentKey(keys, direction)];
 }
 
 function bodyBuffer(body: ServiceAuthBody): Buffer {
-  return typeof body === 'string' ? Buffer.from(body, 'utf8') : Buffer.from(body);
+  return typeof body === 'string'
+    ? Buffer.from(body, 'utf8')
+    : Buffer.from(body);
 }
 
 function signaturePayload(
@@ -114,17 +118,16 @@ export function signatureHeader(
   return `HMAC-SHA256 keyId=${signingKeyId},timestamp=${timestamp},nonce=${nonce},signature=${signature}`;
 }
 
-export function parseSignatureHeader(
-  header: string,
-): {
+export function parseSignatureHeader(header: string): {
   keyId: string;
   timestamp: string;
   nonce: string;
   signature: string;
 } | null {
-  const match = /^HMAC-SHA256\s+keyId=([^,]+),timestamp=([^,]+),nonce=([^,]+),signature=([^,]+)$/.exec(
-    header,
-  );
+  const match =
+    /^HMAC-SHA256\s+keyId=([^,]+),timestamp=([^,]+),nonce=([^,]+),signature=([^,]+)$/.exec(
+      header,
+    );
   if (!match) return null;
   return {
     keyId: match[1],
@@ -147,8 +150,7 @@ export async function verifyServiceRequest(
     throw new ServiceAuthError('service_auth_header_required');
 
   const parsed = parseSignatureHeader(signatureHeaderValue);
-  if (!parsed)
-    throw new ServiceAuthError('service_auth_header_malformed');
+  if (!parsed) throw new ServiceAuthError('service_auth_header_malformed');
 
   const { keyId: suppliedKeyId, timestamp, nonce, signature } = parsed;
   if (suppliedKeyId !== keyId(direction))
@@ -162,8 +164,7 @@ export async function verifyServiceRequest(
 
   const skew = Math.abs(now - timestampNumber);
   const maxSkew = config.maxSkewMs ?? MAX_SKEW_MS;
-  if (skew > maxSkew)
-    throw new ServiceAuthError('service_auth_timestamp_skew');
+  if (skew > maxSkew) throw new ServiceAuthError('service_auth_timestamp_skew');
 
   if (nonce.trim() === '')
     throw new ServiceAuthError('service_auth_nonce_required');
@@ -183,14 +184,15 @@ export async function verifyServiceRequest(
   const suppliedSignature = Buffer.from(signature, 'hex');
   let matched = false;
   for (const key of verificationKeys(config.keys, direction)) {
-    const expectedSignature = createHmac('sha256', key).update(payload).digest();
+    const expectedSignature = createHmac('sha256', key)
+      .update(payload)
+      .digest();
     const candidateMatches =
       suppliedSignature.length === expectedSignature.length &&
       timingSafeEqual(suppliedSignature, expectedSignature);
     matched = matched || candidateMatches;
   }
-  if (!matched)
-    throw new ServiceAuthError('service_auth_signature_mismatch');
+  if (!matched) throw new ServiceAuthError('service_auth_signature_mismatch');
 
   if (!(await config.db.consumeNonce(suppliedKeyId, nonce, now)))
     throw new ServiceAuthError('service_auth_nonce_replayed');
