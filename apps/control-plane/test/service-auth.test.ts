@@ -216,13 +216,7 @@ describe('sign and verify', () => {
     const config = testConfig();
     const now = Date.now();
     const signedAt = now - 120_000;
-    const header = signedHeader(
-      'agent-to-ff',
-      'GET',
-      '/health',
-      '',
-      signedAt,
-    );
+    const header = signedHeader('agent-to-ff', 'GET', '/health', '', signedAt);
 
     await expect(
       verifyServiceRequest(
