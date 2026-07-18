@@ -36,7 +36,11 @@ export function registerControlPlaneSecurity(
 ): void {
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?', 1)[0] ?? request.url;
-    if (path === '/health' || path.startsWith('/worker/v1/')) return;
+    if (
+      path === '/health' ||
+      path.startsWith('/worker/v1/') ||
+      path.startsWith('/api/v1/discord/')
+    ) return;
     if (!path.startsWith('/api/v1/')) return;
 
     const supplied = bearer(request);

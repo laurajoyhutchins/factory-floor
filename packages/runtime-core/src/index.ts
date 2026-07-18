@@ -25,3 +25,10 @@ export * from './operator/types.js';
 export * from './operator/errors.js';
 export * from './operator/operator-command-service.js';
 export * from './operator/operator-query-service.js';
+export {
+  ActivitySessionService,
+  ActivitySessionError,
+  type ActivitySessionRequest,
+  type ActivitySessionResponse,
+} from './activity/activity-session-service.js';
+export { createNonceRepository } from './activity/nonce-repository.js';
