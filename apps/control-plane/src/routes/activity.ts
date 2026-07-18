@@ -145,15 +145,12 @@ export async function registerActivityRoutes(
         const result = await sessionService.createOrJoinSession(
           parseCreateSessionRequest(request),
         );
-        return reply
-          .header('cache-control', 'no-store')
-          .code(201)
-          .send({
-            instanceBindingId: result.instanceBindingId,
-            sessionToken: result.session.sessionToken,
-            expiresAt: result.session.expiresAt.toISOString(),
-            idleExpiresAt: result.session.idleExpiresAt.toISOString(),
-          });
+        return reply.header('cache-control', 'no-store').code(201).send({
+          instanceBindingId: result.instanceBindingId,
+          sessionToken: result.session.sessionToken,
+          expiresAt: result.session.expiresAt.toISOString(),
+          idleExpiresAt: result.session.idleExpiresAt.toISOString(),
+        });
       } catch (error: unknown) {
         return sessionErrorReply(error, request, reply);
       }
@@ -167,7 +164,10 @@ export async function registerActivityRoutes(
       if (!authenticated) return;
 
       try {
-        const sessionToken = requiredString(bodyRecord(request), 'sessionToken');
+        const sessionToken = requiredString(
+          bodyRecord(request),
+          'sessionToken',
+        );
         const result = await sessionService.refreshSession(sessionToken);
         if (!result)
           return reply.code(404).send({
@@ -195,7 +195,10 @@ export async function registerActivityRoutes(
       if (!authenticated) return;
 
       try {
-        const sessionToken = requiredString(bodyRecord(request), 'sessionToken');
+        const sessionToken = requiredString(
+          bodyRecord(request),
+          'sessionToken',
+        );
         await sessionService.revokeSession(sessionToken);
         return reply.code(204).send();
       } catch (error: unknown) {
