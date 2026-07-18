@@ -10,6 +10,9 @@ export default defineConfig({
       '@factory-floor/db': fileURLToPath(
         new URL('./packages/db/src/index.ts', import.meta.url),
       ),
+      '@factory-floor/runtime-core': fileURLToPath(
+        new URL('./packages/runtime-core/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {
