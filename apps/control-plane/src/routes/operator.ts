@@ -163,7 +163,9 @@ function parseDevelopmentTaskRequest(
     for (const value of Object.values(body.authority))
       if (typeof value !== 'boolean')
         throw new OperatorValidationError(MALFORMED_REQUEST);
-    authority = body.authority;
+    authority = body.authority as NonNullable<
+      DevelopmentTaskRequest['authority']
+    >;
   }
 
   let metadata: DevelopmentTaskRequest['metadata'];
