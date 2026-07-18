@@ -102,9 +102,9 @@ describe('repository verification wiring', () => {
     );
 
     expect(unitStage).toContain('unset DATABASE_URL TEST_DATABASE_URL');
-    expect(unitStage.indexOf('unset DATABASE_URL TEST_DATABASE_URL')).toBeLessThan(
-      unitStage.indexOf('pnpm test'),
-    );
+    expect(
+      unitStage.indexOf('unset DATABASE_URL TEST_DATABASE_URL'),
+    ).toBeLessThan(unitStage.indexOf('pnpm test'));
     expect(integrationStage.indexOf('pnpm typecheck')).toBeGreaterThan(-1);
     expect(integrationStage.indexOf('pnpm typecheck')).toBeLessThan(
       integrationStage.indexOf('pnpm test:integration'),
