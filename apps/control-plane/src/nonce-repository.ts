@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { createUuidV7, type Database } from '@factory-floor/db';
 
 const NONCE_RETENTION_MS = 300_000;
@@ -31,9 +31,10 @@ export function createNonceRepository(db: Kysely<Database>) {
       if (now - lastCleanupAt >= NONCE_CLEANUP_INTERVAL_MS) {
         lastCleanupAt = now;
         try {
+          const cutoff = new Date(now - NONCE_RETENTION_MS);
           await db
             .deleteFrom('service_request_nonces')
-            .where('created_at', '<', new Date(now - NONCE_RETENTION_MS))
+            .where('created_at', '<', sql<Date>`${cutoff}`)
             .execute();
         } catch {
           // Cleanup is best effort; the unique insert already consumed the nonce.
