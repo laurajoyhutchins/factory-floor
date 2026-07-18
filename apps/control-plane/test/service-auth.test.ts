@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ServiceAuthError,
+  parseSignatureHeader,
   serviceAuthFromEnv,
   signRequest,
   signatureHeader,
-  parseSignatureHeader,
   verifyServiceRequest,
+  type ServiceAuthDirection,
 } from '../src/service-auth.js';
 
 function testKeys() {
@@ -18,48 +19,58 @@ function testKeys() {
 function testNonceDb() {
   const used = new Set<string>();
   return {
-    isNonceUsed: vi.fn(async (keyId: string, nonce: string) =>
-      used.has(`${keyId}:${nonce}`),
-    ),
-    recordNonce: vi.fn(async (keyId: string, nonce: string) => {
-      used.add(`${keyId}:${nonce}`);
+    consumeNonce: vi.fn(async (keyId: string, nonce: string) => {
+      const value = `${keyId}:${nonce}`;
+      if (used.has(value)) return false;
+      used.add(value);
+      return true;
     }),
   };
 }
 
+function signedHeader(
+  direction: ServiceAuthDirection,
+  method: string,
+  path: string,
+  body: string,
+  now: number,
+  keys = testKeys(),
+): string {
+  const signed = signRequest(keys, direction, method, path, body, now);
+  return signatureHeader(
+    signed.keyId,
+    signed.timestamp,
+    signed.nonce,
+    signed.signature,
+  );
+}
+
 function testConfig() {
-  const nonceDb = testNonceDb();
   return {
     keys: testKeys(),
-    db: nonceDb,
+    db: testNonceDb(),
     maxSkewMs: 30_000,
-    nonceDb,
   };
 }
 
 describe('service auth from env', () => {
-  it('returns keys when env vars are set', () => {
-    const keys = serviceAuthFromEnv({
-      FACTORY_FLOOR_AGENT_TO_FACTORY_KEY: 'agent-key',
-      FACTORY_FLOOR_FACTORY_TO_AGENT_KEY: 'factory-key',
+  it('loads current and previous directional keys', () => {
+    expect(
+      serviceAuthFromEnv({
+        FACTORY_FLOOR_AGENT_TO_FACTORY_KEY: 'agent-key',
+        FACTORY_FLOOR_FACTORY_TO_AGENT_KEY: 'factory-key',
+        FACTORY_FLOOR_PREVIOUS_AGENT_TO_FACTORY_KEY: 'old-agent-key',
+        FACTORY_FLOOR_PREVIOUS_FACTORY_TO_AGENT_KEY: 'old-factory-key',
+      }),
+    ).toEqual({
+      agentToFactoryKey: 'agent-key',
+      factoryToAgentKey: 'factory-key',
+      previousAgentToFactoryKey: 'old-agent-key',
+      previousFactoryToAgentKey: 'old-factory-key',
     });
-    expect(keys).toBeDefined();
-    expect(keys!.agentToFactoryKey).toBe('agent-key');
-    expect(keys!.factoryToAgentKey).toBe('factory-key');
   });
 
-  it('includes previous keys when set', () => {
-    const keys = serviceAuthFromEnv({
-      FACTORY_FLOOR_AGENT_TO_FACTORY_KEY: 'agent-key',
-      FACTORY_FLOOR_FACTORY_TO_AGENT_KEY: 'factory-key',
-      FACTORY_FLOOR_PREVIOUS_AGENT_TO_FACTORY_KEY: 'prev-agent-key',
-      FACTORY_FLOOR_PREVIOUS_FACTORY_TO_AGENT_KEY: 'prev-factory-key',
-    });
-    expect(keys!.previousAgentToFactoryKey).toBe('prev-agent-key');
-    expect(keys!.previousFactoryToAgentKey).toBe('prev-factory-key');
-  });
-
-  it('returns undefined when required keys are missing', () => {
+  it('returns undefined unless both current keys are configured', () => {
     expect(serviceAuthFromEnv({})).toBeUndefined();
     expect(
       serviceAuthFromEnv({ FACTORY_FLOOR_AGENT_TO_FACTORY_KEY: 'agent-key' }),
@@ -68,264 +79,250 @@ describe('service auth from env', () => {
 });
 
 describe('sign and verify', () => {
-  it('signs and verifies a valid request', async () => {
+  it('verifies a valid agent-to-Factory-Floor request', async () => {
     const config = testConfig();
     const now = Date.now();
+    const path = '/api/v1/discord/activity/sessions';
+    const body = '{"instanceId":"test"}';
+    const header = signedHeader('agent-to-ff', 'POST', path, body, now);
 
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { instanceId: 'test' },
-      now,
-    );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-    expect(header).toContain('HMAC-SHA256');
-    expect(header).toContain(`keyId=${keyId}`);
-    expect(header).toContain(`timestamp=${timestamp}`);
-
-    // This should not throw
-    await verifyServiceRequest(
-      { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { instanceId: 'test' },
-      header,
-      now,
-    );
-
-    expect(config.nonceDb.isNonceUsed).toHaveBeenCalledWith(keyId, nonce);
-    expect(config.nonceDb.recordNonce).toHaveBeenCalledWith(keyId, nonce);
-  });
-
-  it('rejects missing auth header', async () => {
-    const config = testConfig();
     await expect(
       verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb },
-        'GET',
-        '/health',
-        null,
-        undefined,
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('rejects malformed auth header', async () => {
-    const config = testConfig();
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb },
-        'GET',
-        '/health',
-        null,
-        'Bearer some-token',
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('rejects unknown key ID', async () => {
-    const config = testConfig();
-    const header = signatureHeader('unknown-key', String(Date.now()), 'nonce-1', 'sig');
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb },
-        'GET',
-        '/health',
-        null,
-        header,
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('rejects stale timestamp beyond skew', async () => {
-    const config = testConfig();
-    const now = Date.now();
-    const stale = now - 120_000;
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
-      'GET',
-      '/health',
-      null,
-      stale,
-    );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-        'GET',
-        '/health',
-        null,
+        config,
+        'agent-to-ff',
+        'POST',
+        path,
+        body,
         header,
         now,
       ),
-    ).rejects.toThrow(ServiceAuthError);
+    ).resolves.toBeUndefined();
+    expect(config.db.consumeNonce).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects replayed nonce', async () => {
+  it('does not accept the reverse-direction key', async () => {
     const config = testConfig();
     const now = Date.now();
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
+    const body = '{}';
+    const header = signedHeader(
+      'ff-to-agent',
       'POST',
       '/api/v1/discord/activity/sessions',
-      { test: true },
+      body,
       now,
     );
 
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-
-    config.nonceDb.isNonceUsed.mockResolvedValueOnce(false);
-    config.nonceDb.recordNonce.mockResolvedValueOnce(undefined);
-
-    await verifyServiceRequest(
-      { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { test: true },
-      header,
-      now,
-    );
-
-    config.nonceDb.isNonceUsed.mockResolvedValueOnce(true);
     await expect(
       verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
+        config,
+        'agent-to-ff',
         'POST',
         '/api/v1/discord/activity/sessions',
-        { test: true },
+        body,
         header,
         now,
       ),
-    ).rejects.toThrow(ServiceAuthError);
+    ).rejects.toMatchObject({ message: 'service_auth_unknown_key' });
+    expect(config.db.consumeNonce).not.toHaveBeenCalled();
   });
 
-  it('rejects signature mismatch from wrong body', async () => {
-    const config = testConfig();
-    const now = Date.now();
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { realBody: true },
-      now,
-    );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-        'POST',
-        '/api/v1/discord/activity/sessions',
-        { fakeBody: true },
-        header,
-        now,
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('rejects signature mismatch from wrong method', async () => {
-    const config = testConfig();
-    const now = Date.now();
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { test: true },
-      now,
-    );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-        'GET',
-        '/api/v1/discord/activity/sessions',
-        { test: true },
-        header,
-        now,
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('rejects signature mismatch from wrong path', async () => {
-    const config = testConfig();
-    const now = Date.now();
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      config.keys,
-      'POST',
-      '/api/v1/discord/activity/sessions',
-      { test: true },
-      now,
-    );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
-
-    await expect(
-      verifyServiceRequest(
-        { keys: config.keys, db: config.nonceDb, maxSkewMs: 30_000 },
-        'POST',
-        '/api/v1/discord/activity/other',
-        { test: true },
-        header,
-        now,
-      ),
-    ).rejects.toThrow(ServiceAuthError);
-  });
-
-  it('accepts requests signed with previous key during rotation', async () => {
-    const config = testConfig();
-    const now = Date.now();
-
-    const { keyId, timestamp, nonce, signature } = signRequest(
-      {
-        agentToFactoryKey: testKeys().agentToFactoryKey,
-        factoryToAgentKey: 'new-factory-key',
+  it('accepts the previous key under the stable directional key ID', async () => {
+    const oldKeys = {
+      agentToFactoryKey: 'old-agent-key',
+      factoryToAgentKey: 'factory-key',
+    };
+    const config = {
+      keys: {
+        ...testKeys(),
+        agentToFactoryKey: 'new-agent-key',
+        previousAgentToFactoryKey: oldKeys.agentToFactoryKey,
       },
-      'GET',
-      '/health',
-      null,
+      db: testNonceDb(),
+    };
+    const now = Date.now();
+    const header = signedHeader(
+      'agent-to-ff',
+      'POST',
+      '/api/v1/discord/activity/sessions',
+      '{}',
       now,
+      oldKeys,
     );
-
-    const header = signatureHeader(keyId, timestamp, nonce, signature);
 
     await expect(
       verifyServiceRequest(
-        {
-          keys: {
-            agentToFactoryKey: testKeys().agentToFactoryKey,
-            factoryToAgentKey: 'new-factory-key',
-            previousAgentToFactoryKey: testKeys().agentToFactoryKey,
-          },
-          db: config.nonceDb,
-          maxSkewMs: 30_000,
-        },
-        'GET',
-        '/health',
-        null,
+        config,
+        'agent-to-ff',
+        'POST',
+        '/api/v1/discord/activity/sessions',
+        '{}',
         header,
         now,
       ),
     ).resolves.toBeUndefined();
   });
+
+  it('signs exact body bytes rather than parsed JSON', async () => {
+    const config = testConfig();
+    const now = Date.now();
+    const path = '/api/v1/discord/activity/sessions';
+    const header = signedHeader(
+      'agent-to-ff',
+      'POST',
+      path,
+      '{"a":1,"b":2}',
+      now,
+    );
+
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'POST',
+        path,
+        '{ "a": 1, "b": 2 }',
+        header,
+        now,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_signature_mismatch' });
+    expect(config.db.consumeNonce).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing and malformed headers', async () => {
+    const config = testConfig();
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'GET',
+        '/health',
+        '',
+        undefined,
+      ),
+    ).rejects.toBeInstanceOf(ServiceAuthError);
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'GET',
+        '/health',
+        '',
+        'Bearer token',
+      ),
+    ).rejects.toBeInstanceOf(ServiceAuthError);
+  });
+
+  it('rejects timestamps outside the skew window', async () => {
+    const config = testConfig();
+    const now = Date.now();
+    const signedAt = now - 120_000;
+    const header = signedHeader(
+      'agent-to-ff',
+      'GET',
+      '/health',
+      '',
+      signedAt,
+    );
+
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'GET',
+        '/health',
+        '',
+        header,
+        now,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_timestamp_skew' });
+  });
+
+  it('rejects replayed nonces atomically', async () => {
+    const config = testConfig();
+    const now = Date.now();
+    const path = '/api/v1/discord/activity/sessions';
+    const header = signedHeader('agent-to-ff', 'POST', path, '{}', now);
+
+    await verifyServiceRequest(
+      config,
+      'agent-to-ff',
+      'POST',
+      path,
+      '{}',
+      header,
+      now,
+    );
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'POST',
+        path,
+        '{}',
+        header,
+        now,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_nonce_replayed' });
+  });
+
+  it('binds the signature to the method and normalized path', async () => {
+    const config = testConfig();
+    const now = Date.now();
+    const path = '/api/v1/discord/activity/sessions';
+    const header = signedHeader('agent-to-ff', 'POST', path, '{}', now);
+
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'GET',
+        path,
+        '{}',
+        header,
+        now,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_signature_mismatch' });
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'POST',
+        `${path}/other`,
+        '{}',
+        header,
+        now,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_signature_mismatch' });
+  });
+
+  it('rejects malformed signature encodings without throwing a buffer error', async () => {
+    const config = testConfig();
+    const header = signatureHeader(
+      'ff-agent-to-ff-v1',
+      String(Date.now()),
+      'nonce',
+      'not-hex',
+    );
+    await expect(
+      verifyServiceRequest(
+        config,
+        'agent-to-ff',
+        'POST',
+        '/api/v1/discord/activity/sessions',
+        '{}',
+        header,
+      ),
+    ).rejects.toMatchObject({ message: 'service_auth_signature_mismatch' });
+  });
 });
 
 describe('parseSignatureHeader', () => {
-  it('parses a valid header', () => {
-    const result = parseSignatureHeader(
-      'HMAC-SHA256 keyId=ff-agent-to-ff-v1,timestamp=12345,nonce=abc,signature=def',
-    );
-    expect(result).toEqual({
+  it('parses the stable header format', () => {
+    expect(
+      parseSignatureHeader(
+        'HMAC-SHA256 keyId=ff-agent-to-ff-v1,timestamp=12345,nonce=abc,signature=def',
+      ),
+    ).toEqual({
       keyId: 'ff-agent-to-ff-v1',
       timestamp: '12345',
       nonce: 'abc',
@@ -333,17 +330,13 @@ describe('parseSignatureHeader', () => {
     });
   });
 
-  it('returns null for invalid format', () => {
+  it('rejects incomplete or ambiguous headers', () => {
     expect(parseSignatureHeader('invalid')).toBeNull();
     expect(parseSignatureHeader('HMAC-SHA256 keyId=only')).toBeNull();
-  });
-});
-
-describe('ServiceAuthError', () => {
-  it('carries the message and status code', () => {
-    const err = new ServiceAuthError('test_error', 403);
-    expect(err.message).toBe('test_error');
-    expect(err.statusCode).toBe(403);
-    expect(err.name).toBe('ServiceAuthError');
+    expect(
+      parseSignatureHeader(
+        'HMAC-SHA256 keyId=a,timestamp=1,nonce=n,signature=s,extra=x',
+      ),
+    ).toBeNull();
   });
 });
