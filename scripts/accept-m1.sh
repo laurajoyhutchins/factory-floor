@@ -39,41 +39,11 @@ rm -rf \
 mkdir -p "$FACTORY_FLOOR_EVIDENCE_DIR"
 
 bash scripts/bootstrap-workspace.sh
-pnpm contracts:validate
-pnpm contracts:check
-pnpm conformance:check
-
 pnpm services:clean
-pnpm services:up
-pnpm services:wait
-pnpm db:migrate
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:python
-
-pnpm exec prettier --check \
-  .github/workflows/task1-verification.yml \
-  apps/cli/src/index.ts \
-  apps/control-plane/src/routes/inspection.ts \
-  apps/control-plane/test/inspection-routes.test.ts \
-  docs/reference/conformance-ledger.yaml \
-  docs/reference/acceptance/m1-durable-reactive-graph.md \
-  eslint.config.js \
-  package.json \
-  packages/runtime-core/src/index.ts \
-  packages/runtime-core/src/observability/observability-service.ts \
-  packages/runtime-core/src/policies/policy-decision-service.ts \
-  scripts/collect-m1-evidence.mjs \
-  scripts/record-m1-policy-evidence.ts \
-  scripts/run-m1-cancellation-evidence.ts \
-  scripts/sanitize-m1-evidence.mjs \
-  tests/integration/runtime-core/policy-decision.test.ts \
-  tests/integration/runtime-core/registration-and-system.test.ts
-
-echo "[factory-floor] Repository-wide pnpm format:check is not an M1 gate because main has documented pre-existing Prettier drift across 101 files; Task 12C Prettier-supported files passed the scoped check above."
-
-pnpm test:integration
+pnpm verify:static
+pnpm verify:unit
+pnpm verify:services
+pnpm verify:integration
 
 set -o pipefail
 ACCEPTANCE_PORT="${FACTORY_FLOOR_ACCEPTANCE_PORT:-3112}"
