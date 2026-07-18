@@ -46,10 +46,12 @@ export function registerControlPlaneSecurity(
     const inspectionRead =
       (request.method === 'GET' || request.method === 'HEAD') &&
       path.startsWith('/api/v1/inspect/');
-    const authorized = inspectionRead
-      ? tokenMatches(supplied, security.operatorToken) ||
-        tokenMatches(supplied, security.adminToken)
-      : tokenMatches(supplied, security.adminToken);
+    const operatorOperation = path.startsWith('/api/v1/operator/');
+    const authorized =
+      inspectionRead || operatorOperation
+        ? tokenMatches(supplied, security.operatorToken) ||
+          tokenMatches(supplied, security.adminToken)
+        : tokenMatches(supplied, security.adminToken);
     if (!authorized) return reply.code(403).send(securityError('forbidden'));
   });
 }
