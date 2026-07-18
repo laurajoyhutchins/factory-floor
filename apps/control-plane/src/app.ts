@@ -38,7 +38,8 @@ import {
   type ServiceAuthConfig,
   type ServiceAuthKeys,
 } from './service-auth.js';
-import { createNonceRepository } from '@factory-floor/runtime-core';
+import { createNonceRepository } from './nonce-repository.js';
+import { ActivitySessionService } from './activity-session-service.js';
 import { registerActivityRoutes } from './routes/activity.js';
 
 export interface StartupRecoveryBounds {
@@ -367,15 +368,12 @@ export async function buildApp(
   }
 
   if (deps.serviceAuthKeys && db) {
-    const nonceRepo = createNonceRepository(db);
     const serviceAuthConfig: ServiceAuthConfig = {
       keys: deps.serviceAuthKeys,
-      db: nonceRepo,
+      db: createNonceRepository(db),
     };
     registerServiceAuth(app, serviceAuthConfig);
-    const { ActivitySessionService } = await import('@factory-floor/runtime-core');
-    const activityService = new ActivitySessionService(db);
-    await registerActivityRoutes(app, activityService);
+    await registerActivityRoutes(app, new ActivitySessionService(db));
   }
 
   if (db)
