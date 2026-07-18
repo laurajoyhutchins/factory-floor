@@ -30,6 +30,14 @@ function securityError(code: 'authentication_required' | 'forbidden') {
   };
 }
 
+function isServiceAuthenticatedActivityRoute(path: string): boolean {
+  return (
+    path === '/api/v1/discord/activity/sessions' ||
+    path === '/api/v1/discord/activity/sessions/refresh' ||
+    path === '/api/v1/discord/activity/sessions/revoke'
+  );
+}
+
 export function registerControlPlaneSecurity(
   app: FastifyInstance,
   security: ControlPlaneSecurity,
@@ -39,8 +47,9 @@ export function registerControlPlaneSecurity(
     if (
       path === '/health' ||
       path.startsWith('/worker/v1/') ||
-      path.startsWith('/api/v1/discord/')
-    ) return;
+      isServiceAuthenticatedActivityRoute(path)
+    )
+      return;
     if (!path.startsWith('/api/v1/')) return;
 
     const supplied = bearer(request);
