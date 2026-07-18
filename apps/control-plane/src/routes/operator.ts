@@ -121,10 +121,7 @@ function assertOnlyKeys(
     throw new OperatorValidationError(MALFORMED_REQUEST);
 }
 
-function requiredString(
-  value: Record<string, unknown>,
-  field: string,
-): string {
+function requiredString(value: Record<string, unknown>, field: string): string {
   const result = value[field];
   if (typeof result !== 'string')
     throw new OperatorValidationError(MALFORMED_REQUEST);
