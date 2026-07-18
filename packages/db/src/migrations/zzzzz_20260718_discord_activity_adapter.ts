@@ -15,18 +15,22 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       installation_identifier text not null,
       bound_run_id text,
       bound_view jsonb not null default '{}'::jsonb,
-      principal_id text,
-      adapter text,
-      expires_at timestamptz,
+      principal_id text not null,
+      adapter text not null,
+      expires_at timestamptz not null,
       closed_at timestamptz,
       constraint uq_activity_instance unique (application_id, instance_id)
     );
+
+    create index if not exists idx_activity_instance_expiry
+      on activity_instance_bindings(expires_at);
 
     create table if not exists activity_sessions (
       id uuid primary key default gen_random_uuid(),
       created_at timestamptz not null default now(),
       instance_binding_id uuid not null
         references activity_instance_bindings(id) on delete cascade,
+      principal_id text not null,
       token_digest text not null,
       expires_at timestamptz not null,
       idle_expires_at timestamptz not null,
@@ -37,6 +41,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     create index if not exists idx_activity_sessions_binding
       on activity_sessions(instance_binding_id);
+    create index if not exists idx_activity_sessions_expiry
+      on activity_sessions(expires_at, idle_expires_at);
 
     create table if not exists activity_collaborative_state (
       id uuid primary key default gen_random_uuid(),
@@ -65,9 +71,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
 export async function down(db: Kysely<unknown>): Promise<void> {
   await sql`
+    drop table if exists service_request_nonces;
     drop table if exists activity_collaborative_state;
     drop table if exists activity_sessions;
     drop table if exists activity_instance_bindings;
-    drop table if exists service_request_nonces;
   `.execute(db);
 }
