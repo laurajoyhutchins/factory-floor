@@ -24,9 +24,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  fast-verification:
+    name: Fast repository verification
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -60,132 +61,120 @@ jobs:
       - name: Verify workspace bootstrap
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Validate contracts
-        run: pnpm contracts:validate
-
-      - name: Check generated contract drift
-        run: pnpm contracts:check
-
-      - name: Validate conformance ledger
-        run: pnpm conformance:check
-
-      - name: Lint
+      - name: Run canonical static verification
+        env:
+          FACTORY_FLOOR_FORMAT_DIAGNOSTICS: '1'
         run: |
           set -o pipefail
-          pnpm lint 2>&1 | tee lint.log
+          pnpm verify:static 2>&1 | tee fast-static.log
 
-      - name: Upload lint log
+      - name: Upload static verification diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-log-${{ github.run_number }}
-          path: lint.log
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Typecheck
-        run: |
-          set -o pipefail
-          pnpm typecheck 2>&1 | tee typecheck.log
-
-      - name: Upload typecheck log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: typecheck-log-${{ github.run_number }}
-          path: typecheck.log
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Run workspace TypeScript tests
-        run: pnpm test
-
-      - name: Run control-plane package tests
-        run: pnpm --filter @factory-floor/control-plane test
-
-      - name: Run Python tests
-        run: pnpm test:python
-
-      - name: Check formatting
-        run: |
-          set -o pipefail
-          if pnpm format:check 2>&1 | tee format.log; then
-            exit 0
-          fi
-          pnpm format
-          git diff --name-only --diff-filter=ACMRT > formatted-files.txt
-          tar -czf formatted-files.tar.gz -T formatted-files.txt
-          exit 1
-
-      - name: Upload formatting diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: format-log-${{ github.run_number }}
+          name: static-verification-${{ github.run_number }}
           path: |
+            fast-static.log
             format.log
             formatted-files.txt
             formatted-files.tar.gz
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Validate Compose configuration
-        run: docker compose config
-
-      - name: Start development services
-        run: pnpm services:up
-
-      - name: Wait for PostgreSQL and MinIO health
-        run: pnpm services:wait
-
-      - name: Run database migrations
-        env:
-          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-        run: pnpm db:migrate
-
-      - name: Run integration test command
-        env:
-          TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+      - name: Run canonical unit verification
         run: |
           set -o pipefail
-          pnpm test:integration 2>&1 | tee integration-test.log
+          pnpm verify:unit 2>&1 | tee unit-verification.log
 
-      - name: Upload integration log
+      - name: Upload unit verification log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-log-${{ github.run_number }}
-          path: integration-test.log
+          name: unit-verification-${{ github.run_number }}
+          path: unit-verification.log
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Run conformance-focused tests
-        env:
-          TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-        run: pnpm test:conformance
+  service-verification:
+    name: Docker-backed repository verification
+    needs: fast-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+      TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
 
-      - name: Verify migration reset against Compose PostgreSQL
-        env:
-          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-          NODE_ENV: development
-        run: pnpm --filter @factory-floor/db migrate reset
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Run Milestone 1 live-restart acceptance
-        env:
-          TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-          DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv
+
+      - name: Install locked dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --project packages/contracts-py --locked
+          uv sync --project packages/worker-sdk-py --locked
+
+      - name: Verify workspace bootstrap
+        run: bash scripts/bootstrap-workspace.sh
+
+      - name: Start services and run migrations
         run: |
           set -o pipefail
-          pnpm test:acceptance 2>&1 | tee acceptance-test.log
+          pnpm verify:services 2>&1 | tee services-verification.log
 
-      - name: Upload acceptance log
+      - name: Upload service verification log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-test-log-${{ github.run_number }}
-          path: acceptance-test.log
+          name: services-verification-${{ github.run_number }}
+          path: services-verification.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Run canonical integration verification
+        run: |
+          set -o pipefail
+          pnpm verify:integration 2>&1 | tee integration-verification.log
+
+      - name: Upload integration verification log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-verification-${{ github.run_number }}
+          path: integration-verification.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Run canonical live-restart acceptance
+        run: |
+          set -o pipefail
+          pnpm verify:acceptance 2>&1 | tee acceptance-verification.log
+
+      - name: Upload acceptance verification log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-verification-${{ github.run_number }}
+          path: acceptance-verification.log
           if-no-files-found: ignore
           retention-days: 30
 
@@ -195,7 +184,7 @@ jobs:
 
   m1-acceptance:
     name: Milestone 1 clean acceptance
-    needs: verify
+    needs: service-verification
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

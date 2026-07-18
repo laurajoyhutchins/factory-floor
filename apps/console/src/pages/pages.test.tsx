@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -93,10 +93,20 @@ describe('console views', () => {
       },
     });
     wrap(<ExecutionDetail />, '/executions/ex1', '/executions/:executionId');
-    expect(await screen.findByText('Attempt 1')).toBeInTheDocument();
-    expect(screen.getByText('failed')).toBeInTheDocument();
-    expect(screen.getByText('Replacement attempt')).toBeInTheDocument();
-    expect(screen.getByText('completed')).toBeInTheDocument();
+    const timelineHeading = await screen.findByRole('heading', {
+      name: 'Attempt timeline',
+    });
+    const timeline = timelineHeading.closest('section');
+    if (!timeline) throw new Error('Attempt timeline section was not rendered');
+    const [failedAttempt, replacementAttempt] =
+      within(timeline).getAllByRole('listitem');
+    expect(within(failedAttempt).getByText('failed')).toBeInTheDocument();
+    expect(
+      within(replacementAttempt).getByText('Replacement attempt'),
+    ).toBeInTheDocument();
+    expect(
+      within(replacementAttempt).getByText('completed'),
+    ).toBeInTheDocument();
   });
 
   it('loads another opaque execution page without synthesizing a cursor', async () => {
@@ -141,9 +151,19 @@ describe('console views', () => {
     ]);
     vi.spyOn(client.consoleApi, 'artifactLineage').mockResolvedValue(data);
     wrap(<ArtifactDetail />, '/artifacts/b', '/artifacts/:artifactId');
-    expect(await screen.findByText('Text relationships')).toBeInTheDocument();
-    expect(screen.getByLabelText('Copy a')).toBeInTheDocument();
-    expect(screen.getByLabelText('Copy b')).toBeInTheDocument();
+    const relationshipsHeading = await screen.findByRole('heading', {
+      name: 'Text relationships',
+    });
+    const relationships = relationshipsHeading.closest('section');
+    if (!relationships)
+      throw new Error('Text relationships section was not rendered');
+    const relationshipList = within(relationships).getByRole('list');
+    expect(
+      within(relationshipList).getByLabelText('Copy a'),
+    ).toBeInTheDocument();
+    expect(
+      within(relationshipList).getByLabelText('Copy b'),
+    ).toBeInTheDocument();
   });
 
   it('maps active topology nodes, ports, and directed connections', async () => {

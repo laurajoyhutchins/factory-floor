@@ -1,0 +1,175 @@
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
+
+import rootVitestConfig from '../vitest.config.ts';
+
+const root = new URL('../', import.meta.url);
+const read = (relativePath) =>
+  readFileSync(new URL(relativePath, root), 'utf8');
+
+describe('repository verification wiring', () => {
+  it('discovers unit tests and preserves the console test project', () => {
+    const projects = rootVitestConfig.test.projects;
+    const rootProject = projects.find(
+      (project) => typeof project === 'object' && project !== null,
+    );
+
+    expect(projects).toEqual(
+      expect.arrayContaining(['apps/console/vitest.config.ts']),
+    );
+    expect(rootProject.test.include).toEqual(
+      expect.arrayContaining([
+        'apps/**/*.test.ts',
+        'apps/**/*.test.tsx',
+        'packages/**/*.test.ts',
+        'packages/**/*.test.tsx',
+        'workers/**/*.test.ts',
+        'workers/**/*.test.tsx',
+        'scripts/**/*.test.mjs',
+      ]),
+    );
+    expect(rootProject.test.include).not.toEqual(
+      expect.arrayContaining([
+        'tests/**/*.test.ts',
+        'tests/integration/**/*.test.ts',
+        'tests/acceptance/**/*.test.ts',
+      ]),
+    );
+    expect(rootProject.test.exclude).toEqual(
+      expect.arrayContaining([
+        'tests/**',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/coverage/**',
+        '**/generated/**',
+        'apps/console/**',
+      ]),
+    );
+    const consoleVitestConfig = read('apps/console/vitest.config.ts');
+    expect(consoleVitestConfig).toContain("environment: 'jsdom'");
+    expect(consoleVitestConfig).toContain(
+      "setupFiles: ['./src/test/setup.ts']",
+    );
+    expect(
+      existsSync(
+        new URL('../apps/console/src/pages/pages.test.tsx', import.meta.url),
+      ),
+    ).toBe(true);
+  });
+
+  it('maps package verification commands to explicit canonical stages', () => {
+    const packageJson = JSON.parse(read('package.json'));
+    const verificationScript = read('scripts/verify.sh');
+
+    expect(packageJson.scripts).toMatchObject({
+      'verify:static': 'bash scripts/verify.sh static',
+      'verify:unit': 'bash scripts/verify.sh unit',
+      'verify:fast': 'bash scripts/verify.sh fast',
+      'verify:services': 'bash scripts/verify.sh services',
+      'verify:integration': 'bash scripts/verify.sh integration',
+      'verify:acceptance': 'bash scripts/verify.sh acceptance',
+      verify: 'bash scripts/verify.sh all',
+    });
+    for (const stage of [
+      'static',
+      'unit',
+      'fast',
+      'services',
+      'integration',
+      'acceptance',
+    ]) {
+      expect(verificationScript).toContain(`verify_${stage}()`);
+    }
+    expect(verificationScript).toContain(
+      'pnpm --filter @factory-floor/console build',
+    );
+  });
+
+  it('keeps verification stages reproducible from caller environments', () => {
+    const verificationScript = read('scripts/verify.sh');
+    const acceptanceScript = read('scripts/accept-m1.sh');
+    const integrationConfig = read('vitest.integration.config.ts');
+    const unitStage = verificationScript.slice(
+      verificationScript.indexOf('verify_unit() {'),
+      verificationScript.indexOf('verify_fast() {'),
+    );
+    const integrationStage = verificationScript.slice(
+      verificationScript.indexOf('verify_integration() {'),
+      verificationScript.indexOf('verify_acceptance() {'),
+    );
+
+    expect(unitStage).toContain('unset DATABASE_URL TEST_DATABASE_URL');
+    expect(
+      unitStage.indexOf('unset DATABASE_URL TEST_DATABASE_URL'),
+    ).toBeLessThan(unitStage.indexOf('pnpm test'));
+    expect(integrationStage.indexOf('pnpm typecheck')).toBeGreaterThan(-1);
+    expect(integrationStage.indexOf('pnpm typecheck')).toBeLessThan(
+      integrationStage.indexOf('pnpm test:integration'),
+    );
+    expect(verificationScript).toContain('pnpm db:reset');
+    expect(verificationScript).not.toContain(
+      'pnpm --filter @factory-floor/db migrate reset',
+    );
+    expect(integrationConfig).toContain("'@factory-floor/artifact-store'");
+    expect(integrationConfig).toContain("'@factory-floor/db'");
+    expect(integrationConfig).toContain("'@factory-floor/runtime-core'");
+    expect(acceptanceScript).toContain('pnpm verify:static');
+    expect(acceptanceScript).toContain('pnpm verify:unit');
+    expect(acceptanceScript).toContain('pnpm verify:services');
+    expect(acceptanceScript).toContain('pnpm verify:integration');
+    expect(acceptanceScript).not.toContain('pnpm test:integration');
+    expect(acceptanceScript).not.toContain('pnpm exec prettier --check');
+  });
+
+  it('makes CI call canonical stages instead of duplicating command lists', () => {
+    const workflow = parse(
+      read('.github/workflows/repository-verification.yml'),
+    );
+    const runCommands = Object.values(workflow.jobs)
+      .flatMap((job) => job.steps ?? [])
+      .map((step) => step.run ?? '')
+      .join('\n');
+
+    expect(runCommands).toContain('pnpm verify:static');
+    expect(runCommands).toContain('pnpm verify:unit');
+    expect(runCommands).toContain('pnpm verify:services');
+    expect(runCommands).toContain('pnpm verify:integration');
+    expect(runCommands).toContain('pnpm verify:acceptance');
+    expect(runCommands).not.toMatch(
+      /pnpm (lint|typecheck|test|test:python|format:check)\b/,
+    );
+    expect(runCommands).not.toContain('@factory-floor/console test');
+    expect(workflow.jobs['m1-acceptance'].needs).toBe('service-verification');
+  });
+
+  it('keeps console typechecking, tests, and production build in permanent verification', () => {
+    const consolePackage = JSON.parse(read('apps/console/package.json'));
+    const verificationScript = read('scripts/verify.sh');
+
+    expect(consolePackage.scripts).toMatchObject({
+      typecheck: 'tsc -p tsconfig.json --pretty false',
+      test: 'vitest run --config vitest.config.ts',
+    });
+    expect(consolePackage.scripts.build).toContain('vite build');
+    expect(verificationScript).toContain('pnpm typecheck');
+    expect(verificationScript).toContain('pnpm test');
+    expect(verificationScript).toContain(
+      'pnpm --filter @factory-floor/console build',
+    );
+    expect(verificationScript).not.toContain('@factory-floor/console test');
+    expect(read('tsconfig.json')).toContain('"path": "apps/console"');
+  });
+
+  it('contains no references to the obsolete workflow filename', () => {
+    const result = spawnSync(
+      'git',
+      ['grep', '-n', ['task1', 'verification.yml'].join('-'), '--', '.'],
+      { cwd: new URL('../', import.meta.url), encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(1);
+  });
+});
