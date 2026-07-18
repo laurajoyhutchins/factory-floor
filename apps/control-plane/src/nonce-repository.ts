@@ -32,10 +32,10 @@ export function createNonceRepository(db: Kysely<Database>) {
         lastCleanupAt = now;
         try {
           const cutoff = new Date(now - NONCE_RETENTION_MS);
-          await db
-            .deleteFrom('service_request_nonces')
-            .where('created_at', '<', sql<Date>`${cutoff}`)
-            .execute();
+          await sql`
+            delete from service_request_nonces
+            where created_at < ${cutoff}
+          `.execute(db);
         } catch {
           // Cleanup is best effort; the unique insert already consumed the nonce.
         }
