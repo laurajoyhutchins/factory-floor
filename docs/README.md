@@ -30,6 +30,7 @@ This directory contains the authoritative, reader-facing documentation for Facto
 - [Architecture](explanation/architecture.md)
 - [Architecture decisions](explanation/architecture-decisions.md)
 - [Operator console model](explanation/operator-console.md)
+- [Discord Activity operator interface](explanation/discord-activity-operator-interface.md)
 
 ## Authority and status
 
