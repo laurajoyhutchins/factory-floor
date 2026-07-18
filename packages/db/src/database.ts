@@ -335,13 +335,14 @@ export interface Database {
     installation_identifier: string;
     bound_run_id: string | null;
     bound_view: Jsonb;
-    principal_id: string | null;
-    adapter: string | null;
-    expires_at: Timestamp | null;
+    principal_id: string;
+    adapter: string;
+    expires_at: Timestamp;
     closed_at: Timestamp | null;
   };
   activity_sessions: Row & {
     instance_binding_id: string;
+    principal_id: string;
     token_digest: string;
     expires_at: Timestamp;
     idle_expires_at: Timestamp;
