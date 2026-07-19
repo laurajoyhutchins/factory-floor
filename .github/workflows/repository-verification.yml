@@ -76,6 +76,7 @@ jobs:
       - name: Write agent CI handoff
         if: always()
         env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job fast-verification --artifact fast-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
@@ -156,6 +157,7 @@ jobs:
       - name: Write agent CI handoff
         if: always()
         env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job service-verification --artifact service-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
@@ -218,6 +220,7 @@ jobs:
       - name: Write agent CI handoff
         if: always()
         env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job m1-acceptance --artifact m1-acceptance-evidence-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
