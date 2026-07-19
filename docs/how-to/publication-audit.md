@@ -76,16 +76,16 @@ Classify every result. Synthetic fixtures and false positives must be documented
 
 ## 3. Audit retained GitHub evidence and snapshot protections
 
-Run:
+Run the complete collector:
 
 ```bash
-bash scripts/audit-publication-github.sh laurajoyhutchins/factory-floor
+bash scripts/audit-publication-github-all.sh laurajoyhutchins/factory-floor
 ```
 
-The script:
+The collector:
 
-- enumerates retained workflow runs, workflow artifacts, cache metadata, releases, and release assets;
-- downloads every retained workflow log, workflow artifact, and release asset available through the API;
+- enumerates retained workflow runs, every numbered rerun attempt, workflow artifacts, cache metadata, releases, and release assets;
+- downloads every retained workflow-attempt log, workflow artifact, and release asset available through the API;
 - rejects unsafe ZIP paths, symbolic links, excessive entry counts, and excessive expansion before extracting workflow evidence;
 - scans downloaded evidence without printing matching content;
 - snapshots repository metadata, rulesets, branch protection, Actions permissions, fork approval policy, repository and environment secret and variable names, environments, runners, installed apps, webhooks, deploy keys, collaborators, Pages, code-security configuration, and private vulnerability reporting;
@@ -94,10 +94,10 @@ The script:
 Evidence is written below:
 
 ```text
-.factory-floor/publication-audit/github-<UTC timestamp>/
+.factory-floor/publication-audit/github-complete-<UTC timestamp>/
 ```
 
-Review every downloaded log, workflow artifact, and release asset manually. Confirm unavailable items are expired or deleted rather than inaccessible because of an authorization problem. Actions caches cannot be downloaded by this audit; classify or purge them before publication.
+Review every downloaded attempt separately: a later clean rerun does not clear a disclosure in an earlier attempt. Review every workflow artifact and release asset manually. Confirm unavailable items are expired or deleted rather than inaccessible because of an authorization problem. Actions caches cannot be downloaded by this audit; classify or purge them before publication.
 
 Pay particular attention to `.github/workflows/agent-pr-handoff.yml`. It uses `pull_request_target`, so verify that it always checks out trusted default-branch code, never executes pull-request-controlled code with elevated permissions, and remains safe for public forks.
 
@@ -156,7 +156,7 @@ Record explicit go/no-go approval in issue #75. Change visibility only after eve
 
 Immediately after conversion:
 
-1. rerun `scripts/audit-publication-github.sh`;
+1. rerun `scripts/audit-publication-github-all.sh`;
 2. diff the complete settings snapshots;
 3. recreate every push ruleset GitHub disabled;
 4. verify required checks resolve on a new harmless pull request;
