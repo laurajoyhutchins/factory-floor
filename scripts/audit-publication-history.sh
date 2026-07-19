@@ -25,6 +25,13 @@ if (( ${#missing[@]} > 0 )); then
   exit 2
 fi
 
+{
+  git --version
+  jq --version
+  gitleaks version
+  trufflehog --version
+} >"${safe_dir}/tool-versions.txt" 2>&1
+
 if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
   echo 'Publication audit requires a clean working tree.' >&2
   exit 2
@@ -43,9 +50,13 @@ if [[ -z "${default_ref}" ]]; then
 fi
 
 git -C "${repo_root}" ls-remote origin | sort >"${raw_dir}/remote-refs-before.txt"
-git clone --mirror "${origin_url}" "${mirror_dir}"
+git clone --mirror "${origin_url}" "${mirror_dir}" \
+  >"${raw_dir}/git-clone.stdout.txt" \
+  2>"${raw_dir}/git-clone.stderr.txt"
 git -C "${mirror_dir}" config remote.origin.fetch '+refs/*:refs/*'
-git -C "${mirror_dir}" fetch --force --prune origin
+git -C "${mirror_dir}" fetch --force --prune origin \
+  >"${raw_dir}/git-fetch.stdout.txt" \
+  2>"${raw_dir}/git-fetch.stderr.txt"
 
 default_sha="$(git -C "${mirror_dir}" rev-parse "${default_ref}^{commit}")"
 if [[ "${candidate_sha}" != "${default_sha}" && "${FACTORY_FLOOR_AUDIT_ALLOW_NONDEFAULT:-0}" != "1" ]]; then
@@ -59,7 +70,7 @@ if ! git -C "${mirror_dir}" cat-file -e "${candidate_sha}^{commit}"; then
   exit 2
 fi
 
-git -C "${mirror_dir}" fsck --full >"${raw_dir}/git-fsck.txt"
+git -C "${mirror_dir}" fsck --full >"${raw_dir}/git-fsck.txt" 2>&1
 
 # Verify that every advertised named ref was captured at the same object ID.
 : >"${raw_dir}/missing-or-mismatched-refs.txt"
@@ -113,7 +124,9 @@ gitleaks git "${mirror_dir}" \
   --log-level=error \
   --report-format=json \
   --report-path="${raw_dir}/gitleaks.json" \
-  --exit-code=0
+  --exit-code=0 \
+  >"${raw_dir}/gitleaks.stdout.txt" \
+  2>"${raw_dir}/gitleaks.stderr.txt"
 
 jq 'map({
   ruleId: .RuleID,
@@ -131,7 +144,8 @@ trufflehog git "file://${mirror_dir}" \
   --results=verified,unknown \
   --json \
   --no-update \
-  >"${raw_dir}/trufflehog.ndjson"
+  >"${raw_dir}/trufflehog.ndjson" \
+  2>"${raw_dir}/trufflehog.stderr.txt"
 
 jq -s 'map({
   detectorName: .DetectorName,
