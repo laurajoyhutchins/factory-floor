@@ -1,0 +1,37 @@
+name: Temporary PR 54 formatter
+
+on:
+  push:
+    branches:
+      - feat/generic-template-instantiation
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/generic-template-instantiation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Activate pnpm
+        run: corepack enable && corepack prepare pnpm@10.12.1 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format service and remove temporary workflow
+        run: |
+          pnpm exec prettier --write packages/runtime-core/src/systems/template-instantiation-service.ts
+          rm .github/workflows/temporary-format-pr54.yml
+      - name: Commit formatting
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/runtime-core/src/systems/template-instantiation-service.ts .github/workflows/temporary-format-pr54.yml
+          git commit -m "style(runtime): format template instantiation service"
+          git push origin HEAD:feat/generic-template-instantiation
