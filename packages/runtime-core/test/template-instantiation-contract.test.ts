@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { TemplateInstantiationContractService } from '../src/systems/template-instantiation-contract-service.js';
 import {
   normalizeTemplateInstantiationRequest,
+  templateInstantiationRequestSchema,
   toTemplateInstantiationResult,
 } from '../src/systems/template-instantiation-contract.js';
 
@@ -20,7 +22,6 @@ const canonicalRequest = {
   template: {
     name: 'bounded-investigation',
     version: '1',
-    expectedContentDigest: digestA,
   },
   parameters: { mode: 'strict' },
   componentConfiguration: { verifier: { retries: 2 } },
@@ -33,13 +34,25 @@ const canonicalRequest = {
 };
 
 describe('template instantiation contract adapter', () => {
+  it('uses the exact canonical request schema', () => {
+    const canonicalSchema = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../contracts/schemas/template-instantiation-request.schema.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    expect(templateInstantiationRequestSchema).toEqual(canonicalSchema);
+  });
+
   it('accepts a canonical request without changing its identity or source', () => {
     expect(normalizeTemplateInstantiationRequest(canonicalRequest)).toEqual({
       protocolVersion: '1.0',
       requestId,
       targetRegionId,
       template: 'bounded-investigation@1',
-      expectedTemplateContentDigest: digestA,
       parameters: { mode: 'strict' },
       componentConfiguration: { verifier: { retries: 2 } },
       source: canonicalRequest.source,
