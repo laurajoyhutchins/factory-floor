@@ -16,13 +16,11 @@ import {
 
 type JsonObject = { [key: string]: Json };
 
-export interface TemplateInstantiationRequest
-  extends TopologyTemplateInstantiationRequest {
+export interface TemplateInstantiationRequest extends TopologyTemplateInstantiationRequest {
   requestId?: string;
 }
 
-export interface TemplateInstantiationResult
-  extends TopologyTemplateInstantiationResult {
+export interface TemplateInstantiationResult extends TopologyTemplateInstantiationResult {
   instantiationId: string;
 }
 
@@ -107,7 +105,8 @@ export class TemplateInstantiationService {
       componentConfiguration,
       source,
     });
-    const requestId = request.requestId ?? deterministicRequestId(requestDigest);
+    const requestId =
+      request.requestId ?? deterministicRequestId(requestDigest);
     const existing = await this.instantiations.findByRequestId(
       transaction,
       requestId,
@@ -129,7 +128,10 @@ export class TemplateInstantiationService {
         source,
       },
     );
-    const regionId = rowId(topologyResult.region, 'template instantiation region');
+    const regionId = rowId(
+      topologyResult.region,
+      'template instantiation region',
+    );
     const topologyRevisionId = rowId(
       topologyResult.revision,
       'template instantiation revision',
@@ -154,15 +156,14 @@ export class TemplateInstantiationService {
       };
     }
 
-    const referencedDefinitions: Json = topologyResult.referencedDefinitions.map(
-      (reference) => ({
+    const referencedDefinitions: Json =
+      topologyResult.referencedDefinitions.map((reference) => ({
         kind: reference.kind,
         id: reference.id,
         name: reference.name,
         version: reference.version,
         contentDigest: reference.contentDigest,
-      }),
-    );
+      }));
     const instantiation = await this.instantiations.create(transaction, {
       requestId,
       requestDigest,
