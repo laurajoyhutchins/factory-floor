@@ -10,9 +10,7 @@ function harness() {
     selectFrom: () => ({
       select: () => ({
         where: () => ({
-          execute: async () => [
-            { id: 'component-verifier', name: 'verifier' },
-          ],
+          execute: async () => [{ id: 'component-verifier', name: 'verifier' }],
         }),
       }),
     }),
@@ -126,8 +124,7 @@ function harness() {
         topology_revision_id: input.topologyRevisionId,
         region_id: input.regionId,
         source_template_id: input.sourceTemplateId,
-        origin_template_instantiation_id:
-          input.originTemplateInstantiationId,
+        origin_template_instantiation_id: input.originTemplateInstantiationId,
         provenance: input.provenance,
       };
       versions.push(version);
