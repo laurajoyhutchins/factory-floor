@@ -64,7 +64,10 @@ interface ResolvedInstance {
 
 function requireNonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new DomainError('invalid_declaration', `${label} must be a non-empty string`);
+    throw new DomainError(
+      'invalid_declaration',
+      `${label} must be a non-empty string`,
+    );
   }
   return value;
 }
@@ -87,11 +90,7 @@ function parseSchemaRef(
   reference: unknown,
   label: string,
 ): { name: string; version: string } {
-  if (
-    reference &&
-    typeof reference === 'object' &&
-    !Array.isArray(reference)
-  ) {
+  if (reference && typeof reference === 'object' && !Array.isArray(reference)) {
     return {
       name: requireNonEmptyString((reference as any).name, `${label}.name`),
       version: requireNonEmptyString(
@@ -143,7 +142,12 @@ function parameterValue(parameters: JsonObject, path: string): Json {
     : path.split('.').filter(Boolean);
   let value: Json = parameters;
   for (const part of parts) {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || !(part in value)) {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      !(part in value)
+    ) {
       throw new DomainError(
         'invalid_template_parameters',
         `Template parameter ${path} was not supplied`,
@@ -194,7 +198,10 @@ function mergeObjects(base: JsonObject, override: JsonObject): JsonObject {
   return result;
 }
 
-function validateParameterSchema(schema: unknown, parameters: JsonObject): void {
+function validateParameterSchema(
+  schema: unknown,
+  parameters: JsonObject,
+): void {
   if (schema === undefined) {
     if (Object.keys(parameters).length > 0) {
       throw new DomainError(
@@ -211,7 +218,9 @@ function validateParameterSchema(schema: unknown, parameters: JsonObject): void 
     );
   }
   try {
-    const validate = new Ajv2020({ strict: true, allErrors: true }).compile(schema);
+    const validate = new Ajv2020({ strict: true, allErrors: true }).compile(
+      schema,
+    );
     if (!validate(parameters)) {
       throw new DomainError(
         'invalid_template_parameters',
@@ -267,14 +276,18 @@ export class TemplateInstantiationService {
   ): Promise<TemplateInstantiationResult> {
     this.validateRequest(request);
     try {
-      return await this.db.transaction().execute((transaction) =>
-        this.instantiateInTransaction(transaction, request),
-      );
+      return await this.db
+        .transaction()
+        .execute((transaction) =>
+          this.instantiateInTransaction(transaction, request),
+        );
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      return this.db.transaction().execute((transaction) =>
-        this.instantiateInTransaction(transaction, request),
-      );
+      return this.db
+        .transaction()
+        .execute((transaction) =>
+          this.instantiateInTransaction(transaction, request),
+        );
     }
   }
 
@@ -356,7 +369,9 @@ export class TemplateInstantiationService {
     });
 
     const resolvedInstances = new Map<string, ResolvedInstance>();
-    const allowedComponents = Array.isArray(templateDocument.spec.allowedComponents)
+    const allowedComponents = Array.isArray(
+      templateDocument.spec.allowedComponents,
+    )
       ? new Set(templateDocument.spec.allowedComponents.map(String))
       : undefined;
     for (const instance of staticTopology.instances) {
@@ -492,10 +507,16 @@ export class TemplateInstantiationService {
       }
       inputSchemas.set(
         port,
-        await resolveSchemaContract(input.schema ?? input.schemaRef, `Input ${port} schema`),
+        await resolveSchemaContract(
+          input.schema ?? input.schemaRef,
+          `Input ${port} schema`,
+        ),
       );
     }
-    const outputSchemas = new Map<string, { schemaId: string; required: boolean }>();
+    const outputSchemas = new Map<
+      string,
+      { schemaId: string; required: boolean }
+    >();
     for (const output of templateDocument.spec.outputs ?? []) {
       const port = requireNonEmptyString(output?.port, 'Template output port');
       if (outputSchemas.has(port)) {
@@ -513,9 +534,13 @@ export class TemplateInstantiationService {
       });
     }
 
-    const completionSchema = templateDocument.spec.completion?.requireValidation?.schema;
+    const completionSchema =
+      templateDocument.spec.completion?.requireValidation?.schema;
     if (completionSchema !== undefined) {
-      await resolveSchemaContract(completionSchema, 'Completion validation schema');
+      await resolveSchemaContract(
+        completionSchema,
+        'Completion validation schema',
+      );
     }
 
     for (const reference of templateDocument.spec.policies ?? []) {
@@ -558,7 +583,9 @@ export class TemplateInstantiationService {
         .executeTakeFirst();
       if (capability === undefined || capability.retired_at !== null) {
         throw new DomainError(
-          capability === undefined ? 'capability_not_found' : 'capability_retired',
+          capability === undefined
+            ? 'capability_not_found'
+            : 'capability_retired',
           `Capability ${capabilityReference.name}@${capabilityReference.version} is unavailable`,
         );
       }
@@ -605,7 +632,10 @@ export class TemplateInstantiationService {
     for (const connection of staticTopology.connections) {
       const sourceEndpoint = endpoint(connection.from);
       const targetEndpoint = endpoint(connection.to);
-      if (sourceEndpoint.instance === 'region' && targetEndpoint.instance === 'region') {
+      if (
+        sourceEndpoint.instance === 'region' &&
+        targetEndpoint.instance === 'region'
+      ) {
         throw new DomainError(
           'invalid_port_reference',
           `Connection ${connection.from} -> ${connection.to} cannot connect two region boundaries`,
@@ -621,7 +651,10 @@ export class TemplateInstantiationService {
           );
         }
         const declaredSchema = inputSchemas.get(sourceEndpoint.port);
-        if (declaredSchema !== undefined && declaredSchema !== targetPort.schemaId) {
+        if (
+          declaredSchema !== undefined &&
+          declaredSchema !== targetPort.schemaId
+        ) {
           throw new DomainError(
             'incompatible_port_schema',
             `Connection ${connection.from} -> ${connection.to} has incompatible schemas`,
@@ -694,7 +727,9 @@ export class TemplateInstantiationService {
       const target = endpoint(
         requireNonEmptyString(rule?.input, 'Fan-in input endpoint'),
       );
-      const port = resolvedInstances.get(target.instance)?.ports.get(target.port);
+      const port = resolvedInstances
+        .get(target.instance)
+        ?.ports.get(target.port);
       const expected = rule?.completion?.expected;
       if (
         port?.direction !== 'input' ||
