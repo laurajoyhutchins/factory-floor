@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/template-instantiation-result.schema.json",
+  "title": "TemplateInstantiationResult",
+  "description": "Canonical result of authoritative template instantiation.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "resolvedTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "contentDigest": { "$ref": "#/$defs/sha256Digest" }
+      },
+      "required": ["id", "name", "version", "contentDigest"]
+    },
+    "resolvedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["template", "component", "schema", "policy", "capability"]
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "contentDigest": { "$ref": "#/$defs/sha256Digest" }
+      },
+      "required": ["kind", "id", "name", "version", "contentDigest"]
+    },
+    "systemSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "system" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "contentDigest": { "$ref": "#/$defs/sha256Digest" }
+      },
+      "required": ["kind", "name", "version", "contentDigest"]
+    },
+    "regionRequestSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "regionRequest" },
+        "requestId": { "type": "string", "format": "uuid" },
+        "parentRegionId": { "type": "string", "format": "uuid" },
+        "requesterComponentInstanceId": { "type": "string", "format": "uuid" }
+      },
+      "required": [
+        "kind",
+        "requestId",
+        "parentRegionId",
+        "requesterComponentInstanceId"
+      ]
+    },
+    "internalSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "internal" },
+        "operation": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
+      "required": ["kind", "operation"]
+    },
+    "source": {
+      "oneOf": [
+        { "$ref": "#/$defs/systemSource" },
+        { "$ref": "#/$defs/regionRequestSource" },
+        { "$ref": "#/$defs/internalSource" }
+      ]
+    }
+  },
+  "properties": {
+    "protocolVersion": { "const": "1.0" },
+    "requestId": { "type": "string", "format": "uuid" },
+    "disposition": { "enum": ["created", "existing"] },
+    "digest": { "$ref": "#/$defs/sha256Digest" },
+    "regionId": { "type": "string", "format": "uuid" },
+    "topologyRevisionId": { "type": "string", "format": "uuid" },
+    "template": { "$ref": "#/$defs/resolvedTemplate" },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "source": { "$ref": "#/$defs/source" },
+    "referencedDefinitions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/resolvedReference" },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "requestId",
+    "disposition",
+    "digest",
+    "regionId",
+    "topologyRevisionId",
+    "template",
+    "parameters",
+    "source",
+    "referencedDefinitions"
+  ]
+}
