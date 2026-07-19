@@ -44,7 +44,7 @@ function harness() {
       execute: (callback: (trx: unknown) => unknown) => callback(transaction),
     }),
   } as any;
-  const regions = new Map([
+  const regions = new Map<string, any>([
     [
       'region-alpha',
       {
@@ -88,6 +88,7 @@ function harness() {
     }),
     listPorts: async () => [],
     findArtifactSchemaById: async () => undefined,
+    findArtifactSchema: async () => undefined,
     findPolicy: async () => undefined,
   } as any;
 
