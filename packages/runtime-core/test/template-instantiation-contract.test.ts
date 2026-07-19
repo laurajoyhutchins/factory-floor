@@ -13,6 +13,7 @@ import {
 } from '../src/systems/template-instantiation-error.js';
 
 const requestId = '019bb22e-58b0-7d87-8000-000000000001';
+const instantiationId = '019bb22e-58b0-7d87-8000-000000000009';
 const targetRegionId = '019bb22e-58b0-7d87-8000-000000000002';
 const revisionId = '019bb22e-58b0-7d87-8000-000000000003';
 const templateId = '019bb22e-58b0-7d87-8000-000000000004';
@@ -40,6 +41,7 @@ const canonicalRequest = {
 
 const runtimeResult = {
   disposition: 'created' as const,
+  instantiationId,
   digest: digestB,
   region: { id: targetRegionId, name: 'analysis' },
   revision: { id: revisionId, content_digest: digestB },
@@ -65,6 +67,7 @@ const runtimeResult = {
 const contractResult = {
   protocolVersion: '1.0',
   requestId,
+  instantiationId,
   disposition: 'created',
   digest: digestB,
   regionId: targetRegionId,
@@ -154,7 +157,7 @@ describe('template instantiation contract adapter', () => {
     expect(instantiate).not.toHaveBeenCalled();
   });
 
-  it('invokes the authoritative runtime with a lossless internal request', async () => {
+  it('invokes the authoritative runtime with caller identity preserved', async () => {
     const instantiate = vi.fn().mockResolvedValue(runtimeResult);
     const service = new TemplateInstantiationContractService({ instantiate });
 
@@ -162,6 +165,7 @@ describe('template instantiation contract adapter', () => {
       contractResult,
     );
     expect(instantiate).toHaveBeenCalledWith({
+      requestId,
       targetRegionId,
       template: 'bounded-investigation@1',
       parameters: { mode: 'strict' },

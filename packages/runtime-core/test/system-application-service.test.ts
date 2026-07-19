@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
-import { SystemApplicationService } from '../src/index.js';
+import {
+  SystemApplicationService,
+  TemplateInstantiationService,
+} from '../src/index.js';
 
 const systemDocument = {
   apiVersion: 'factoryfloor.dev/v1alpha1',
@@ -52,6 +55,7 @@ describe('SystemApplicationService', () => {
     const revisions: any[] = [];
     const createdInstances: any[] = [];
     const createdConnections: any[] = [];
+    const instantiationRecords: any[] = [];
 
     const topology = {
       findRegion: async (_db: unknown, id: string) =>
@@ -169,8 +173,37 @@ describe('SystemApplicationService', () => {
       findArtifactSchema: async () => schema,
       findPolicy: async () => undefined,
     } as any;
+    const instantiationRepository = {
+      findByRequestId: async (_db: unknown, requestId: string) =>
+        instantiationRecords.find((record) => record.request_id === requestId),
+      create: async (_db: unknown, input: any) => {
+        const record = {
+          id: `instantiation-${instantiationRecords.length + 1}`,
+          request_id: input.requestId,
+          request_digest: input.requestDigest,
+          target_region_id: input.targetRegionId,
+          topology_revision_id: input.topologyRevisionId,
+          template_id: input.templateId,
+          effective_digest: input.effectiveDigest,
+          initial_disposition: input.initialDisposition,
+        };
+        instantiationRecords.push(record);
+        return record;
+      },
+    } as any;
+    const instantiations = new TemplateInstantiationService(
+      db,
+      definitions,
+      topology,
+      instantiationRepository,
+    );
 
-    const service = new SystemApplicationService(db, definitions, topology);
+    const service = new SystemApplicationService(
+      db,
+      definitions,
+      topology,
+      instantiations,
+    );
     const first = await service.apply(systemDocument);
     const second = await service.apply(systemDocument);
 
@@ -186,6 +219,7 @@ describe('SystemApplicationService', () => {
       digest: first.digest,
     });
     expect(createdInstances).toHaveLength(2);
+    expect(instantiationRecords).toHaveLength(1);
     expect(activeRevisions.has('region-analysis-work')).toBe(true);
 
     await expect(
@@ -200,5 +234,6 @@ describe('SystemApplicationService', () => {
       }),
     ).rejects.toMatchObject({ code: 'template_instantiation_conflict' });
     expect(createdInstances).toHaveLength(2);
+    expect(instantiationRecords).toHaveLength(1);
   });
 });

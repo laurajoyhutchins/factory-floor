@@ -188,6 +188,7 @@ export interface ResolvedInstantiationReference {
 export interface TemplateInstantiationResult {
   protocolVersion: '1.0';
   requestId: string;
+  instantiationId: string;
   disposition: 'created' | 'existing';
   digest: string;
   regionId: string;
@@ -210,6 +211,7 @@ export interface TemplateInstantiationResultInput {
   request:
     | CanonicalTemplateInstantiationRequest
     | NormalizedTemplateInstantiationRequest;
+  instantiationId: string;
   disposition: 'created' | 'existing';
   digest: string;
   region: { id: string };
@@ -399,6 +401,7 @@ export function toTemplateInstantiationResult(
   return {
     protocolVersion: '1.0',
     requestId: request.requestId,
+    instantiationId: input.instantiationId,
     disposition: input.disposition,
     digest: input.digest,
     regionId: input.region.id,

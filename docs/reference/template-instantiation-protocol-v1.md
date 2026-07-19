@@ -64,7 +64,7 @@ A `regionRequest` source is a contract shape only in this slice. Child-region au
 
 A successful result contains:
 
-- the original `requestId` and protocol version;
+- the original `requestId`, stable durable `instantiationId`, and protocol version;
 - `disposition`, either `created` or `existing`;
 - the effective instantiation digest;
 - stable region and topology-revision identities;
@@ -74,6 +74,8 @@ A successful result contains:
 
 `existing` means the target region already has the same effective active topology. A different active topology produces `template_instantiation_conflict`; it is never silently replaced.
 
+A retry with the same `requestId` and identical normalized request content reuses the same durable instantiation record. Reusing a `requestId` for different content produces `template_instantiation_conflict`. A different request identity may produce a distinct durable `existing` record that references the same effective topology revision.
+
 ## Errors
 
 The error schema exposes only stable domain outcomes that callers can handle without learning database or implementation details. It includes declaration validation, unavailable or retired definitions, region eligibility, topology and port/schema validation, fan-in validation, instantiation conflict, and transient internal failure.
@@ -82,10 +84,10 @@ Database constraint names, SQLSTATE values, stack traces, and repository impleme
 
 ## Runtime adapter and compatibility
 
-`TemplateInstantiationContractService` is the canonical in-process adapter. It validates the complete request before invoking `TemplateInstantiationService`, translates the natural-key request into the existing authoritative runtime call, and converts internal region/revision rows into the stable protocol result.
+`TemplateInstantiationContractService` is the canonical in-process adapter. It validates the complete request before invoking `TemplateInstantiationService`, preserves caller request identity, and converts internal region/revision rows plus the durable instantiation row into the stable protocol result.
 
-Existing static-system application continues to use the implementation-local request shape against the same authoritative `TemplateInstantiationService`. It remains compatible without creating a second validation or topology-publication implementation; direct canonical consumption by the child-region boundary is deferred to issue #74.
+Existing static-system application continues to use the implementation-local request shape against the same authoritative topology-publication implementation. The durable orchestration service derives a deterministic request identity for those legacy calls, so retries converge without creating a second topology-publication path. Direct canonical consumption by the child-region boundary is deferred to issue #74.
 
 ## Authority and deferred work
 
-This protocol does not make request identity or instantiation history durable by itself. First-class durable instantiation identity, initial-state publication, lineage, projections, and inspection remain issue #73. PostgreSQL concurrency evidence and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.
+Successful authoritative requests are recorded atomically with their topology outcome. Template-provided initial-state publication and lineage remain issue #79; projections and operator inspection remain issue #80. PostgreSQL concurrency hardening and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.
