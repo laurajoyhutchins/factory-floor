@@ -75,11 +75,7 @@ export const buildSummary = ({
         command: stage.command,
         metric: stage.metric ?? null,
         log,
-        result: metric
-          ? metric.success
-            ? 'passed'
-            : 'failed'
-          : 'unknown',
+        result: metric ? (metric.success ? 'passed' : 'failed') : 'unknown',
         exitCode: metric?.exitCode ?? null,
         firstActionableError: actionableErrorFromLog(log),
       };
