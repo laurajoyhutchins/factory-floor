@@ -5,11 +5,7 @@ const runTimestamp = (run) => {
   return Number.isFinite(value) ? value : 0;
 };
 
-export const selectRepositoryVerificationRun = (
-  runs,
-  headSha,
-  pullNumber,
-) =>
+export const selectRepositoryVerificationRun = (runs, headSha, pullNumber) =>
   runs
     .filter(
       (run) =>
