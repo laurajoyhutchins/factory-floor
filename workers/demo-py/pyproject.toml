@@ -1,20 +1,27 @@
 [project]
 name = "factory-floor-demo-py"
 version = "0.1.0"
+license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
 dependencies = ["factory-floor-contracts", "factory-floor-worker-sdk"]
+
 [project.scripts]
 factory-floor-demo-py = "factory_floor_demo_py.verifier:main"
+
 [dependency-groups]
 dev = ["pytest>=8.4,<9", "pytest-asyncio>=1.2,<2"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src", "../../packages/worker-sdk-py/src"]
 testpaths = ["tests"]
+
 [tool.uv.sources]
 factory-floor-contracts = { path = "../../packages/contracts-py", editable = true }
 factory-floor-worker-sdk = { path = "../../packages/worker-sdk-py", editable = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/factory_floor_demo_py"]
