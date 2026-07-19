@@ -19,7 +19,13 @@ export {
 } from './systems/template-instantiation-contract.js';
 export * from './systems/template-instantiation-contract-service.js';
 export * from './systems/template-instantiation-error.js';
-export * from './systems/template-instantiation-service.js';
+export {
+  TemplateInstantiationService as TemplateTopologyInstantiationService,
+  type TemplateInstantiationRequest as TopologyTemplateInstantiationRequest,
+  type TemplateInstantiationResult as TopologyTemplateInstantiationResult,
+  type ResolvedInstantiationReference,
+} from './systems/template-instantiation-service.js';
+export * from './systems/durable-template-instantiation-service.js';
 export * from './policies/policy-decision-service.js';
 export * from './artifacts/errors.js';
 export * from './artifacts/artifact-validation-service.js';
