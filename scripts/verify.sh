@@ -16,6 +16,7 @@ verify_static() {
   pnpm contracts:check
   pnpm conformance:check
   pnpm ci:quality:check
+  pnpm audit:publication:syntax
   pnpm lint
   pnpm typecheck
 
