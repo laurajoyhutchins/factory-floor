@@ -8,20 +8,31 @@ import {
 } from './agent-pr-handoff-state.mjs';
 
 describe('agent pull request handoff state', () => {
-  it('selects only the Repository Verification run for the exact head', () => {
+  it('selects only the Repository Verification run for the exact head and pull request', () => {
     const runs = [
       {
         name: 'Unrelated successful workflow',
         event: 'pull_request',
         head_sha: 'head-sha',
+        pull_requests: [{ number: 69 }],
         status: 'completed',
         conclusion: 'success',
-        created_at: '2026-07-19T04:02:00Z',
+        created_at: '2026-07-19T04:04:00Z',
       },
       {
         name: 'Repository Verification',
         event: 'pull_request',
         head_sha: 'head-sha',
+        pull_requests: [{ number: 70 }],
+        status: 'completed',
+        conclusion: 'success',
+        created_at: '2026-07-19T04:03:00Z',
+      },
+      {
+        name: 'Repository Verification',
+        event: 'pull_request',
+        head_sha: 'head-sha',
+        pull_requests: [{ number: 69 }],
         status: 'completed',
         conclusion: 'failure',
         created_at: '2026-07-19T04:01:00Z',
@@ -30,16 +41,20 @@ describe('agent pull request handoff state', () => {
         name: 'Repository Verification',
         event: 'pull_request',
         head_sha: 'stale-sha',
+        pull_requests: [{ number: 69 }],
         status: 'completed',
         conclusion: 'success',
-        created_at: '2026-07-19T04:03:00Z',
+        created_at: '2026-07-19T04:05:00Z',
       },
     ];
 
-    expect(selectRepositoryVerificationRun(runs, 'head-sha')).toMatchObject({
+    expect(
+      selectRepositoryVerificationRun(runs, 'head-sha', 69),
+    ).toMatchObject({
       name: 'Repository Verification',
       conclusion: 'failure',
       head_sha: 'head-sha',
+      pull_requests: [{ number: 69 }],
     });
   });
 
