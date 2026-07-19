@@ -137,7 +137,7 @@ describe('CI metrics summary', () => {
     );
     writeFileSync(
       join(testsDirectory, 'pytest.xml'),
-      '<testsuites tests="2" failures="0" errors="1" skipped="0" time="0.5"></testsuites>',
+      '<testsuites name="pytest tests"><testsuite tests="2" failures="0" errors="1" skipped="0" time="0.5"></testsuite></testsuites>',
     );
 
     const result = runNode([
