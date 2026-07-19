@@ -1,0 +1,553 @@
+name: Apply normalized PR 54 fixes
+
+on:
+  push:
+    branches:
+      - feat/generic-template-instantiation
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/generic-template-instantiation
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Patch, format, and record diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import traceback
+
+          def lines(*items: str) -> str:
+              return "\n".join(items)
+
+          def replace(path: str, old: str, new: str, expected: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise RuntimeError(
+                      f"{path}: expected {expected} occurrence(s), found {count}: {old[:120]!r}"
+                  )
+              file.write_text(text.replace(old, new))
+
+          service = 'packages/runtime-core/src/systems/template-instantiation-service.ts'
+          system = 'packages/runtime-core/src/systems/system-application-service.ts'
+          system_test = 'packages/runtime-core/test/system-application-service.test.ts'
+          workflow = Path('.github/workflows/pr54-apply-fixes-v2.yml')
+          diagnostic = Path('PR54_PATCH_ERROR.txt')
+
+          try:
+              replace(
+                  service,
+                  lines(
+                      '  parameters?: JsonObject;',
+                      '  componentConfiguration?: Record<string, JsonObject>;',
+                      '}',
+                  ),
+                  lines(
+                      '  parameters?: JsonObject;',
+                      '  componentConfiguration?: Record<string, JsonObject>;',
+                      '  source?: JsonObject;',
+                      '}',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '  parameters: JsonObject;',
+                      '  referencedDefinitions: ResolvedInstantiationReference[];',
+                      '}',
+                  ),
+                  lines(
+                      '  parameters: JsonObject;',
+                      '  source: JsonObject;',
+                      '  referencedDefinitions: ResolvedInstantiationReference[];',
+                      '}',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      'interface ResolvedInstance {',
+                      '  name: string;',
+                      '  component: string;',
+                      '  definitionId: string;',
+                      '  configuration: JsonObject;',
+                      '  ports: Map<string, ResolvedPort>;',
+                      '}',
+                  ),
+                  lines(
+                      'interface ResolvedInstance {',
+                      '  name: string;',
+                      '  component: string;',
+                      '  definitionId: string;',
+                      '  configuration: JsonObject;',
+                      '  ports: Map<string, ResolvedPort>;',
+                      '}',
+                      '',
+                      'function portKey(name: string, direction: PortDirection): string {',
+                      '  return `${direction}:${name}`;',
+                      '}',
+                      '',
+                      'function resolvedPort(',
+                      '  instance: ResolvedInstance | undefined,',
+                      '  name: string,',
+                      '  direction: PortDirection,',
+                      '): ResolvedPort | undefined {',
+                      '  return instance?.ports.get(portKey(name, direction));',
+                      '}',
+                  ),
+              )
+              replace(
+                  service,
+                  "      if (typeof value === 'number' && (!Number.isFinite(value) || value < 0)) {",
+                  "      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {",
+              )
+              replace(
+                  service,
+                  '    const configurationOverrides = request.componentConfiguration ?? {};',
+                  lines(
+                      '    const configurationOverrides = structuredClone(',
+                      '      request.componentConfiguration ?? {},',
+                      '    );',
+                      '    const source = structuredClone(request.source ?? {});',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '        ports.set(port.name, {',
+                      '          direction: port.direction as PortDirection,',
+                      '          schemaId: port.schema_id,',
+                      '        });',
+                  ),
+                  lines(
+                      '        const direction = port.direction as PortDirection;',
+                      '        ports.set(portKey(port.name, direction), {',
+                      '          direction,',
+                      '          schemaId: port.schema_id,',
+                      '        });',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '        const instance = resolvedInstances.get(target.component);',
+                      '        const port = instance?.ports.get(target.port);',
+                      "        if (port?.direction !== 'input') {",
+                  ),
+                  lines(
+                      '        const instance = resolvedInstances.get(target.component);',
+                      "        const port = resolvedPort(instance, target.port, 'input');",
+                      '        if (port === undefined) {',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '    const persistedConnections: Array<{',
+                      '      source: ResolvedInstance;',
+                      '      sourcePort: string;',
+                      '      target: ResolvedInstance;',
+                      '      targetPort: string;',
+                      '    }> = [];',
+                      '    const connectedOutputs = new Set<string>();',
+                      '    for (const connection of staticTopology.connections) {',
+                      '      const sourceEndpoint = endpoint(connection.from);',
+                      '      const targetEndpoint = endpoint(connection.to);',
+                  ),
+                  lines(
+                      '    const persistedConnections: Array<{',
+                      '      source: ResolvedInstance;',
+                      '      sourcePort: string;',
+                      '      target: ResolvedInstance;',
+                      '      targetPort: string;',
+                      '    }> = [];',
+                      '    const connectionKeys = new Set<string>();',
+                      '    const incomingConnectionCounts = new Map<string, number>();',
+                      '    const connectedOutputs = new Set<string>();',
+                      '    for (const connection of staticTopology.connections) {',
+                      '      const sourceEndpoint = endpoint(connection.from);',
+                      '      const targetEndpoint = endpoint(connection.to);',
+                      '      const connectionKey = `${connection.from}->${connection.to}`;',
+                      '      if (connectionKeys.has(connectionKey)) {',
+                      '        throw new DomainError(',
+                      "          'duplicate_connection',",
+                      '          `Duplicate connection ${connection.from} -> ${connection.to}`,',
+                      '        );',
+                      '      }',
+                      '      connectionKeys.add(connectionKey);',
+                      "      if (targetEndpoint.instance !== 'region') {",
+                      '        const targetKey = `${targetEndpoint.instance}.${targetEndpoint.port}`;',
+                      '        incomingConnectionCounts.set(',
+                      '          targetKey,',
+                      '          (incomingConnectionCounts.get(targetKey) ?? 0) + 1,',
+                      '        );',
+                      '      }',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '        const target = resolvedInstances.get(targetEndpoint.instance);',
+                      '        const targetPort = target?.ports.get(targetEndpoint.port);',
+                      "        if (targetPort?.direction !== 'input') {",
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Invalid connection target ${connection.to}`,',
+                      '          );',
+                      '        }',
+                      '        const declaredSchema = inputSchemas.get(sourceEndpoint.port);',
+                      '        if (',
+                      '          declaredSchema !== undefined &&',
+                      '          declaredSchema !== targetPort.schemaId',
+                      '        ) {',
+                  ),
+                  lines(
+                      '        const target = resolvedInstances.get(targetEndpoint.instance);',
+                      "        const targetPort = resolvedPort(target, targetEndpoint.port, 'input');",
+                      '        if (targetPort === undefined) {',
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Invalid connection target ${connection.to}`,',
+                      '          );',
+                      '        }',
+                      '        const declaredSchema = inputSchemas.get(sourceEndpoint.port);',
+                      '        if (declaredSchema === undefined) {',
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Undeclared template input ${sourceEndpoint.port}`,',
+                      '          );',
+                      '        }',
+                      '        if (declaredSchema !== targetPort.schemaId) {',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '        const source = resolvedInstances.get(sourceEndpoint.instance);',
+                      '        const sourcePort = source?.ports.get(sourceEndpoint.port);',
+                      "        if (sourcePort?.direction !== 'output') {",
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Invalid connection source ${connection.from}`,',
+                      '          );',
+                      '        }',
+                      '        const declaredOutput = outputSchemas.get(targetEndpoint.port);',
+                      '        if (',
+                      '          declaredOutput !== undefined &&',
+                      '          declaredOutput.schemaId !== sourcePort.schemaId',
+                      '        ) {',
+                  ),
+                  lines(
+                      '        const source = resolvedInstances.get(sourceEndpoint.instance);',
+                      "        const sourcePort = resolvedPort(source, sourceEndpoint.port, 'output');",
+                      '        if (sourcePort === undefined) {',
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Invalid connection source ${connection.from}`,',
+                      '          );',
+                      '        }',
+                      '        const declaredOutput = outputSchemas.get(targetEndpoint.port);',
+                      '        if (declaredOutput === undefined) {',
+                      '          throw new DomainError(',
+                      "            'invalid_port_reference',",
+                      '            `Undeclared template output ${targetEndpoint.port}`,',
+                      '          );',
+                      '        }',
+                      '        if (declaredOutput.schemaId !== sourcePort.schemaId) {',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '        connectedOutputs.add(targetEndpoint.port);',
+                      '        continue;',
+                  ),
+                  lines(
+                      '        if (connectedOutputs.has(targetEndpoint.port)) {',
+                      '          throw new DomainError(',
+                      "            'duplicate_connection',",
+                      '            `Template output ${targetEndpoint.port} has multiple producers`,',
+                      '          );',
+                      '        }',
+                      '        connectedOutputs.add(targetEndpoint.port);',
+                      '        continue;',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '      const source = resolvedInstances.get(sourceEndpoint.instance);',
+                      '      const target = resolvedInstances.get(targetEndpoint.instance);',
+                      '      const sourcePort = source?.ports.get(sourceEndpoint.port);',
+                      '      const targetPort = target?.ports.get(targetEndpoint.port);',
+                      '      if (',
+                      '        source === undefined ||',
+                      '        target === undefined ||',
+                      "        sourcePort?.direction !== 'output' ||",
+                      "        targetPort?.direction !== 'input'",
+                      '      ) {',
+                  ),
+                  lines(
+                      '      const source = resolvedInstances.get(sourceEndpoint.instance);',
+                      '      const target = resolvedInstances.get(targetEndpoint.instance);',
+                      "      const sourcePort = resolvedPort(source, sourceEndpoint.port, 'output');",
+                      "      const targetPort = resolvedPort(target, targetEndpoint.port, 'input');",
+                      '      if (',
+                      '        source === undefined ||',
+                      '        target === undefined ||',
+                      '        sourcePort === undefined ||',
+                      '        targetPort === undefined',
+                      '      ) {',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '    for (const rule of templateDocument.spec.fanIn ?? []) {',
+                      '      const target = endpoint(',
+                      "        requireNonEmptyString(rule?.input, 'Fan-in input endpoint'),",
+                      '      );',
+                      '      const port = resolvedInstances',
+                      '        .get(target.instance)',
+                      '        ?.ports.get(target.port);',
+                      '      const expected = rule?.completion?.expected;',
+                      '      if (',
+                      "        port?.direction !== 'input' ||",
+                      '        !Number.isInteger(expected) ||',
+                      '        expected <= 0',
+                      '      ) {',
+                      '        throw new DomainError(',
+                      "          'invalid_fan_in_rule',",
+                      "          `Invalid fan-in rule for ${rule?.input ?? 'unknown input'}`,",
+                      '        );',
+                      '      }',
+                      '    }',
+                  ),
+                  lines(
+                      '    const fanInInputs = new Set<string>();',
+                      '    for (const rule of templateDocument.spec.fanIn ?? []) {',
+                      '      const target = endpoint(',
+                      "        requireNonEmptyString(rule?.input, 'Fan-in input endpoint'),",
+                      '      );',
+                      '      const targetKey = `${target.instance}.${target.port}`;',
+                      '      const port = resolvedPort(',
+                      '        resolvedInstances.get(target.instance),',
+                      '        target.port,',
+                      "        'input',",
+                      '      );',
+                      '      const completion = rule?.completion;',
+                      '      const expected = completion?.expected;',
+                      '      const deadlineSeconds = completion?.deadlineSeconds;',
+                      '      const incomingCount = incomingConnectionCounts.get(targetKey) ?? 0;',
+                      '      if (',
+                      '        fanInInputs.has(targetKey) ||',
+                      '        port === undefined ||',
+                      "        completion?.type !== 'all-expected' ||",
+                      '        !Number.isInteger(expected) ||',
+                      '        expected <= 0 ||',
+                      '        expected !== incomingCount ||',
+                      '        (deadlineSeconds !== undefined &&',
+                      '          (!Number.isFinite(deadlineSeconds) || deadlineSeconds <= 0))',
+                      '      ) {',
+                      '        throw new DomainError(',
+                      "          'invalid_fan_in_rule',",
+                      "          `Invalid fan-in rule for ${rule?.input ?? 'unknown input'}`,",
+                      '        );',
+                      '      }',
+                      '      fanInInputs.add(targetKey);',
+                      '    }',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '      parameters,',
+                      '      componentConfiguration: configurationOverrides,',
+                      '      referencedDefinitions,',
+                      '    };',
+                  ),
+                  lines(
+                      '      parameters,',
+                      '      componentConfiguration: configurationOverrides,',
+                      '      source,',
+                      '      referencedDefinitions,',
+                      '    };',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '      parameters,',
+                      '      componentConfiguration: configurationOverrides,',
+                      '      referencedDefinitions,',
+                      '      effectiveTopology,',
+                  ),
+                  lines(
+                      '      parameters,',
+                      '      componentConfiguration: configurationOverrides,',
+                      '      source,',
+                      '      referencedDefinitions,',
+                      '      effectiveTopology,',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '          parameters,',
+                      '          referencedDefinitions,',
+                      '        };',
+                  ),
+                  lines(
+                      '          parameters,',
+                      '          source,',
+                      '          referencedDefinitions,',
+                      '        };',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '      parameters,',
+                      '      referencedDefinitions,',
+                      '    };',
+                  ),
+                  lines(
+                      '      parameters,',
+                      '      source,',
+                      '      referencedDefinitions,',
+                      '    };',
+                  ),
+              )
+              replace(
+                  service,
+                  lines(
+                      '    if (request.componentConfiguration !== undefined) {',
+                      "      jsonObject(request.componentConfiguration, 'componentConfiguration');",
+                      '    }',
+                  ),
+                  lines(
+                      '    if (request.componentConfiguration !== undefined) {',
+                      "      jsonObject(request.componentConfiguration, 'componentConfiguration');",
+                      '    }',
+                      '    if (request.source !== undefined) {',
+                      "      jsonObject(request.source, 'source');",
+                      '    }',
+                  ),
+              )
+
+              replace(
+                  system,
+                  lines(
+                      '      const rootName = document.spec.rootRegion.id as string;',
+                      "      let disposition: 'created' | 'existing' = 'existing';",
+                  ),
+                  lines(
+                      '      const rootName = document.spec.rootRegion.id as string;',
+                      '      const source = {',
+                      "        kind: 'system',",
+                      '        name: String(document.metadata.name),',
+                      '        version: String(document.metadata.version),',
+                      '        contentDigest: canonicalJsonDigest(document),',
+                      '      };',
+                      "      let disposition: 'created' | 'existing' = 'existing';",
+                  ),
+              )
+              replace(
+                  system,
+                  lines(
+                      '            componentConfiguration:',
+                      '              regionDeclaration.componentConfiguration ?? {},',
+                      '          },',
+                  ),
+                  lines(
+                      '            componentConfiguration:',
+                      '              regionDeclaration.componentConfiguration ?? {},',
+                      '            source,',
+                      '          },',
+                  ),
+              )
+              replace(
+                  system,
+                  lines(
+                      '      const digest = canonicalJsonDigest({',
+                      '        system: document,',
+                      '        instantiations: instantiated,',
+                      '      });',
+                  ),
+                  lines(
+                      '      const digest = canonicalJsonDigest({',
+                      '        source,',
+                      '        instantiations: instantiated,',
+                      '      });',
+                  ),
+              )
+              replace(
+                  system_test,
+                  lines(
+                      '  spec: {',
+                      '    initialTopology: {',
+                  ),
+                  lines(
+                      '  spec: {',
+                      "    inputs: [{ port: 'objective', schema: 'payload.1' }],",
+                      "    outputs: [{ port: 'result', schema: 'payload.1', required: true }],",
+                      '    initialTopology: {',
+                  ),
+              )
+
+              subprocess.run(
+                  [
+                      'pnpm',
+                      'exec',
+                      'prettier',
+                      '--write',
+                      service,
+                      system,
+                      system_test,
+                      'packages/runtime-core/test/template-instantiation-service.test.ts',
+                      'packages/runtime-core/src/declarations/errors.ts',
+                  ],
+                  check=True,
+              )
+              diagnostic.unlink(missing_ok=True)
+          except BaseException:
+              diagnostic.write_text(traceback.format_exc())
+
+          workflow.unlink()
+          PY
+
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f PR54_PATCH_ERROR.txt ]; then
+            git add PR54_PATCH_ERROR.txt .github/workflows/pr54-apply-fixes-v2.yml
+            git commit -m "chore: record normalized PR 54 patch diagnostic"
+          else
+            git add .
+            git commit -m "fix(runtime): address template instantiation review"
+          fi
+          git push origin HEAD:feat/generic-template-instantiation
