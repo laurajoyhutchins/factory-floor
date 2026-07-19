@@ -22,9 +22,11 @@
 ### Task 1: Contract Conformance Tests
 
 **Files:**
+
 - Create: `scripts/template-instantiation-contracts.test.mjs`
 
 **Interfaces:**
+
 - Consumes: `contracts/schemas/template-instantiation-request.schema.json`, `template-instantiation-result.schema.json`, and `template-instantiation-error.schema.json`.
 - Produces: executable fixtures defining the accepted request/result/error surface and rejected malformed variants.
 
@@ -67,6 +69,7 @@ git commit -m "test(contracts): specify template instantiation boundary"
 ### Task 2: Canonical JSON Schemas and Generated Bindings
 
 **Files:**
+
 - Create: `contracts/schemas/template-instantiation-request.schema.json`
 - Create: `contracts/schemas/template-instantiation-result.schema.json`
 - Create: `contracts/schemas/template-instantiation-error.schema.json`
@@ -80,6 +83,7 @@ git commit -m "test(contracts): specify template instantiation boundary"
 - Modify: `packages/contracts-py/factory_floor_contracts/__init__.py`
 
 **Interfaces:**
+
 - Produces: `TemplateInstantiationRequest`, `TemplateInstantiationResult`, and `TemplateInstantiationError` in both generated packages.
 - Request source union: `system`, `regionRequest`, or `internal`.
 - Result disposition: `created` or `existing`.
@@ -150,6 +154,7 @@ git commit -m "feat(contracts): define template instantiation protocol"
 ### Task 3: Runtime Contract Adapter and Pre-Database Validation
 
 **Files:**
+
 - Create: `packages/runtime-core/src/systems/template-instantiation-contract.ts`
 - Modify: `packages/runtime-core/src/systems/template-instantiation-service.ts`
 - Modify: `packages/runtime-core/src/systems/system-application-service.ts`
@@ -161,6 +166,7 @@ git commit -m "feat(contracts): define template instantiation protocol"
 - Test: `packages/runtime-core/test/system-application-service.test.ts`
 
 **Interfaces:**
+
 - Consumes: generated `TemplateInstantiationRequest` and `TemplateInstantiationResult`.
 - Produces: `normalizeTemplateInstantiationRequest(input)` and `toTemplateInstantiationResult(...)`.
 - Preserves: `instantiateInTransaction(transaction, request)` as the authoritative publication entrypoint.
@@ -208,10 +214,12 @@ git commit -m "feat(runtime): consume template instantiation contracts"
 ### Task 4: Final Verification and Documentation
 
 **Files:**
+
 - Modify: `docs/reference/runtime-api.md` if the existing reference index covers internal authoritative services; otherwise modify `docs/README.md` only to link the contract schemas.
 - Modify: GitHub PR description and issue #72 evidence.
 
 **Interfaces:**
+
 - Produces: a reviewable contract reference and retained verification evidence.
 
 - [ ] **Step 1: Document the frozen boundary**
