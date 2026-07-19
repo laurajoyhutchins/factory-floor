@@ -37,9 +37,18 @@ describe('agent CI summary metric attribution', () => {
     const integrationLog = join(directory, 'integration.log');
     const acceptanceLog = join(directory, 'acceptance.log');
 
-    writeFileSync(servicesMetric, JSON.stringify({ stage: 'services', success: true, exitCode: 0 }));
-    writeFileSync(integrationMetric, JSON.stringify({ stage: 'integration', success: false, exitCode: 1 }));
-    writeFileSync(acceptanceMetric, JSON.stringify({ stage: 'acceptance', success: true, exitCode: 0 }));
+    writeFileSync(
+      servicesMetric,
+      JSON.stringify({ stage: 'services', success: true, exitCode: 0 }),
+    );
+    writeFileSync(
+      integrationMetric,
+      JSON.stringify({ stage: 'integration', success: false, exitCode: 1 }),
+    );
+    writeFileSync(
+      acceptanceMetric,
+      JSON.stringify({ stage: 'acceptance', success: true, exitCode: 0 }),
+    );
     writeFileSync(servicesLog, 'services passed\n');
     writeFileSync(integrationLog, 'FAIL integration contract\n');
     writeFileSync(acceptanceLog, 'acceptance passed\n');
@@ -47,9 +56,24 @@ describe('agent CI summary metric attribution', () => {
     const summary = buildSummary({
       manifest: {
         stages: [
-          { name: 'services', command: 'pnpm verify:services', metric: servicesMetric, logs: [servicesLog] },
-          { name: 'integration', command: 'pnpm verify:integration', metric: integrationMetric, logs: [integrationLog] },
-          { name: 'acceptance', command: 'pnpm verify:acceptance', metric: acceptanceMetric, logs: [acceptanceLog] },
+          {
+            name: 'services',
+            command: 'pnpm verify:services',
+            metric: servicesMetric,
+            logs: [servicesLog],
+          },
+          {
+            name: 'integration',
+            command: 'pnpm verify:integration',
+            metric: integrationMetric,
+            logs: [integrationLog],
+          },
+          {
+            name: 'acceptance',
+            command: 'pnpm verify:acceptance',
+            metric: acceptanceMetric,
+            logs: [acceptanceLog],
+          },
         ],
       },
       environment,
@@ -74,14 +98,22 @@ describe('agent CI summary metric attribution', () => {
     const acceptanceLog = join(directory, 'acceptance.log');
     const cleanupLog = join(directory, 'cleanup.log');
 
-    writeFileSync(acceptanceMetric, JSON.stringify({ stage: 'acceptance', success: true, exitCode: 0 }));
+    writeFileSync(
+      acceptanceMetric,
+      JSON.stringify({ stage: 'acceptance', success: true, exitCode: 0 }),
+    );
     writeFileSync(acceptanceLog, 'acceptance passed\n');
     writeFileSync(cleanupLog, 'Error: Docker cleanup failed\n');
 
     const summary = buildSummary({
       manifest: {
         stages: [
-          { name: 'acceptance', command: 'pnpm verify:acceptance', metric: acceptanceMetric, logs: [acceptanceLog] },
+          {
+            name: 'acceptance',
+            command: 'pnpm verify:acceptance',
+            metric: acceptanceMetric,
+            logs: [acceptanceLog],
+          },
         ],
       },
       environment,
