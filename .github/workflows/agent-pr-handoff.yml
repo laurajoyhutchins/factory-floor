@@ -69,6 +69,7 @@ jobs:
             const latestRun = logic.selectRepositoryVerificationRun(
               runs,
               pull.head.sha,
+              pullNumber,
             );
 
             let reviewThreads;
