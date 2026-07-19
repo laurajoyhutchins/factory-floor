@@ -2,6 +2,7 @@
   "name": "@factory-floor/artifact-store",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "main": "dist/src/public.js",
   "types": "dist/src/public.d.ts",
