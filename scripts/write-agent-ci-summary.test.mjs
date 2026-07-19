@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 import { findActionableError } from './write-agent-ci-summary.mjs';
 
-const script = fileURLToPath(new URL('./write-agent-ci-summary.mjs', import.meta.url));
+const script = fileURLToPath(
+  new URL('./write-agent-ci-summary.mjs', import.meta.url),
+);
 const withTemp = (callback) => {
   const directory = mkdtempSync(join(tmpdir(), 'agent-ci-summary-'));
   try {
@@ -20,37 +22,81 @@ const withTemp = (callback) => {
 };
 
 test('findActionableError ignores zero-error summaries', () => {
-  assert.equal(findActionableError('0 errors\nTypeError: broken adapter'), 'TypeError: broken adapter');
+  assert.equal(
+    findActionableError('0 errors\nTypeError: broken adapter'),
+    'TypeError: broken adapter',
+  );
+});
+
+test('findActionableError ignores failure words in file paths', () => {
+  assert.equal(
+    findActionableError(
+      '- contracts/schemas/failure-descriptor.schema.json\n[warn] Code style issues found in 3 files.',
+    ),
+    '[warn] Code style issues found in 3 files.',
+  );
 });
 
 test('writes a failed handoff for the last started stage', () => {
   withTemp((directory) => {
     const manifest = join(directory, 'manifest.json');
     const output = join(directory, 'agent-ci-summary.json');
-    writeFileSync(manifest, JSON.stringify({ stages: [
-      { name: 'format', command: 'pnpm format:check', logs: [join(directory, 'format.log')] },
-      { name: 'test', command: 'pnpm test', logs: [join(directory, 'test.log')] },
-      { name: 'build', command: 'pnpm build', logs: [join(directory, 'build.log')] },
-    ] }));
+    writeFileSync(
+      manifest,
+      JSON.stringify({
+        stages: [
+          {
+            name: 'format',
+            command: 'pnpm format:check',
+            logs: [join(directory, 'format.log')],
+          },
+          {
+            name: 'test',
+            command: 'pnpm test',
+            logs: [join(directory, 'test.log')],
+          },
+          {
+            name: 'build',
+            command: 'pnpm build',
+            logs: [join(directory, 'build.log')],
+          },
+        ],
+      }),
+    );
     writeFileSync(join(directory, 'format.log'), 'Formatting passed\n');
-    writeFileSync(join(directory, 'test.log'), 'FAIL src/example.test.ts\nAssertionError: expected true\n');
-    const result = spawnSync(process.execPath, [
-      script, '--manifest', manifest, '--output', output, '--job', 'test', '--artifact', 'test-evidence',
-    ], {
-      cwd: directory,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        AGENT_CI_JOB_STATUS: 'failure',
-        AGENT_CI_HEAD_SHA: 'head-sha',
-        GITHUB_REPOSITORY: 'owner/repo',
-        GITHUB_RUN_ID: '123',
-        GITHUB_RUN_ATTEMPT: '2',
-        GITHUB_JOB: 'test',
-        GITHUB_SHA: 'verification-sha',
-        GITHUB_WORKFLOW: 'CI',
+    writeFileSync(
+      join(directory, 'test.log'),
+      'FAIL src/example.test.ts\nAssertionError: expected true\n',
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        script,
+        '--manifest',
+        manifest,
+        '--output',
+        output,
+        '--job',
+        'test',
+        '--artifact',
+        'test-evidence',
+      ],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          AGENT_CI_JOB_STATUS: 'failure',
+          AGENT_CI_HEAD_SHA: 'head-sha',
+          GITHUB_REPOSITORY: 'owner/repo',
+          GITHUB_RUN_ID: '123',
+          GITHUB_RUN_ATTEMPT: '2',
+          GITHUB_JOB: 'test',
+          GITHUB_SHA: 'verification-sha',
+          GITHUB_WORKFLOW: 'CI',
+        },
       },
-    });
+    );
     assert.equal(result.status, 0, result.stderr);
     const summary = JSON.parse(readFileSync(output, 'utf8'));
     assert.equal(summary.headSha, 'head-sha');
@@ -59,7 +105,10 @@ test('writes a failed handoff for the last started stage', () => {
     assert.equal(summary.firstActionableError, 'FAIL src/example.test.ts');
     assert.equal(summary.reproductionCommand, 'pnpm test');
     assert.deepEqual(summary.artifacts, ['test-evidence']);
-    assert.equal(summary.runUrl, 'https://github.com/owner/repo/actions/runs/123');
+    assert.equal(
+      summary.runUrl,
+      'https://github.com/owner/repo/actions/runs/123',
+    );
   });
 });
 
@@ -67,17 +116,31 @@ test('writes a successful handoff without a false failure', () => {
   withTemp((directory) => {
     const manifest = join(directory, 'manifest.json');
     const output = join(directory, 'agent-ci-summary.json');
-    writeFileSync(manifest, JSON.stringify({ stages: [
-      { name: 'check', command: 'pnpm check', logs: [join(directory, 'check.log')] },
-    ] }));
-    writeFileSync(join(directory, 'check.log'), '0 errors\nAll checks passed\n');
-    const result = spawnSync(process.execPath, [
-      script, '--manifest', manifest, '--output', output, '--job', 'check',
-    ], {
-      cwd: directory,
-      encoding: 'utf8',
-      env: { ...process.env, AGENT_CI_JOB_STATUS: 'success' },
-    });
+    writeFileSync(
+      manifest,
+      JSON.stringify({
+        stages: [
+          {
+            name: 'check',
+            command: 'pnpm check',
+            logs: [join(directory, 'check.log')],
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(directory, 'check.log'),
+      '0 errors\nAll checks passed\n',
+    );
+    const result = spawnSync(
+      process.execPath,
+      [script, '--manifest', manifest, '--output', output, '--job', 'check'],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        env: { ...process.env, AGENT_CI_JOB_STATUS: 'success' },
+      },
+    );
     assert.equal(result.status, 0, result.stderr);
     const summary = JSON.parse(readFileSync(output, 'utf8'));
     assert.equal(summary.failedStage, null);
