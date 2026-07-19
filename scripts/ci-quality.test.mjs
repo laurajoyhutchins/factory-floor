@@ -182,6 +182,51 @@ describe('repository CI quality policy', () => {
     expect(result.stdout).toContain('CI quality gates are valid');
   });
 
+  it('rejects an invalid quality policy', () => {
+    const directory = makeTemporaryDirectory();
+    const policyPath = join(directory, 'quality-gates.json');
+    const policy = JSON.parse(
+      readFileSync(new URL('../quality-gates.json', import.meta.url), 'utf8'),
+    );
+    writeFileSync(
+      policyPath,
+      `${JSON.stringify({ ...policy, schemaVersion: 2 }, null, 2)}\n`,
+    );
+
+    const result = runNode([
+      'scripts/check-ci-quality-gates.mjs',
+      '--policy',
+      policyPath,
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('schemaVersion must be 1');
+  });
+
+  it('rejects a floating GitHub Action reference', () => {
+    const directory = makeTemporaryDirectory();
+    const workflowPath = join(directory, 'repository-verification.yml');
+    const workflow = readFileSync(
+      new URL(
+        '../.github/workflows/repository-verification.yml',
+        import.meta.url,
+      ),
+      'utf8',
+    ).replace(/actions\/checkout@[0-9a-f]{40}/, 'actions/checkout@v4');
+    writeFileSync(workflowPath, workflow);
+
+    const result = runNode([
+      'scripts/check-ci-quality-gates.mjs',
+      '--workflow',
+      workflowPath,
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Action reference must use an immutable 40-character SHA: actions/checkout@v4',
+    );
+  });
+
   it('records enforceable targets separately from future ratchets', () => {
     const policy = JSON.parse(
       readFileSync(new URL('../quality-gates.json', import.meta.url), 'utf8'),
