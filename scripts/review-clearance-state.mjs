@@ -78,8 +78,13 @@ export const readReviewThreadState = async ({
           repository(owner: $owner, name: $repo) {
             pullRequest(number: $number) {
               reviewThreads(first: 100, after: $after) {
-                nodes { isResolved }
-                pageInfo { hasNextPage endCursor }
+                nodes {
+                  isResolved
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
               }
             }
           }
@@ -113,8 +118,7 @@ export const parseReviewClearance = ({ comments, ownerLogin, headSha }) => {
         comment.body?.includes(REVIEW_CLEARANCE_MARKER),
     )
     .sort((left, right) => {
-      const timeDifference =
-        commentTimestamp(right) - commentTimestamp(left);
+      const timeDifference = commentTimestamp(right) - commentTimestamp(left);
       if (timeDifference !== 0) return timeDifference;
       return Number(right.id ?? 0) - Number(left.id ?? 0);
     })[0];
