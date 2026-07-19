@@ -78,7 +78,10 @@ const contractResult = {
 const loadSchema = (name: string) =>
   JSON.parse(
     readFileSync(
-      new URL(`../../../contracts/schemas/${name}.schema.json`, import.meta.url),
+      new URL(
+        `../../../contracts/schemas/${name}.schema.json`,
+        import.meta.url,
+      ),
       'utf8',
     ),
   );
@@ -187,13 +190,13 @@ describe('template instantiation contract adapter', () => {
       message: 'region is already active',
       retryable: false,
     });
-    expect(toTemplateInstantiationError(new Error('database password'))).toEqual(
-      {
-        protocolVersion: '1.0',
-        code: 'internal_transient_failure',
-        message: 'template instantiation failed',
-        retryable: true,
-      },
-    );
+    expect(
+      toTemplateInstantiationError(new Error('database password')),
+    ).toEqual({
+      protocolVersion: '1.0',
+      code: 'internal_transient_failure',
+      message: 'template instantiation failed',
+      retryable: true,
+    });
   });
 });
