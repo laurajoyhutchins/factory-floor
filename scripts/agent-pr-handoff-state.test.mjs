@@ -48,14 +48,14 @@ describe('agent pull request handoff state', () => {
       },
     ];
 
-    expect(
-      selectRepositoryVerificationRun(runs, 'head-sha', 69),
-    ).toMatchObject({
-      name: 'Repository Verification',
-      conclusion: 'failure',
-      head_sha: 'head-sha',
-      pull_requests: [{ number: 69 }],
-    });
+    expect(selectRepositoryVerificationRun(runs, 'head-sha', 69)).toMatchObject(
+      {
+        name: 'Repository Verification',
+        conclusion: 'failure',
+        head_sha: 'head-sha',
+        pull_requests: [{ number: 69 }],
+      },
+    );
   });
 
   it('paginates every review thread before calculating unresolved state', async () => {
