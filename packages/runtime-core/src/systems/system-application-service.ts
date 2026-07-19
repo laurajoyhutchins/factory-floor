@@ -1,18 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Kysely } from 'kysely';
-import type { Database, Json } from '@factory-floor/db';
+import type { Database } from '@factory-floor/db';
 import {
   DefinitionRepository,
   isUniqueViolation,
   TopologyRepository,
 } from '@factory-floor/db';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
-import { DomainError } from '../declarations/errors.js';
 import {
   validateSimpleDeclaration,
-  validateStaticTopology,
   validateSystemDeclaration,
 } from '../declarations/validation.js';
+import { TemplateInstantiationService } from './template-instantiation-service.js';
 
 export interface SystemApplyResult {
   disposition: 'created' | 'existing';
@@ -20,36 +19,16 @@ export interface SystemApplyResult {
   regions: unknown[];
 }
 
-function parseRef(reference: string): { name: string; version: string } {
-  const separator = reference.lastIndexOf('@');
-  if (separator < 1 || separator === reference.length - 1) {
-    throw new DomainError(
-      'invalid_declaration',
-      `Invalid reference ${reference}`,
-    );
-  }
-  return {
-    name: reference.slice(0, separator),
-    version: reference.slice(separator + 1),
-  };
-}
-
-function endpoint(value: string): { instance: string; port: string } {
-  const separator = value.lastIndexOf('.');
-  if (separator < 1 || separator === value.length - 1) {
-    throw new DomainError('invalid_declaration', `Invalid endpoint ${value}`);
-  }
-  return {
-    instance: value.slice(0, separator),
-    port: value.slice(separator + 1),
-  };
-}
-
 export class SystemApplicationService {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly definitions = new DefinitionRepository(),
     private readonly topology = new TopologyRepository(),
+    private readonly instantiations = new TemplateInstantiationService(
+      db,
+      definitions,
+      topology,
+    ),
   ) {}
 
   async apply(document: any): Promise<SystemApplyResult> {
@@ -94,201 +73,48 @@ export class SystemApplicationService {
         regionRows.set(regionDeclaration.id, region);
       }
 
-      const investigationDeclaration = document.spec.regions.find(
-        (region: any) => region.id === 'investigation',
+      const instantiated: Array<{ regionId: string; digest: string }> = [];
+      for (const regionDeclaration of document.spec.regions) {
+        const [name, version] = String(regionDeclaration.template).split('@');
+        const template = await this.definitions.findTemplate(
+          transaction,
+          name,
+          version,
+        );
+
+        // Milestone 1 systems include stable boundary regions whose templates are
+        // not yet registered. Preserve that compatibility behavior while routing
+        // every registered, topology-bearing template through the generic service.
+        if (template === undefined) continue;
+        const templateDocument = template.template as any;
+        validateSimpleDeclaration(templateDocument, 'Template');
+        if (templateDocument.spec.initialTopology === undefined) continue;
+
+        const region = regionRows.get(regionDeclaration.id)!;
+        const result = await this.instantiations.instantiateInTransaction(
+          transaction,
+          {
+            targetRegionId: region.id,
+            template: regionDeclaration.template,
+            parameters: regionDeclaration.parameters ?? {},
+            componentConfiguration:
+              regionDeclaration.componentConfiguration ?? {},
+          },
+        );
+        if (result.disposition === 'created') disposition = 'created';
+        instantiated.push({ regionId: region.id, digest: result.digest });
+      }
+
+      instantiated.sort((left, right) =>
+        left.regionId.localeCompare(right.regionId),
       );
-      if (investigationDeclaration === undefined) {
-        throw new DomainError(
-          'invalid_declaration',
-          'System must declare the investigation region',
-        );
-      }
-      const investigationRegion = regionRows.get('investigation');
-      if (investigationRegion === undefined) {
-        throw new DomainError(
-          'invalid_declaration',
-          'Investigation region was not created',
-        );
-      }
-
-      const templateReference = parseRef(investigationDeclaration.template);
-      const templateRow = await this.definitions.findTemplate(
-        transaction,
-        templateReference.name,
-        templateReference.version,
-      );
-      if (templateRow === undefined) {
-        throw new DomainError(
-          'template_not_found',
-          `Template ${investigationDeclaration.template} was not found`,
-        );
-      }
-
-      const templateDocument = templateRow.template as any;
-      validateSimpleDeclaration(templateDocument, 'Template');
-      const staticTopology = templateDocument.spec.initialTopology;
-      if (staticTopology === undefined) {
-        throw new DomainError(
-          'invalid_declaration',
-          `Template ${investigationDeclaration.template} does not define spec.initialTopology`,
-        );
-      }
-      validateStaticTopology(staticTopology);
-
       const digest = canonicalJsonDigest({
         system: document,
-        templateDigest: templateRow.content_digest,
+        instantiations: instantiated,
       });
-      const activeRevision = await this.topology.activeRevision(
-        transaction,
-        investigationRegion.id,
-      );
-      if (activeRevision !== undefined) {
-        if (activeRevision.content_digest === digest) {
-          return {
-            disposition,
-            digest,
-            regions: [root, ...regionRows.values()],
-          };
-        }
-        throw new DomainError(
-          'system_conflict',
-          'Static system exists with different content',
-        );
-      }
 
-      const definitionByInstance = new Map<
-        string,
-        { id: string; ports: Map<string, 'input' | 'output' | 'state'> }
-      >();
-      for (const instance of staticTopology.instances) {
-        const reference = parseRef(instance.component);
-        const definition = await this.definitions.findComponentDefinition(
-          transaction,
-          reference.name,
-          reference.version,
-        );
-        if (definition === undefined) {
-          throw new DomainError(
-            'component_definition_not_found',
-            `Component definition ${instance.component} was not found`,
-          );
-        }
-        const ports = await this.definitions.listPorts(
-          transaction,
-          definition.id,
-        );
-        definitionByInstance.set(instance.name, {
-          id: definition.id,
-          ports: new Map(
-            ports.map((port) => [
-              port.name,
-              port.direction as 'input' | 'output' | 'state',
-            ]),
-          ),
-        });
-      }
-
-      for (const [commandType, rule] of Object.entries(
-        staticTopology.ingress?.commands ?? {},
-      )) {
-        const seen = new Set<string>();
-        for (const target of (rule as any).targets ?? []) {
-          const ports = definitionByInstance.get(target.component)?.ports;
-          if (ports?.get(target.port) !== 'input') {
-            throw new DomainError(
-              'invalid_port_reference',
-              `Invalid ingress ${commandType} target ${target.component}.${target.port}`,
-            );
-          }
-          const key = `${target.component}.${target.port}`;
-          if (seen.has(key))
-            throw new DomainError(
-              'duplicate_ingress_target',
-              `Duplicate ingress target ${key}`,
-            );
-          seen.add(key);
-        }
-      }
-
-      for (const connection of staticTopology.connections) {
-        const source = endpoint(connection.from);
-        const target = endpoint(connection.to);
-        if (source.instance === 'region' || target.instance === 'region')
-          continue;
-        if (
-          !definitionByInstance.get(source.instance)?.ports.has(source.port) ||
-          !definitionByInstance.get(target.instance)?.ports.has(target.port)
-        ) {
-          throw new DomainError(
-            'invalid_port_reference',
-            `Invalid connection ${connection.from} -> ${connection.to}`,
-          );
-        }
-      }
-
-      const revision = await this.topology.createRevision(
-        transaction,
-        investigationRegion.id,
-        digest,
-        templateDocument as Json,
-      );
-      const instanceIds = new Map<string, string>();
-      for (const instance of staticTopology.instances) {
-        const definition = definitionByInstance.get(instance.name)!;
-        const row = await this.topology.createInstance(transaction, {
-          regionId: investigationRegion.id,
-          revisionId: revision.id,
-          definitionId: definition.id,
-          name: instance.name,
-          configuration: (instance.configuration ?? {}) as Json,
-        });
-        instanceIds.set(instance.name, row.id);
-      }
-
-      for (const [commandType, rule] of Object.entries(
-        staticTopology.ingress?.commands ?? {},
-      )) {
-        const seen = new Set<string>();
-        for (const target of (rule as any).targets ?? []) {
-          const ports = definitionByInstance.get(target.component)?.ports;
-          if (ports?.get(target.port) !== 'input') {
-            throw new DomainError(
-              'invalid_port_reference',
-              `Invalid ingress ${commandType} target ${target.component}.${target.port}`,
-            );
-          }
-          const key = `${target.component}.${target.port}`;
-          if (seen.has(key))
-            throw new DomainError(
-              'duplicate_ingress_target',
-              `Duplicate ingress target ${key}`,
-            );
-          seen.add(key);
-        }
-      }
-
-      for (const connection of staticTopology.connections) {
-        const source = endpoint(connection.from);
-        const target = endpoint(connection.to);
-        if (source.instance === 'region' || target.instance === 'region')
-          continue;
-        await this.topology.createConnection(transaction, {
-          revisionId: revision.id,
-          sourceId: instanceIds.get(source.instance)!,
-          sourcePort: source.port,
-          targetId: instanceIds.get(target.instance)!,
-          targetPort: target.port,
-        });
-      }
-
-      await this.topology.activate(
-        transaction,
-        investigationRegion.id,
-        revision.id,
-      );
       return {
-        disposition: 'created',
+        disposition,
         digest,
         regions: [root, ...regionRows.values()],
       };
