@@ -10,6 +10,15 @@ export * from './scheduling/lease.js';
 export * from './scheduling/scheduler-service.js';
 export * from './registration/registration-service.js';
 export * from './systems/system-application-service.js';
+export {
+  normalizeTemplateInstantiationRequest,
+  toTemplateInstantiationResult,
+  type CanonicalTemplateInstantiationRequest,
+  type NormalizedTemplateInstantiationRequest,
+  type TemplateInstantiationSource,
+} from './systems/template-instantiation-contract.js';
+export * from './systems/template-instantiation-contract-service.js';
+export * from './systems/template-instantiation-error.js';
 export * from './systems/template-instantiation-service.js';
 export * from './policies/policy-decision-service.js';
 export * from './artifacts/errors.js';

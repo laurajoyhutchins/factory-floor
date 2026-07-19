@@ -13,6 +13,9 @@ from .proposed_result_schema import *  # noqa: F401,F403
 from .resource_usage_schema import *  # noqa: F401,F403
 from .source_identity_schema import *  # noqa: F401,F403
 from .staged_artifact_schema import *  # noqa: F401,F403
+from .template_instantiation_error_schema import *  # noqa: F401,F403
+from .template_instantiation_request_schema import *  # noqa: F401,F403
+from .template_instantiation_result_schema import *  # noqa: F401,F403
 from .worker.cancellation_response_schema import *  # noqa: F401,F403
 from .worker.capability_request_schema import *  # noqa: F401,F403
 from .worker.capability_response_schema import *  # noqa: F401,F403
