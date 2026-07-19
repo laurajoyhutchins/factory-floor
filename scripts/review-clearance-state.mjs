@@ -1,5 +1,13 @@
 export const REVIEW_CLEARANCE_MARKER = '<!-- review-clearance:v1 -->';
 
+const REQUIRED_REVIEW_SECTIONS = [
+  '## Final review',
+  'Scope reviewed:',
+  'Findings and changes:',
+  'Verification:',
+  'Remaining limitations:',
+];
+
 const isPullNumber = (value) => Number.isInteger(value) && value > 0;
 
 const eventPullNumber = (payload) => {
@@ -110,6 +118,18 @@ export const readReviewThreadState = async ({
 const commentTimestamp = (comment) =>
   Math.max(timestamp(comment.updated_at), timestamp(comment.created_at));
 
+const hasCompleteReviewRecord = (body) => {
+  let offset = body.indexOf(REVIEW_CLEARANCE_MARKER);
+  if (offset < 0) return false;
+
+  for (const section of REQUIRED_REVIEW_SECTIONS) {
+    offset = body.indexOf(section, offset + 1);
+    if (offset < 0) return false;
+  }
+
+  return true;
+};
+
 export const parseReviewClearance = ({ comments, ownerLogin, headSha }) => {
   const latest = comments
     .filter(
@@ -130,10 +150,10 @@ export const parseReviewClearance = ({ comments, ownerLogin, headSha }) => {
   const reviewedHead = latest.body.match(
     /Reviewed head:\s*`([0-9a-f]{40})`/i,
   )?.[1];
-  if (!reviewedHead) {
+  if (!reviewedHead || !hasCompleteReviewRecord(latest.body)) {
     return {
       state: 'not-cleared',
-      reviewedHead: null,
+      reviewedHead: reviewedHead ?? null,
       commentId: latest.id,
     };
   }
