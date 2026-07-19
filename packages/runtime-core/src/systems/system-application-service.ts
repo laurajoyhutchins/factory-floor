@@ -11,7 +11,7 @@ import {
   validateSimpleDeclaration,
   validateSystemDeclaration,
 } from '../declarations/validation.js';
-import { TemplateInstantiationService } from './template-instantiation-service.js';
+import { TemplateInstantiationService } from './durable-template-instantiation-service.js';
 
 export interface SystemApplyResult {
   disposition: 'created' | 'existing';
