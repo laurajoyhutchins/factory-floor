@@ -1,9 +1,9 @@
+import console from 'node:console';
 import {
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
