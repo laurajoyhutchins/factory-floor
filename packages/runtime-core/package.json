@@ -6,9 +6,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
+    "@factory-floor/artifact-store": "workspace:*",
+    "@factory-floor/contracts-ts": "workspace:*",
     "@factory-floor/db": "workspace:*",
     "ajv": "^8.20.0",
-    "kysely": "^0.29.3",
-    "@factory-floor/artifact-store": "workspace:*"
+    "kysely": "^0.29.3"
   }
 }
