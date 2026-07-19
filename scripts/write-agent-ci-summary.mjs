@@ -40,33 +40,99 @@ export const findActionableError = (text) => {
   return match ? match.slice(0, 500) : null;
 };
 
+const readExistingLog = (logs = []) =>
+  logs.find((candidate) => existsSync(resolve(candidate))) ?? null;
+
+const readMetric = (metricPath) => {
+  if (!metricPath || !existsSync(resolve(metricPath))) return null;
+  const metric = JSON.parse(readFileSync(resolve(metricPath), 'utf8'));
+  if (typeof metric.stage !== 'string' || typeof metric.success !== 'boolean') {
+    throw new TypeError(`Invalid CI stage metric: ${metricPath}`);
+  }
+  return metric;
+};
+
+const actionableErrorFromLog = (log) =>
+  log ? findActionableError(readFileSync(resolve(log), 'utf8')) : null;
+
 export const buildSummary = ({
   manifest,
   environment,
   jobStatus,
   artifactName,
+  failureStep = null,
 }) => {
-  const stages = manifest.stages
+  const declaresMetrics = manifest.stages.some(
+    (stage) => typeof stage.metric === 'string',
+  );
+  const startedStages = manifest.stages
     .map((stage) => {
-      const log = stage.logs.find((candidate) =>
-        existsSync(resolve(candidate)),
-      );
-      if (!log) return null;
+      const metric = readMetric(stage.metric);
+      const log = readExistingLog(stage.logs);
+      if (!metric && !log) return null;
       return {
         name: stage.name,
         command: stage.command,
+        metric: stage.metric ?? null,
         log,
-        firstActionableError: findActionableError(
-          readFileSync(resolve(log), 'utf8'),
-        ),
+        result: metric
+          ? metric.success
+            ? 'passed'
+            : 'failed'
+          : 'unknown',
+        exitCode: metric?.exitCode ?? null,
+        firstActionableError: actionableErrorFromLog(log),
       };
     })
     .filter(Boolean);
-  const failed = jobStatus !== 'success';
-  const failedStage = failed ? (stages.at(-1) ?? null) : null;
+  const failedMetricStage = startedStages.find(
+    (stage) => stage.result === 'failed',
+  );
+  const legacyFailedStage =
+    jobStatus !== 'success' && !declaresMetrics
+      ? (startedStages.at(-1) ?? null)
+      : null;
+  const failedVerificationStage = failedMetricStage ?? legacyFailedStage;
+  const failed = jobStatus !== 'success' || Boolean(failedMetricStage);
+
+  let failureKind = null;
+  let failedStage = null;
+  let firstActionableError = null;
+  let reproductionCommand = null;
+  if (failedVerificationStage) {
+    failureKind = 'verification-stage';
+    failedStage = failedVerificationStage.name;
+    firstActionableError = failedVerificationStage.firstActionableError;
+    reproductionCommand = failedVerificationStage.command;
+  } else if (failed && failureStep) {
+    failureKind = 'infrastructure';
+    failedStage = failureStep.name;
+    firstActionableError = actionableErrorFromLog(failureStep.log);
+    reproductionCommand = failureStep.command ?? null;
+  } else if (failed) {
+    failureKind = 'infrastructure';
+    failedStage = 'job-infrastructure';
+  }
+
   const repository = environment.GITHUB_REPOSITORY ?? null;
   const runId = environment.GITHUB_RUN_ID ?? null;
   const serverUrl = environment.GITHUB_SERVER_URL ?? 'https://github.com';
+  const result =
+    failedMetricStage && jobStatus === 'success' ? 'failure' : jobStatus;
+  const stages = startedStages.map((stage) => ({
+    name: stage.name,
+    command: stage.command,
+    metric: stage.metric,
+    log: stage.log,
+    result:
+      legacyFailedStage && stage.result === 'unknown'
+        ? stage === legacyFailedStage
+          ? 'failed'
+          : 'passed'
+        : stage.result,
+    exitCode: stage.exitCode,
+  }));
+
   return {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -77,17 +143,13 @@ export const buildSummary = ({
     runId,
     runAttempt: environment.GITHUB_RUN_ATTEMPT ?? null,
     job: environment.GITHUB_JOB ?? job,
-    result: jobStatus,
+    result,
     stale: false,
-    failedStage: failedStage?.name ?? null,
-    firstActionableError: failedStage?.firstActionableError ?? null,
-    reproductionCommand: failedStage?.command ?? null,
-    stages: stages.map((stage, index) => ({
-      name: stage.name,
-      command: stage.command,
-      log: stage.log,
-      result: failed && index === stages.length - 1 ? 'failed' : 'passed',
-    })),
+    failureKind,
+    failedStage,
+    firstActionableError,
+    reproductionCommand,
+    stages,
     artifacts: artifactName ? [artifactName] : [],
     runUrl:
       repository && runId
@@ -105,17 +167,26 @@ const run = () => {
   const manifest = JSON.parse(readFileSync(resolve(manifestPath), 'utf8'));
   if (!Array.isArray(manifest.stages))
     throw new TypeError('Agent CI manifest must contain a stages array.');
+  const failureStepName = process.env.AGENT_CI_FAILURE_STEP?.trim();
+  const failureStep = failureStepName
+    ? {
+        name: failureStepName,
+        command: process.env.AGENT_CI_FAILURE_COMMAND?.trim() || null,
+        log: process.env.AGENT_CI_FAILURE_LOG?.trim() || null,
+      }
+    : null;
   const summary = buildSummary({
     manifest,
     environment: process.env,
     jobStatus: process.env.AGENT_CI_JOB_STATUS ?? 'unknown',
     artifactName: artifact,
+    failureStep,
   });
   const destination = resolve(outputPath);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, `${JSON.stringify(summary, null, 2)}\n`);
   process.stdout.write(
-    `## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Verification SHA: \`${summary.verificationSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`,
+    `## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Verification SHA: \`${summary.verificationSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failure kind: ${summary.failureKind ? `\`${summary.failureKind}\`` : 'none'}\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`,
   );
 };
 const isMain =
