@@ -29,11 +29,13 @@ function template(initialState: unknown) {
   };
 }
 
-function harness(options: {
-  initialState?: unknown;
-  direction?: 'input' | 'output' | 'state';
-  schema?: Record<string, unknown>;
-} = {}) {
+function harness(
+  options: {
+    initialState?: unknown;
+    direction?: 'input' | 'output' | 'state';
+    schema?: Record<string, unknown>;
+  } = {},
+) {
   const definitions = {
     findTemplate: async () =>
       template(
