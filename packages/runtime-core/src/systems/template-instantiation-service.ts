@@ -802,6 +802,14 @@ export class TemplateInstantiationService {
       }
       fanInInputs.add(targetKey);
     }
+    for (const [targetKey, incomingCount] of incomingConnectionCounts) {
+      if (incomingCount > 1 && !fanInInputs.has(targetKey)) {
+        throw new DomainError(
+          'invalid_fan_in_rule',
+          `Input ${targetKey} has ${incomingCount} incoming connections but no fan-in rule`,
+        );
+      }
+    }
 
     const referencedDefinitions = sortedReferences(references);
     const effectiveTopology = structuredClone(templateDocument);
