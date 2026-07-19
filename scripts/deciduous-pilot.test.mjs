@@ -47,6 +47,9 @@ async function makeHarness(version = 'deciduous 0.16.0') {
     '  printf "%s\\n" "$current" > "$counter"',
     '  printf "Created node %s\\n" "$current"',
     'fi',
+    'if [[ "$command_name" == "graph" ]]; then',
+    '  printf \'{"nodes":[],"edges":[]}\\n\'',
+    'fi',
     '',
   ].join('\n');
 
@@ -236,30 +239,26 @@ describe('Deciduous pilot wrapper', () => {
     ]);
   });
 
-  test('exports a branch patch only inside the configured patch directory', async () => {
+  test('exports a validated full-graph snapshot inside the configured export directory', async () => {
     const harness = await makeHarness();
 
-    const valid = runWrapper(
-      ['export', 'agent-deciduous-pilot.json', 'agent/deciduous-pilot'],
-      harness,
-    );
-    const invalid = runWrapper(
-      ['export', '../escape.json', 'agent/deciduous-pilot'],
-      harness,
-    );
+    const valid = runWrapper(['export', 'agent-deciduous-pilot.json'], harness);
+    const invalid = runWrapper(['export', '../escape.json'], harness);
 
     expect(valid.status).toBe(0);
     expect(invalid.status).toBe(2);
     expect(invalid.stderr).toContain('simple .json filename');
-    expect(await readCalls(harness)).toEqual([
-      [
-        'diff',
-        'export',
-        '--branch',
-        'agent/deciduous-pilot',
-        '-o',
-        join(harness.stateDirectory, 'patches/agent-deciduous-pilot.json'),
-      ],
-    ]);
+    expect(await readCalls(harness)).toEqual([['graph']]);
+    expect(
+      JSON.parse(
+        await readFile(
+          join(
+            harness.stateDirectory,
+            'exports/agent-deciduous-pilot.json',
+          ),
+          'utf8',
+        ),
+      ),
+    ).toEqual({ nodes: [], edges: [] });
   });
 });
