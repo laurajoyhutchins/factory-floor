@@ -65,6 +65,7 @@ describe('repository verification wiring', () => {
     const verificationScript = read('scripts/verify.sh');
 
     expect(packageJson.scripts).toMatchObject({
+      'ci:quality:check': 'node scripts/check-ci-quality-gates.mjs',
       'verify:static': 'bash scripts/verify.sh static',
       'verify:unit': 'bash scripts/verify.sh unit',
       'verify:fast': 'bash scripts/verify.sh fast',
@@ -83,6 +84,7 @@ describe('repository verification wiring', () => {
     ]) {
       expect(verificationScript).toContain(`verify_${stage}()`);
     }
+    expect(verificationScript).toContain('pnpm ci:quality:check');
     expect(verificationScript).toContain(
       'pnpm --filter @factory-floor/console build',
     );
@@ -105,6 +107,8 @@ describe('repository verification wiring', () => {
     expect(
       unitStage.indexOf('unset DATABASE_URL TEST_DATABASE_URL'),
     ).toBeLessThan(unitStage.indexOf('pnpm test'));
+    expect(unitStage).toContain('pnpm test:ci');
+    expect(unitStage).toContain('pnpm test:python:ci');
     expect(integrationStage.indexOf('pnpm typecheck')).toBeGreaterThan(-1);
     expect(integrationStage.indexOf('pnpm typecheck')).toBeLessThan(
       integrationStage.indexOf('pnpm test:integration'),
@@ -124,14 +128,16 @@ describe('repository verification wiring', () => {
     expect(acceptanceScript).not.toContain('pnpm exec prettier --check');
   });
 
-  it('makes CI call canonical stages instead of duplicating command lists', () => {
+  it('makes CI call measured canonical stages with immutable actions', () => {
     const workflow = parse(
       read('.github/workflows/repository-verification.yml'),
     );
-    const runCommands = Object.values(workflow.jobs)
-      .flatMap((job) => job.steps ?? [])
-      .map((step) => step.run ?? '')
-      .join('\n');
+    const jobs = Object.values(workflow.jobs);
+    const steps = jobs.flatMap((job) => job.steps ?? []);
+    const runCommands = steps.map((step) => step.run ?? '').join('\n');
+    const actionReferences = steps
+      .map((step) => step.uses)
+      .filter((reference) => typeof reference === 'string');
 
     expect(runCommands).toContain('pnpm verify:static');
     expect(runCommands).toContain('pnpm verify:unit');
@@ -142,6 +148,30 @@ describe('repository verification wiring', () => {
       /pnpm (lint|typecheck|test|test:python|format:check)\b/,
     );
     expect(runCommands).not.toContain('@factory-floor/console test');
+    for (const stage of [
+      'static',
+      'unit',
+      'services',
+      'integration',
+      'acceptance',
+      'm1-clean-acceptance',
+    ]) {
+      expect(runCommands).toContain(
+        `node scripts/run-ci-stage.mjs --stage ${stage}`,
+      );
+    }
+    expect(runCommands).toContain('node scripts/summarize-ci-metrics.mjs');
+    expect(actionReferences.length).toBeGreaterThan(0);
+    for (const reference of actionReferences) {
+      expect(reference).toMatch(/^[^@]+@[0-9a-f]{40}$/);
+    }
+    for (const job of jobs) {
+      const artifactPaths = (job.steps ?? [])
+        .filter((step) => step.uses?.startsWith('actions/upload-artifact@'))
+        .map((step) => step.with?.path ?? '')
+        .join('\n');
+      expect(artifactPaths).toContain('.factory-floor/ci-metrics/');
+    }
     expect(workflow.jobs['m1-acceptance'].needs).toBe('service-verification');
   });
 
