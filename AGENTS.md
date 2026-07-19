@@ -63,6 +63,42 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
+## ChatGPT–GitHub operating protocol
+
+### Delegation vocabulary
+
+- **Take issue #N** — inspect current `main` and the issue, create an isolated branch, implement the complete accepted scope, open or update a draft pull request, perform a fresh self-review, resolve review and CI findings, verify the exact current head, and squash merge when every required gate is satisfied.
+- **Review PR #N** — inspect the issue, complete diff, review threads, current-head CI, compatibility, failure semantics, security, and missing tests. Report findings only; do not modify or merge unless separately asked.
+- **Fix PR #N** — work on the existing pull-request branch, address actionable findings, resolve appropriate review threads, and verify the exact current head. Do not merge.
+- **Land PR #N** — review, fix anything necessary, verify the exact current head, then squash merge and close linked issues when safe.
+- **Start open issues** — select the highest-leverage unblocked issues whose scopes and branches do not overlap. Respect dependency order and do not create competing implementations.
+
+### Standing defaults
+
+- Continue through ordinary implementation, self-review, CI-repair, and documentation loops without asking for repeated `continue` instructions.
+- Resolve routine implementation choices autonomously in favor of deterministic, strict, least-privileged, and testable behavior.
+- Never merge a stale or unverified head. Re-check the head SHA after every branch update, review fix, or CI rerun.
+- Use squash merge for completed feature and maintenance pull requests unless the issue explicitly requires preserved commit structure.
+- Do not expose secrets, credentials, private artifact bytes, or sensitive runtime data in chat, commits, logs, artifacts, or pull-request text.
+- Stop for unavailable credentials, deployment or external side effects, destructive operations, accepted-invariant changes, unresolved architecture conflicts, or work that cannot be completed and verified within the available environment.
+
+### Pull-request lifecycle
+
+1. Start from current `main` or an explicitly approved stacked base and record the base SHA.
+2. Keep the pull request in draft while behavior, tests, or self-review findings remain incomplete.
+3. Implement test-first and retain red-state evidence in commit history, a focused log, or the pull-request narrative. Required CI must not remain intentionally red once an implementation is available.
+4. Perform a fresh review from the issue and complete current diff rather than relying on the implementation conversation.
+5. Resolve all actionable findings and explicitly defer only issue-linked work.
+6. Require successful repository verification on the exact reviewed head.
+7. Merge only when the sticky agent handoff, CI artifacts, and GitHub state all refer to that same head SHA.
+
+### Durable handoff
+
+- Keep the pull-request description current with scope, risk, invariants, verification, deferred work, and external blockers.
+- The `Agent PR handoff` workflow owns one sticky status comment. Treat its JSON block as a resumable snapshot, not as approval.
+- CI jobs must retain `agent-ci-summary.json` with the reviewed SHA, job, failed stage, first actionable error, reproduction command, artifact name, and run URL.
+- Use the manual `Sync pull request branch` workflow for same-repository branch updates. It must never force-push or conceal conflicts.
+
 ## Completion evidence
 
 Before claiming completion, run and report:
