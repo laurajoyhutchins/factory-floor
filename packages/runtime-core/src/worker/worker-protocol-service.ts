@@ -758,9 +758,7 @@ export class WorkerProtocolService {
           submission_digest: digest,
           result: input as unknown as Json,
         })
-        .onConflict((conflict) =>
-          conflict.column('attempt_id').doNothing(),
-        )
+        .onConflict((conflict) => conflict.column('attempt_id').doNothing())
         .returning('submission_digest')
         .executeTakeFirst();
       if (!inserted) {
