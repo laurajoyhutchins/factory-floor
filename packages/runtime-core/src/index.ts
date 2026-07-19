@@ -26,6 +26,7 @@ export {
   type ResolvedInstantiationReference,
 } from './systems/template-instantiation-service.js';
 export * from './systems/durable-template-instantiation-service.js';
+export * from './systems/template-initial-state-resolver.js';
 export * from './policies/policy-decision-service.js';
 export * from './artifacts/errors.js';
 export * from './artifacts/artifact-validation-service.js';
@@ -33,7 +34,12 @@ export * from './artifacts/artifact-publication-service.js';
 export * from './artifacts/artifact-reconciliation-service.js';
 export * from './artifacts/artifact-tombstone-service.js';
 export * from './artifacts/proposed-result-prevalidation-service.js';
-export * from './worker/worker-protocol-service.js';
+export {
+  WorkerProtocolError,
+  type WorkerErrorCode,
+  type WorkerProtocolOptions,
+} from './worker/worker-protocol-service.js';
+export { WorkerProtocolService } from './worker/state-aware-worker-protocol-service.js';
 export * from './commit/execution-commit-service.js';
 export * from './observability/observability-service.js';
 export * from './observability/recovery-service.js';
