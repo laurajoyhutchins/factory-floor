@@ -32,10 +32,10 @@ data/
 
 # Deciduous pilot local state
 .deciduous/*
-!.deciduous/patches/
-.deciduous/patches/*
-!.deciduous/patches/.gitkeep
-!.deciduous/patches/*.json
+!.deciduous/exports/
+.deciduous/exports/*
+!.deciduous/exports/.gitkeep
+!.deciduous/exports/*.json
 
 # Editors and operating systems
 .vscode/*
