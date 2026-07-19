@@ -112,11 +112,7 @@ function harness() {
       componentPorts.get(definitionId.replace(/^definition-/, '')) ?? [],
     findArtifactSchemaById: async (_db: unknown, id: string) =>
       id === payloadSchema.id ? payloadSchema : undefined,
-    findArtifactSchema: async (
-      _db: unknown,
-      name: string,
-      version: string,
-    ) =>
+    findArtifactSchema: async (_db: unknown, name: string, version: string) =>
       name === payloadSchema.name && version === payloadSchema.version
         ? payloadSchema
         : undefined,
@@ -243,9 +239,7 @@ describe('TemplateInstantiationService', () => {
       registeredTemplate('boundary', {
         initialTopology: {
           instances: [{ name: 'worker', component: 'boundary-worker@1' }],
-          connections: [
-            { from: 'region.objective', to: 'worker.objective' },
-          ],
+          connections: [{ from: 'region.objective', to: 'worker.objective' }],
         },
       }),
     );
