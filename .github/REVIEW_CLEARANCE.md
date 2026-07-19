@@ -14,16 +14,20 @@ The repository owner posts one top-level pull-request comment in this exact stru
 Reviewed head: `<full 40-character commit SHA>`
 
 Scope reviewed:
+
 - complete current diff
 - relevant invariants, failure behavior, security, tests, and documentation
 
 Findings and changes:
+
 - concise summary, or `None.`
 
 Verification:
+
 - exact-head commands and GitHub Actions runs
 
 Remaining limitations:
+
 - concise limitations, or `None.`
 
 Disposition: Cleared for merge.
