@@ -4,31 +4,37 @@
     {
       "name": "static",
       "command": "pnpm verify:static",
+      "metric": ".factory-floor/ci-metrics/static.json",
       "logs": ["fast-static.log"]
     },
     {
       "name": "unit",
       "command": "pnpm verify:unit",
+      "metric": ".factory-floor/ci-metrics/unit.json",
       "logs": ["unit-verification.log"]
     },
     {
       "name": "services",
       "command": "pnpm verify:services",
+      "metric": ".factory-floor/ci-metrics/services.json",
       "logs": ["services-verification.log"]
     },
     {
       "name": "integration",
       "command": "pnpm verify:integration",
+      "metric": ".factory-floor/ci-metrics/integration.json",
       "logs": ["integration-verification.log"]
     },
     {
       "name": "acceptance",
       "command": "pnpm verify:acceptance",
+      "metric": ".factory-floor/ci-metrics/acceptance.json",
       "logs": ["acceptance-verification.log"]
     },
     {
       "name": "m1-clean-acceptance",
       "command": "pnpm accept:m1",
+      "metric": ".factory-floor/ci-metrics/m1-clean-acceptance.json",
       "logs": ["m1-acceptance.log"]
     }
   ]
