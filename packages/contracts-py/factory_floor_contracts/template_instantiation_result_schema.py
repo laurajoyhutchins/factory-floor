@@ -90,6 +90,7 @@ class TemplateInstantiationResult(BaseModel):
     )
     protocolVersion: Literal['1.0']
     requestId: UUID
+    instantiationId: UUID
     disposition: Disposition
     digest: Sha256Digest
     regionId: UUID
