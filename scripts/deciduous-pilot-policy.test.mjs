@@ -9,14 +9,14 @@ async function readRepositoryFile(path) {
 }
 
 describe('Deciduous pilot repository policy', () => {
-  test('ignores local graph state while permitting reviewable JSON patches', async () => {
+  test('ignores local graph state while permitting reviewable JSON snapshots', async () => {
     const gitignore = await readRepositoryFile('.gitignore');
 
     expect(gitignore).toContain('.deciduous/*');
-    expect(gitignore).toContain('!.deciduous/patches/');
-    expect(gitignore).toContain('.deciduous/patches/*');
-    expect(gitignore).toContain('!.deciduous/patches/.gitkeep');
-    expect(gitignore).toContain('!.deciduous/patches/*.json');
+    expect(gitignore).toContain('!.deciduous/exports/');
+    expect(gitignore).toContain('.deciduous/exports/*');
+    expect(gitignore).toContain('!.deciduous/exports/.gitkeep');
+    expect(gitignore).toContain('!.deciduous/exports/*.json');
   });
 
   test('keeps the pilot nonblocking and subordinate to existing authorities', async () => {
@@ -41,10 +41,11 @@ describe('Deciduous pilot repository policy', () => {
     expect(guide).toContain('## Rollback');
   });
 
-  test('never invokes generated assistant integration', async () => {
+  test('never invokes generated or unsupported assistant integration', async () => {
     const wrapper = await readRepositoryFile('scripts/deciduous-pilot.sh');
 
     expect(wrapper).not.toContain('deciduous init');
+    expect(wrapper).not.toContain('diff export');
     expect(wrapper).not.toContain('.claude');
     expect(wrapper).not.toContain('.opencode');
     expect(wrapper).not.toContain('.windsurf');
