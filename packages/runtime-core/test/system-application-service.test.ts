@@ -99,11 +99,7 @@ describe('SystemApplicationService', () => {
       createConnection: async (_db: unknown, input: any) => {
         createdConnections.push(input);
       },
-      activate: async (
-        _db: unknown,
-        regionId: string,
-        revisionId: string,
-      ) => {
+      activate: async (_db: unknown, regionId: string, revisionId: string) => {
         activeRevisions.set(
           regionId,
           revisions.find((revision) => revision.id === revisionId),
