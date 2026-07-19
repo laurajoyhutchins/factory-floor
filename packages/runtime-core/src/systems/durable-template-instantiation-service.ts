@@ -154,6 +154,15 @@ export class TemplateInstantiationService {
       };
     }
 
+    const referencedDefinitions: Json = topologyResult.referencedDefinitions.map(
+      (reference) => ({
+        kind: reference.kind,
+        id: reference.id,
+        name: reference.name,
+        version: reference.version,
+        contentDigest: reference.contentDigest,
+      }),
+    );
     const instantiation = await this.instantiations.create(transaction, {
       requestId,
       requestDigest,
@@ -164,9 +173,7 @@ export class TemplateInstantiationService {
       parameters,
       componentConfiguration,
       source,
-      referencedDefinitions: structuredClone(
-        topologyResult.referencedDefinitions,
-      ) as Json,
+      referencedDefinitions,
       initialDisposition: topologyResult.disposition,
     });
 
