@@ -84,7 +84,7 @@ Database constraint names, SQLSTATE values, stack traces, and repository impleme
 
 `TemplateInstantiationContractService` is the canonical in-process adapter. It validates the complete request before invoking `TemplateInstantiationService`, translates the natural-key request into the existing authoritative runtime call, and converts internal region/revision rows into the stable protocol result.
 
-Existing static-system application remains compatible through the implementation-local request shape. That compatibility path is normalized deterministically to the same source and parameter/configuration semantics; it is not a separate topology publication implementation.
+Existing static-system application continues to use the implementation-local request shape against the same authoritative `TemplateInstantiationService`. It remains compatible without creating a second validation or topology-publication implementation; direct canonical consumption by the child-region boundary is deferred to issue #74.
 
 ## Authority and deferred work
 
