@@ -37,7 +37,7 @@ const templateDocument = {
 };
 
 describe('SystemApplicationService', () => {
-  it('routes a registered topology-bearing region through generic instantiation without requiring a literal investigation region', async () => {
+  it('routes any topology-bearing region through generic instantiation and preserves static-system conflicts', async () => {
     const transaction = {};
     const db = {
       transaction: () => ({
@@ -185,5 +185,18 @@ describe('SystemApplicationService', () => {
     });
     expect(createdInstances).toHaveLength(2);
     expect(activeRevisions.has('region-analysis-work')).toBe(true);
+
+    await expect(
+      service.apply({
+        ...systemDocument,
+        spec: {
+          ...systemDocument.spec,
+          connections: [
+            { from: 'intake.accepted', to: 'analysis-work.objective' },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'template_instantiation_conflict' });
+    expect(createdInstances).toHaveLength(2);
   });
 });
