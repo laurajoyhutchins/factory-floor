@@ -3,6 +3,7 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 
 const repositoryRoot = resolve(import.meta.dirname, '..');
 const wrapper = join(repositoryRoot, 'scripts/deciduous-pilot.sh');
@@ -31,8 +32,6 @@ async function makeHarness(version = 'deciduous 0.16.0') {
     '  printf "\\t%s" "$argument" >> "$log"',
     'done',
     'printf "\\n" >> "$log"',
-    'if [[ "$(head -n 1 "$log" | cut -f1)" == "never" ]]; then exit 99; fi',
-    'if [[ "${1:-}" == "never" ]]; then exit 99; fi',
     'command_name="$(tail -n 1 "$log" | cut -f1)"',
     'if [[ "$command_name" == "add" ]]; then',
     '  current=0',
