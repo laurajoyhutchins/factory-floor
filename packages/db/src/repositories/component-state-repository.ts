@@ -22,8 +22,11 @@ export interface ComponentStateVersionTable {
   schema_id: string;
   topology_revision_id: string;
   region_id: string;
-  source_template_id: string;
-  origin_template_instantiation_id: string;
+  source_kind: 'template_instantiation' | 'execution';
+  source_template_id: string | null;
+  origin_template_instantiation_id: string | null;
+  source_execution_id: string | null;
+  source_attempt_id: string | null;
   provenance: Jsonb;
   created_at: Generated<Timestamp>;
 }
@@ -93,8 +96,11 @@ export class ComponentStateRepository {
         schema_id: input.schemaId,
         topology_revision_id: input.topologyRevisionId,
         region_id: input.regionId,
+        source_kind: 'template_instantiation',
         source_template_id: input.sourceTemplateId,
         origin_template_instantiation_id: input.originTemplateInstantiationId,
+        source_execution_id: null,
+        source_attempt_id: null,
         provenance: input.provenance,
       })
       .onConflict((conflict) =>
