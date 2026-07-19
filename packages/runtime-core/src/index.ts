@@ -18,6 +18,7 @@ export {
   type TemplateInstantiationSource,
 } from './systems/template-instantiation-contract.js';
 export * from './systems/template-instantiation-contract-service.js';
+export * from './systems/template-instantiation-error.js';
 export * from './systems/template-instantiation-service.js';
 export * from './policies/policy-decision-service.js';
 export * from './artifacts/errors.js';
