@@ -92,10 +92,16 @@ function bindParameters(value: Json, parameters: JsonObject): Json {
   return value;
 }
 
-function initialStateDeclaration(instance: any): { port: string; value: Json } | undefined {
+function initialStateDeclaration(
+  instance: any,
+): { port: string; value: Json } | undefined {
   const declaration = instance.initialState;
   if (declaration === undefined) return undefined;
-  if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) {
+  if (
+    !declaration ||
+    typeof declaration !== 'object' ||
+    Array.isArray(declaration)
+  ) {
     throw new DomainError(
       'invalid_declaration',
       `Initial state for ${instance.name} must be an object`,
@@ -182,8 +188,7 @@ export class TemplateInitialStateResolver {
       const statePort = (
         await this.definitions.listPorts(db, component.id)
       ).find(
-        (port) =>
-          port.direction === 'state' && port.name === declaration.port,
+        (port) => port.direction === 'state' && port.name === declaration.port,
       );
       if (statePort === undefined) {
         throw new DomainError(
