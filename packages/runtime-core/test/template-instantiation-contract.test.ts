@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { DomainError } from '../src/declarations/errors.js';
 import { TemplateInstantiationContractService } from '../src/systems/template-instantiation-contract-service.js';
 import {
   normalizeTemplateInstantiationRequest,
   templateInstantiationRequestSchema,
   toTemplateInstantiationResult,
 } from '../src/systems/template-instantiation-contract.js';
+import { toTemplateInstantiationError } from '../src/systems/template-instantiation-error.js';
 
 const requestId = '019bb22e-58b0-7d87-8000-000000000001';
 const targetRegionId = '019bb22e-58b0-7d87-8000-000000000002';
@@ -31,6 +33,43 @@ const canonicalRequest = {
     version: '1',
     contentDigest: digestB,
   },
+};
+
+const runtimeResult = {
+  disposition: 'created' as const,
+  digest: digestB,
+  region: { id: targetRegionId, name: 'analysis' },
+  revision: { id: revisionId, content_digest: digestB },
+  template: {
+    id: templateId,
+    name: 'bounded-investigation',
+    version: '1',
+    contentDigest: digestA,
+  },
+  parameters: { mode: 'strict' },
+  source: canonicalRequest.source,
+  referencedDefinitions: [
+    {
+      kind: 'component' as const,
+      id: definitionId,
+      name: 'retrieve',
+      version: '1',
+      contentDigest: digestA,
+    },
+  ],
+};
+
+const contractResult = {
+  protocolVersion: '1.0',
+  requestId,
+  disposition: 'created',
+  digest: digestB,
+  regionId: targetRegionId,
+  topologyRevisionId: revisionId,
+  template: runtimeResult.template,
+  parameters: { mode: 'strict' },
+  source: canonicalRequest.source,
+  referencedDefinitions: runtimeResult.referencedDefinitions,
 };
 
 describe('template instantiation contract adapter', () => {
@@ -102,56 +141,49 @@ describe('template instantiation contract adapter', () => {
     expect(instantiate).not.toHaveBeenCalled();
   });
 
+  it('invokes the authoritative runtime with a lossless internal request', async () => {
+    const instantiate = vi.fn().mockResolvedValue(runtimeResult);
+    const service = new TemplateInstantiationContractService({ instantiate });
+
+    await expect(service.instantiate(canonicalRequest)).resolves.toEqual(
+      contractResult,
+    );
+    expect(instantiate).toHaveBeenCalledWith({
+      targetRegionId,
+      template: 'bounded-investigation@1',
+      parameters: { mode: 'strict' },
+      componentConfiguration: { verifier: { retries: 2 } },
+      source: canonicalRequest.source,
+    });
+  });
+
   it('converts implementation rows into the stable canonical result', () => {
     expect(
       toTemplateInstantiationResult({
         request: canonicalRequest,
-        disposition: 'created',
-        digest: digestB,
-        region: { id: targetRegionId, name: 'analysis' },
-        revision: { id: revisionId, content_digest: digestB },
-        template: {
-          id: templateId,
-          name: 'bounded-investigation',
-          version: '1',
-          contentDigest: digestA,
-        },
-        parameters: { mode: 'strict' },
-        source: canonicalRequest.source,
-        referencedDefinitions: [
-          {
-            kind: 'component',
-            id: definitionId,
-            name: 'retrieve',
-            version: '1',
-            contentDigest: digestA,
-          },
-        ],
+        ...runtimeResult,
       }),
+    ).toEqual(contractResult);
+  });
+
+  it('maps stable domain failures without leaking internal failures', () => {
+    expect(
+      toTemplateInstantiationError(
+        new DomainError('region_not_eligible', 'region is already active'),
+      ),
     ).toEqual({
       protocolVersion: '1.0',
-      requestId,
-      disposition: 'created',
-      digest: digestB,
-      regionId: targetRegionId,
-      topologyRevisionId: revisionId,
-      template: {
-        id: templateId,
-        name: 'bounded-investigation',
-        version: '1',
-        contentDigest: digestA,
-      },
-      parameters: { mode: 'strict' },
-      source: canonicalRequest.source,
-      referencedDefinitions: [
-        {
-          kind: 'component',
-          id: definitionId,
-          name: 'retrieve',
-          version: '1',
-          contentDigest: digestA,
-        },
-      ],
+      code: 'region_not_eligible',
+      message: 'region is already active',
+      retryable: false,
     });
+    expect(toTemplateInstantiationError(new Error('database password'))).toEqual(
+      {
+        protocolVersion: '1.0',
+        code: 'internal_transient_failure',
+        message: 'template instantiation failed',
+        retryable: true,
+      },
+    );
   });
 });
