@@ -11,10 +11,7 @@ const readOption = (name, fallback) => {
 
 const policyPath = resolve(readOption('--policy', 'quality-gates.json'));
 const workflowPath = resolve(
-  readOption(
-    '--workflow',
-    '.github/workflows/repository-verification.yml',
-  ),
+  readOption('--workflow', '.github/workflows/repository-verification.yml'),
 );
 const violations = [];
 
@@ -158,9 +155,7 @@ if (policy && workflow) {
 
   for (const [jobName, job] of Object.entries(jobs)) {
     const uploadPaths = (job.steps ?? [])
-      .filter((step) =>
-        step.uses?.startsWith('actions/upload-artifact@'),
-      )
+      .filter((step) => step.uses?.startsWith('actions/upload-artifact@'))
       .map((step) => step.with?.path ?? '')
       .join('\n');
     record(
