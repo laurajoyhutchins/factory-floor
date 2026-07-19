@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { signRequest, type ServiceAuthDirection } from '../src/service-auth.js';
 
-const EXPECTED_FIXTURE_DIGEST = '22c7499456e0bd1d4a1aaa8541e926b3f6778e06d678906311751a9c11ee2fd0';
+const EXPECTED_FIXTURE_DIGEST =
+  '22c7499456e0bd1d4a1aaa8541e926b3f6778e06d678906311751a9c11ee2fd0';
 
 interface ServiceAuthVector {
   name: string;
@@ -26,7 +27,10 @@ interface ServiceAuthFixture {
   vectors: ServiceAuthVector[];
 }
 
-const fixtureUrl = new URL('../../../contracts/discord-activity/service-auth-v1.json', import.meta.url);
+const fixtureUrl = new URL(
+  '../../../contracts/discord-activity/service-auth-v1.json',
+  import.meta.url,
+);
 const fixtureBytes = readFileSync(fixtureUrl);
 const fixture = JSON.parse(fixtureBytes.toString('utf8')) as ServiceAuthFixture;
 
@@ -54,7 +58,7 @@ describe('Discord Activity service-auth contract fixture', () => {
     });
   });
 
-  it.each(fixture.vectors)('matches $name', vector => {
+  it.each(fixture.vectors)('matches $name', (vector) => {
     const signed = signRequest(
       keysFor(vector),
       vector.direction,
