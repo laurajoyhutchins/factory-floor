@@ -1,4 +1,4 @@
-import type { ColumnType, Generated } from 'kysely';
+import { sql, type ColumnType, type Generated } from 'kysely';
 import type { Json, RuntimeDb } from '../database.js';
 import { createUuidV7 } from '../ids.js';
 
@@ -66,7 +66,9 @@ export class TemplateInstantiationRepository {
         parameters: input.parameters,
         component_configuration: input.componentConfiguration,
         source: input.source,
-        referenced_definitions: input.referencedDefinitions,
+        referenced_definitions: sql<Json>`${JSON.stringify(
+          input.referencedDefinitions,
+        )}::jsonb`,
         initial_disposition: input.initialDisposition,
       })
       .returningAll()
