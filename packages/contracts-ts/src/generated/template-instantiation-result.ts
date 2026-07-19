@@ -17,6 +17,10 @@ export type Source = SystemSource | RegionRequestSource | InternalSource;
 export interface TemplateInstantiationResult {
   protocolVersion: '1.0';
   requestId: string;
+  /**
+   * Stable durable identity of the authoritative instantiation record.
+   */
+  instantiationId: string;
   disposition: 'created' | 'existing';
   digest: Sha256Digest;
   regionId: string;

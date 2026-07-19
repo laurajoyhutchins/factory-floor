@@ -1,7 +1,7 @@
 import type {
   TemplateInstantiationRequest as InternalTemplateInstantiationRequest,
   TemplateInstantiationResult as InternalTemplateInstantiationResult,
-} from './template-instantiation-service.js';
+} from './durable-template-instantiation-service.js';
 import {
   normalizeTemplateInstantiationRequest,
   toTemplateInstantiationResult,
@@ -40,6 +40,7 @@ export class TemplateInstantiationContractService {
   ): Promise<TemplateInstantiationResult> {
     const normalized = normalizeTemplateInstantiationRequest(request);
     const result = await this.runtime.instantiate({
+      requestId: normalized.requestId,
       targetRegionId: normalized.targetRegionId,
       template: normalized.template,
       parameters: normalized.parameters,
@@ -48,6 +49,7 @@ export class TemplateInstantiationContractService {
     });
     return toTemplateInstantiationResult({
       request: normalized,
+      instantiationId: result.instantiationId,
       disposition: result.disposition,
       digest: result.digest,
       region: rowWithId(result.region, 'template instantiation region'),
