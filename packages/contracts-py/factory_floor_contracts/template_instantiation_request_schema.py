@@ -19,7 +19,6 @@ class NaturalKey(BaseModel):
     )
     name: constr(min_length=1, max_length=128)
     version: constr(min_length=1, max_length=128)
-    expectedContentDigest: Sha256Digest | None = None
 
 
 class SystemSource(BaseModel):
