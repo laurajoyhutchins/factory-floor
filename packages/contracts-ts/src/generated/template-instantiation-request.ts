@@ -36,7 +36,6 @@ export interface TemplateInstantiationRequest {
 export interface NaturalKey {
   name: string;
   version: string;
-  expectedContentDigest?: Sha256Digest;
 }
 /**
  * This interface was referenced by `TemplateInstantiationRequest`'s JSON-Schema
