@@ -17,7 +17,7 @@ Before making the repository public, the publication audit must inventory and cl
 For each approved item, add a record with:
 
 | Item | Repository path | Source and author | License | Modified | Required attribution or redistribution terms |
-| --- | --- | --- | --- | --- | --- |
+| ---- | --------------- | ----------------- | ------- | -------- | -------------------------------------------- |
 
 Ordinary package dependencies are not manually duplicated here unless their license requires a notice in distributions. Their licenses must still be inventoried from the JavaScript/TypeScript and Python lockfiles during the publication audit.
 
