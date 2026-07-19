@@ -1,0 +1,63 @@
+name: Enforce explicit fan-in routing
+
+on:
+  push:
+    branches:
+      - feat/generic-template-instantiation
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/generic-template-instantiation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+      - name: Patch and format
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/runtime-core/src/systems/template-instantiation-service.ts')
+          text = path.read_text()
+          needle = """      fanInInputs.add(targetKey);
+            }
+
+            const referencedDefinitions = sortedReferences(references);
+          """
+          replacement = """      fanInInputs.add(targetKey);
+            }
+            for (const [targetKey, incomingCount] of incomingConnectionCounts) {
+              if (incomingCount > 1 && !fanInInputs.has(targetKey)) {
+                throw new DomainError(
+                  'invalid_fan_in_rule',
+                  `Input ${targetKey} has ${incomingCount} incoming connections but no fan-in rule`,
+                );
+              }
+            }
+
+            const referencedDefinitions = sortedReferences(references);
+          """
+          if text.count(needle) != 1:
+              raise SystemExit(f'expected one insertion point, found {text.count(needle)}')
+          path.write_text(text.replace(needle, replacement))
+          PY
+          pnpm exec prettier --write \
+            packages/runtime-core/src/systems/template-instantiation-service.ts \
+            packages/runtime-core/test/template-instantiation-routing-validation.test.ts
+      - name: Commit and clean up
+        run: |
+          rm .github/workflows/pr54-enforce-fan-in.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "fix(runtime): require explicit fan-in for multiple producers"
+          git push origin HEAD:feat/generic-template-instantiation
