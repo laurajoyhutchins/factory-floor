@@ -15,6 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/generic-template-instantiation
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -26,38 +27,37 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('packages/runtime-core/src/systems/template-instantiation-service.ts')
-          text = path.read_text()
-          needle = """      fanInInputs.add(targetKey);
-            }
+          import traceback
 
-            const referencedDefinitions = sortedReferences(references);
-          """
-          replacement = """      fanInInputs.add(targetKey);
-            }
-            for (const [targetKey, incomingCount] of incomingConnectionCounts) {
-              if (incomingCount > 1 && !fanInInputs.has(targetKey)) {
-                throw new DomainError(
-                  'invalid_fan_in_rule',
-                  `Input ${targetKey} has ${incomingCount} incoming connections but no fan-in rule`,
-                );
-              }
-            }
-
-            const referencedDefinitions = sortedReferences(references);
-          """
-          if text.count(needle) != 1:
-              raise SystemExit(f'expected one insertion point, found {text.count(needle)}')
-          path.write_text(text.replace(needle, replacement))
+          source = Path('packages/runtime-core/src/systems/template-instantiation-service.ts')
+          workflow = Path('.github/workflows/pr54-enforce-fan-in.yml')
+          diagnostic = Path('PR54_FAN_IN_PATCH_ERROR.txt')
+          try:
+              text = source.read_text()
+              needle = "      fanInInputs.add(targetKey);\n    }\n\n    const referencedDefinitions = sortedReferences(references);"
+              replacement = "      fanInInputs.add(targetKey);\n    }\n    for (const [targetKey, incomingCount] of incomingConnectionCounts) {\n      if (incomingCount > 1 && !fanInInputs.has(targetKey)) {\n        throw new DomainError(\n          'invalid_fan_in_rule',\n          `Input ${targetKey} has ${incomingCount} incoming connections but no fan-in rule`,\n        );\n      }\n    }\n\n    const referencedDefinitions = sortedReferences(references);"
+              count = text.count(needle)
+              if count != 1:
+                  raise RuntimeError(f'expected one insertion point, found {count}')
+              source.write_text(text.replace(needle, replacement))
+              diagnostic.unlink(missing_ok=True)
+          except BaseException:
+              diagnostic.write_text(traceback.format_exc())
+          workflow.unlink()
           PY
-          pnpm exec prettier --write \
-            packages/runtime-core/src/systems/template-instantiation-service.ts \
-            packages/runtime-core/test/template-instantiation-routing-validation.test.ts
-      - name: Commit and clean up
+          if [ ! -f PR54_FAN_IN_PATCH_ERROR.txt ]; then
+            pnpm exec prettier --write \
+              packages/runtime-core/src/systems/template-instantiation-service.ts \
+              packages/runtime-core/test/template-instantiation-routing-validation.test.ts
+          fi
+      - name: Commit result and clean up
         run: |
-          rm .github/workflows/pr54-enforce-fan-in.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "fix(runtime): require explicit fan-in for multiple producers"
+          if [ -f PR54_FAN_IN_PATCH_ERROR.txt ]; then
+            git commit -m "chore: record fan-in patch diagnostic"
+          else
+            git commit -m "fix(runtime): require explicit fan-in for multiple producers"
+          fi
           git push origin HEAD:feat/generic-template-instantiation
