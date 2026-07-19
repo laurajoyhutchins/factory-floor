@@ -272,10 +272,7 @@ describe('review clearance state', () => {
       'utf8',
     );
     const verificationWorkflow = readFileSync(
-      new URL(
-        '../.github/workflows/repository-verification.yml',
-        import.meta.url,
-      ),
+      new URL('../.github/workflows/verification-gate.yml', import.meta.url),
       'utf8',
     );
 
@@ -291,10 +288,9 @@ describe('review clearance state', () => {
       'github.event.pull_request.head.sha',
     );
 
-    expect(verificationWorkflow).toContain('verify:');
-    expect(verificationWorkflow).toContain('name: verify');
-    expect(verificationWorkflow).toContain('FAST_RESULT');
-    expect(verificationWorkflow).toContain('SERVICE_RESULT');
-    expect(verificationWorkflow).toContain('M1_RESULT');
+    expect(verificationWorkflow).toContain("context: 'verify'");
+    expect(verificationWorkflow).toContain('Repository Verification');
+    expect(verificationWorkflow).toContain('selectAuthoritativeWorkflowRun');
+    expect(verificationWorkflow).toContain('persist-credentials: false');
   });
 });
