@@ -51,7 +51,8 @@ export const buildSummary = ({ manifest, environment, jobStatus, artifactName })
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     repository,
-    headSha: environment.GITHUB_SHA ?? null,
+    headSha: environment.AGENT_CI_HEAD_SHA ?? environment.GITHUB_SHA ?? null,
+    verificationSha: environment.GITHUB_SHA ?? null,
     workflow: environment.GITHUB_WORKFLOW ?? null,
     runId,
     runAttempt: environment.GITHUB_RUN_ATTEMPT ?? null,
@@ -89,7 +90,7 @@ const run = () => {
   const destination = resolve(outputPath);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, `${JSON.stringify(summary, null, 2)}\n`);
-  process.stdout.write(`## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`);
+  process.stdout.write(`## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Verification SHA: \`${summary.verificationSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`);
 };
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) run();
