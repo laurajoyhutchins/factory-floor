@@ -77,7 +77,7 @@ describe('TemplateInstantiationService routing validation', () => {
       findArtifactSchema: async () => schema,
       findPolicy: async () => undefined,
     } as any;
-    const revisions: unknown[] = [];
+    const writes: unknown[] = [];
     const topology = {
       findRegion: async () => ({
         id: 'region-routing',
@@ -87,12 +87,19 @@ describe('TemplateInstantiationService routing validation', () => {
       }),
       activeRevision: async () => undefined,
       createRevision: async (...args: unknown[]) => {
-        revisions.push(args);
+        writes.push(['revision', ...args]);
         return { id: 'revision-routing' };
       },
-      createInstance: async () => ({ id: 'instance' }),
-      createConnection: async () => undefined,
-      activate: async () => undefined,
+      createInstance: async (...args: unknown[]) => {
+        writes.push(['instance', ...args]);
+        return { id: 'instance' };
+      },
+      createConnection: async (...args: unknown[]) => {
+        writes.push(['connection', ...args]);
+      },
+      activate: async (...args: unknown[]) => {
+        writes.push(['activate', ...args]);
+      },
     } as any;
 
     await expect(
@@ -101,6 +108,6 @@ describe('TemplateInstantiationService routing validation', () => {
         template: 'routing@1',
       }),
     ).rejects.toMatchObject({ code: 'invalid_fan_in_rule' });
-    expect(revisions).toEqual([]);
+    expect(writes).toEqual([]);
   });
 });
