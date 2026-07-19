@@ -124,7 +124,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
         source_attempt_id,
         provenance
       ) values (
-        gen_random_uuid(),
+        new.id,
         owner_component_id,
         new.port_name,
         next_version,
