@@ -57,7 +57,7 @@ git -C "${repo_root}" rev-list --objects --all \
   | git -C "${repo_root}" cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' \
   | awk '$1 == "blob"' \
   | sort -k3,3nr >"${raw_dir}/all-blobs-by-size.txt"
-head -n 200 "${raw_dir}/all-blobs-by-size.txt" >"${safe_dir}/largest-blobs.txt"
+head -n 200 "${raw_dir}/all-blobs-by-size.txt" >"${raw_dir}/largest-blobs.txt"
 
 # File names can themselves disclose private information, so retain the full
 # list only in the local sensitive directory and expose only the count below.
@@ -147,7 +147,7 @@ Automated history scan completed at \`${head_sha}\`.
 - Review \`sanitized/gitleaks-findings.json\` and the protected raw report.
 - Review \`sanitized/trufflehog-findings.json\` and the protected raw report.
 - Review the complete commit metadata for personal email addresses, private host names, account identifiers, local paths, customer data, copied conversations, and private project names.
-- Review the largest and non-text blobs, including every archive, image, screenshot, PDF, database, dump, generated report, and release asset.
+- Review \`sensitive-raw/largest-blobs.txt\` and all non-text blobs, including every archive, image, screenshot, PDF, database, dump, generated report, and release asset.
 - Classify every result as synthetic, false positive, expired, revoked, or active.
 - Revoke or rotate real credentials before rewriting history.
 - Repeat this scan after any rewrite and compare commit/ref coverage.
