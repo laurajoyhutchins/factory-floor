@@ -1,3 +1,4 @@
+import console from 'node:console';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
@@ -124,7 +125,10 @@ if (policy && workflow) {
   const runCommands = allSteps.map((step) => step.run ?? '').join('\n');
 
   for (const jobName of policy.requiredJobs ?? []) {
-    record(Boolean(jobs[jobName]), `Required workflow job is missing: ${jobName}`);
+    record(
+      Boolean(jobs[jobName]),
+      `Required workflow job is missing: ${jobName}`,
+    );
   }
 
   for (const stage of policy.requiredStages ?? []) {
