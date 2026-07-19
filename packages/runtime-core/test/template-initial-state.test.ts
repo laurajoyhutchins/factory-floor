@@ -6,7 +6,17 @@ const requestA = '019bb22e-58b0-7d87-8000-000000000201';
 const requestB = '019bb22e-58b0-7d87-8000-000000000202';
 
 function harness() {
-  const transaction = {};
+  const transaction = {
+    selectFrom: () => ({
+      select: () => ({
+        where: () => ({
+          execute: async () => [
+            { id: 'component-verifier', name: 'verifier' },
+          ],
+        }),
+      }),
+    }),
+  };
   const db = {
     transaction: () => ({
       execute: (callback: (trx: unknown) => unknown) => callback(transaction),
@@ -31,9 +41,13 @@ function harness() {
     parameters: {},
     source: { kind: 'internal', operation: 'test' },
     referencedDefinitions: [],
-    initialStates: [
+  };
+  const topologyService = {
+    instantiateInTransaction: async () => topologyResult,
+  } as any;
+  const initialStateResolver = {
+    resolve: async () => [
       {
-        componentInstanceId: 'component-verifier',
         componentInstanceName: 'verifier',
         portName: 'checkpoint',
         schemaId: 'schema-checkpoint',
@@ -41,9 +55,6 @@ function harness() {
         value: { completedSteps: [] },
       },
     ],
-  };
-  const topologyService = {
-    instantiateInTransaction: async () => topologyResult,
   } as any;
   const instantiations = {
     findByRequestId: async (_db: unknown, requestId: string) =>
@@ -64,7 +75,9 @@ function harness() {
   } as any;
   const artifactRepository = {
     createCommittedArtifactIdempotently: async (_db: unknown, input: any) => {
-      const existing = artifacts.find((artifact) => artifact.digest === input.digest);
+      const existing = artifacts.find(
+        (artifact) => artifact.digest === input.digest,
+      );
       if (existing) return { artifact: existing, created: false };
       const artifact = {
         id: `artifact-${artifacts.length + 1}`,
@@ -83,12 +96,17 @@ function harness() {
   } as any;
   const stateRepository = {
     createInlinePayloadIdempotently: async (_db: unknown, input: any) => {
-      if (!inlinePayloads.some((payload) => payload.artifact_id === input.artifactId))
-        inlinePayloads.push({
-          artifact_id: input.artifactId,
-          payload: input.payload,
-          canonical_size_bytes: input.canonicalSizeBytes,
-        });
+      const existing = inlinePayloads.find(
+        (payload) => payload.artifact_id === input.artifactId,
+      );
+      if (existing) return { payload: existing, created: false };
+      const payload = {
+        artifact_id: input.artifactId,
+        payload: input.payload,
+        canonical_size_bytes: input.canonicalSizeBytes,
+      };
+      inlinePayloads.push(payload);
+      return { payload, created: true };
     },
     createInitialVersionIdempotently: async (_db: unknown, input: any) => {
       const existing = versions.find(
@@ -108,6 +126,8 @@ function harness() {
         topology_revision_id: input.topologyRevisionId,
         region_id: input.regionId,
         source_template_id: input.sourceTemplateId,
+        origin_template_instantiation_id:
+          input.originTemplateInstantiationId,
         provenance: input.provenance,
       };
       versions.push(version);
@@ -140,6 +160,7 @@ function harness() {
       instantiations,
       artifactRepository,
       stateRepository,
+      initialStateResolver,
       topologyService,
     ),
     records,
