@@ -1,0 +1,84 @@
+name: Verification gate
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  workflow_run:
+    workflows: [Repository Verification]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  publish:
+    name: Publish aggregate verification status
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted verification logic
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Publish verify status
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const logic = await import(
+              pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/review-clearance-state.mjs`).href
+            );
+            const { owner, repo } = context.repo;
+            const pullNumbers = logic.selectPullNumbersForClearanceEvent({
+              eventName: context.eventName,
+              payload: context.payload,
+            });
+
+            for (const pullNumber of pullNumbers) {
+              const { data: pull } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pullNumber,
+              });
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                {
+                  owner,
+                  repo,
+                  head_sha: pull.head.sha,
+                  event: 'pull_request',
+                  per_page: 100,
+                },
+              );
+              const workflowRun = logic.selectAuthoritativeWorkflowRun(runs, {
+                workflowName: 'Repository Verification',
+                headSha: pull.head.sha,
+                pullNumber,
+              });
+              const state = !workflowRun || workflowRun.status !== 'completed'
+                ? 'pending'
+                : workflowRun.conclusion === 'success'
+                  ? 'success'
+                  : 'failure';
+              const description = state === 'pending'
+                ? 'Waiting for exact-head Repository Verification.'
+                : state === 'success'
+                  ? 'All Factory Floor verification lanes passed.'
+                  : 'Repository Verification did not pass.';
+
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha: pull.head.sha,
+                state,
+                context: 'verify',
+                description,
+                target_url: workflowRun?.html_url ?? pull.html_url,
+              });
+            }
