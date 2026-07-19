@@ -22,6 +22,8 @@ const templateDocument = {
   kind: 'Template',
   metadata: { name: 'bounded-investigation', version: '1' },
   spec: {
+    inputs: [{ port: 'objective', schema: 'payload.1' }],
+    outputs: [{ port: 'result', schema: 'payload.1', required: true }],
     initialTopology: {
       instances: [
         { name: 'retrieve', component: 'retrieve@1' },

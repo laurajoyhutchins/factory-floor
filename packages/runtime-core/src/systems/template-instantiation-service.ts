@@ -24,6 +24,7 @@ export interface TemplateInstantiationRequest {
   template: string;
   parameters?: JsonObject;
   componentConfiguration?: Record<string, JsonObject>;
+  source?: JsonObject;
 }
 
 export interface ResolvedInstantiationReference {
@@ -46,6 +47,7 @@ export interface TemplateInstantiationResult {
     contentDigest: string;
   };
   parameters: JsonObject;
+  source: JsonObject;
   referencedDefinitions: ResolvedInstantiationReference[];
 }
 
@@ -60,6 +62,18 @@ interface ResolvedInstance {
   definitionId: string;
   configuration: JsonObject;
   ports: Map<string, ResolvedPort>;
+}
+
+function portKey(name: string, direction: PortDirection): string {
+  return `${direction}:${name}`;
+}
+
+function resolvedPort(
+  instance: ResolvedInstance | undefined,
+  name: string,
+  direction: PortDirection,
+): ResolvedPort | undefined {
+  return instance?.ports.get(portKey(name, direction));
 }
 
 function requireNonEmptyString(value: unknown, label: string): string {
@@ -242,7 +256,7 @@ function validateResourceDeclarations(spec: any): void {
     if (section === undefined) continue;
     const object = jsonObject(section, `Template spec.${sectionName}`);
     for (const [name, value] of Object.entries(object)) {
-      if (typeof value === 'number' && (!Number.isFinite(value) || value < 0)) {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
         throw new DomainError(
           'invalid_declaration',
           `Template spec.${sectionName}.${name} must be a finite non-negative number`,
@@ -340,7 +354,10 @@ export class TemplateInstantiationService {
 
     const parameters = structuredClone(request.parameters ?? {});
     validateParameterSchema(templateDocument.spec.parameters, parameters);
-    const configurationOverrides = request.componentConfiguration ?? {};
+    const configurationOverrides = structuredClone(
+      request.componentConfiguration ?? {},
+    );
+    const source = structuredClone(request.source ?? {});
     const instanceNames = new Set(
       staticTopology.instances.map((instance: any) => instance.name as string),
     );
@@ -412,8 +429,9 @@ export class TemplateInstantiationService {
         transaction,
         definition.id,
       )) {
-        ports.set(port.name, {
-          direction: port.direction as PortDirection,
+        const direction = port.direction as PortDirection;
+        ports.set(portKey(port.name, direction), {
+          direction,
           schemaId: port.schema_id,
         });
         const schema = await this.definitions.findArtifactSchemaById(
@@ -604,8 +622,8 @@ export class TemplateInstantiationService {
       const seen = new Set<string>();
       for (const target of (rule as any).targets ?? []) {
         const instance = resolvedInstances.get(target.component);
-        const port = instance?.ports.get(target.port);
-        if (port?.direction !== 'input') {
+        const port = resolvedPort(instance, target.port, 'input');
+        if (port === undefined) {
           throw new DomainError(
             'invalid_port_reference',
             `Invalid ingress ${commandType} target ${target.component}.${target.port}`,
@@ -628,10 +646,27 @@ export class TemplateInstantiationService {
       target: ResolvedInstance;
       targetPort: string;
     }> = [];
+    const connectionKeys = new Set<string>();
+    const incomingConnectionCounts = new Map<string, number>();
     const connectedOutputs = new Set<string>();
     for (const connection of staticTopology.connections) {
       const sourceEndpoint = endpoint(connection.from);
       const targetEndpoint = endpoint(connection.to);
+      const connectionKey = `${connection.from}->${connection.to}`;
+      if (connectionKeys.has(connectionKey)) {
+        throw new DomainError(
+          'duplicate_connection',
+          `Duplicate connection ${connection.from} -> ${connection.to}`,
+        );
+      }
+      connectionKeys.add(connectionKey);
+      if (targetEndpoint.instance !== 'region') {
+        const targetKey = `${targetEndpoint.instance}.${targetEndpoint.port}`;
+        incomingConnectionCounts.set(
+          targetKey,
+          (incomingConnectionCounts.get(targetKey) ?? 0) + 1,
+        );
+      }
       if (
         sourceEndpoint.instance === 'region' &&
         targetEndpoint.instance === 'region'
@@ -643,18 +678,21 @@ export class TemplateInstantiationService {
       }
       if (sourceEndpoint.instance === 'region') {
         const target = resolvedInstances.get(targetEndpoint.instance);
-        const targetPort = target?.ports.get(targetEndpoint.port);
-        if (targetPort?.direction !== 'input') {
+        const targetPort = resolvedPort(target, targetEndpoint.port, 'input');
+        if (targetPort === undefined) {
           throw new DomainError(
             'invalid_port_reference',
             `Invalid connection target ${connection.to}`,
           );
         }
         const declaredSchema = inputSchemas.get(sourceEndpoint.port);
-        if (
-          declaredSchema !== undefined &&
-          declaredSchema !== targetPort.schemaId
-        ) {
+        if (declaredSchema === undefined) {
+          throw new DomainError(
+            'invalid_port_reference',
+            `Undeclared template input ${sourceEndpoint.port}`,
+          );
+        }
+        if (declaredSchema !== targetPort.schemaId) {
           throw new DomainError(
             'incompatible_port_schema',
             `Connection ${connection.from} -> ${connection.to} has incompatible schemas`,
@@ -664,21 +702,30 @@ export class TemplateInstantiationService {
       }
       if (targetEndpoint.instance === 'region') {
         const source = resolvedInstances.get(sourceEndpoint.instance);
-        const sourcePort = source?.ports.get(sourceEndpoint.port);
-        if (sourcePort?.direction !== 'output') {
+        const sourcePort = resolvedPort(source, sourceEndpoint.port, 'output');
+        if (sourcePort === undefined) {
           throw new DomainError(
             'invalid_port_reference',
             `Invalid connection source ${connection.from}`,
           );
         }
         const declaredOutput = outputSchemas.get(targetEndpoint.port);
-        if (
-          declaredOutput !== undefined &&
-          declaredOutput.schemaId !== sourcePort.schemaId
-        ) {
+        if (declaredOutput === undefined) {
+          throw new DomainError(
+            'invalid_port_reference',
+            `Undeclared template output ${targetEndpoint.port}`,
+          );
+        }
+        if (declaredOutput.schemaId !== sourcePort.schemaId) {
           throw new DomainError(
             'incompatible_port_schema',
             `Connection ${connection.from} -> ${connection.to} has incompatible schemas`,
+          );
+        }
+        if (connectedOutputs.has(targetEndpoint.port)) {
+          throw new DomainError(
+            'duplicate_connection',
+            `Template output ${targetEndpoint.port} has multiple producers`,
           );
         }
         connectedOutputs.add(targetEndpoint.port);
@@ -687,13 +734,13 @@ export class TemplateInstantiationService {
 
       const source = resolvedInstances.get(sourceEndpoint.instance);
       const target = resolvedInstances.get(targetEndpoint.instance);
-      const sourcePort = source?.ports.get(sourceEndpoint.port);
-      const targetPort = target?.ports.get(targetEndpoint.port);
+      const sourcePort = resolvedPort(source, sourceEndpoint.port, 'output');
+      const targetPort = resolvedPort(target, targetEndpoint.port, 'input');
       if (
         source === undefined ||
         target === undefined ||
-        sourcePort?.direction !== 'output' ||
-        targetPort?.direction !== 'input'
+        sourcePort === undefined ||
+        targetPort === undefined
       ) {
         throw new DomainError(
           'invalid_port_reference',
@@ -723,24 +770,37 @@ export class TemplateInstantiationService {
       }
     }
 
+    const fanInInputs = new Set<string>();
     for (const rule of templateDocument.spec.fanIn ?? []) {
       const target = endpoint(
         requireNonEmptyString(rule?.input, 'Fan-in input endpoint'),
       );
-      const port = resolvedInstances
-        .get(target.instance)
-        ?.ports.get(target.port);
-      const expected = rule?.completion?.expected;
+      const targetKey = `${target.instance}.${target.port}`;
+      const port = resolvedPort(
+        resolvedInstances.get(target.instance),
+        target.port,
+        'input',
+      );
+      const completion = rule?.completion;
+      const expected = completion?.expected;
+      const deadlineSeconds = completion?.deadlineSeconds;
+      const incomingCount = incomingConnectionCounts.get(targetKey) ?? 0;
       if (
-        port?.direction !== 'input' ||
+        fanInInputs.has(targetKey) ||
+        port === undefined ||
+        completion?.type !== 'all-expected' ||
         !Number.isInteger(expected) ||
-        expected <= 0
+        expected <= 0 ||
+        expected !== incomingCount ||
+        (deadlineSeconds !== undefined &&
+          (!Number.isFinite(deadlineSeconds) || deadlineSeconds <= 0))
       ) {
         throw new DomainError(
           'invalid_fan_in_rule',
           `Invalid fan-in rule for ${rule?.input ?? 'unknown input'}`,
         );
       }
+      fanInInputs.add(targetKey);
     }
 
     const referencedDefinitions = sortedReferences(references);
@@ -769,6 +829,7 @@ export class TemplateInstantiationService {
       },
       parameters,
       componentConfiguration: configurationOverrides,
+      source,
       referencedDefinitions,
     };
 
@@ -780,6 +841,7 @@ export class TemplateInstantiationService {
       },
       parameters,
       componentConfiguration: configurationOverrides,
+      source,
       referencedDefinitions,
       effectiveTopology,
     });
@@ -802,6 +864,7 @@ export class TemplateInstantiationService {
             contentDigest: templateRow.content_digest,
           },
           parameters,
+          source,
           referencedDefinitions,
         };
       }
@@ -857,6 +920,7 @@ export class TemplateInstantiationService {
         contentDigest: templateRow.content_digest,
       },
       parameters,
+      source,
       referencedDefinitions,
     };
   }
@@ -869,6 +933,9 @@ export class TemplateInstantiationService {
     }
     if (request.componentConfiguration !== undefined) {
       jsonObject(request.componentConfiguration, 'componentConfiguration');
+    }
+    if (request.source !== undefined) {
+      jsonObject(request.source, 'source');
     }
   }
 }

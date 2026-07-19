@@ -44,6 +44,12 @@ export class SystemApplicationService {
   private async applyOnce(document: any): Promise<SystemApplyResult> {
     return this.db.transaction().execute(async (transaction) => {
       const rootName = document.spec.rootRegion.id as string;
+      const source = {
+        kind: 'system',
+        name: String(document.metadata.name),
+        version: String(document.metadata.version),
+        contentDigest: canonicalJsonDigest(document),
+      };
       let disposition: 'created' | 'existing' = 'existing';
 
       let root = await this.topology.findRoot(transaction, rootName);
@@ -99,6 +105,7 @@ export class SystemApplicationService {
             parameters: regionDeclaration.parameters ?? {},
             componentConfiguration:
               regionDeclaration.componentConfiguration ?? {},
+            source,
           },
         );
         if (result.disposition === 'created') disposition = 'created';
@@ -109,7 +116,7 @@ export class SystemApplicationService {
         left.regionId.localeCompare(right.regionId),
       );
       const digest = canonicalJsonDigest({
-        system: document,
+        source,
         instantiations: instantiated,
       });
 
