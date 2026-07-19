@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
-import { TemplateInstantiationService } from '../src/systems/template-instantiation-service.js';
+import { TemplateInstantiationService } from '../src/systems/durable-template-instantiation-service.js';
 
 const requestA = '019bb22e-58b0-7d87-8000-000000000101';
 const requestB = '019bb22e-58b0-7d87-8000-000000000102';
