@@ -13,7 +13,8 @@ const manifestPath = readOption('--manifest');
 const outputPath = readOption('--output');
 const job = readOption('--job');
 const artifact = readOption('--artifact');
-const normalizeLine = (line) => line.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').trim();
+const ansiEscapePattern = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
+const normalizeLine = (line) => line.replace(ansiEscapePattern, '').trim();
 const errorPattern =
   /(?:^|\b)(?:error|fail|failed|failure|fatal|exception|assertionerror|typeerror|referenceerror|syntaxerror|not ok)(?:\b|:)/i;
 const noisePattern =
@@ -73,7 +74,7 @@ export const buildSummary = ({ manifest, environment, jobStatus, artifactName })
 
 const run = () => {
   if (!manifestPath || !outputPath || !job) {
-    console.error(usage);
+    process.stderr.write(`${usage}\n`);
     process.exitCode = 2;
     return;
   }
