@@ -121,9 +121,11 @@ export const buildSummary = ({
     metric: stage.metric,
     log: stage.log,
     result:
-      legacyFailedStage && stage.result === 'unknown'
-        ? stage === legacyFailedStage
-          ? 'failed'
+      !declaresMetrics && stage.result === 'unknown'
+        ? legacyFailedStage
+          ? stage === legacyFailedStage
+            ? 'failed'
+            : 'passed'
           : 'passed'
         : stage.result,
     exitCode: stage.exitCode,
