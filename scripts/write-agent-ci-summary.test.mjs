@@ -42,16 +42,19 @@ test('writes a failed handoff for the last started stage', () => {
       env: {
         ...process.env,
         AGENT_CI_JOB_STATUS: 'failure',
+        AGENT_CI_HEAD_SHA: 'head-sha',
         GITHUB_REPOSITORY: 'owner/repo',
         GITHUB_RUN_ID: '123',
         GITHUB_RUN_ATTEMPT: '2',
         GITHUB_JOB: 'test',
-        GITHUB_SHA: '0123456789abcdef',
+        GITHUB_SHA: 'verification-sha',
         GITHUB_WORKFLOW: 'CI',
       },
     });
     assert.equal(result.status, 0, result.stderr);
     const summary = JSON.parse(readFileSync(output, 'utf8'));
+    assert.equal(summary.headSha, 'head-sha');
+    assert.equal(summary.verificationSha, 'verification-sha');
     assert.equal(summary.failedStage, 'test');
     assert.equal(summary.firstActionableError, 'FAIL src/example.test.ts');
     assert.equal(summary.reproductionCommand, 'pnpm test');
