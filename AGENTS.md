@@ -72,7 +72,7 @@ bash scripts/deciduous-pilot.sh start "Goal tied to the issue or PR"
 bash scripts/deciduous-pilot.sh decision "Chosen approach" "Why this approach was selected"
 bash scripts/deciduous-pilot.sh observe "A discovery that changed or clarified the work"
 bash scripts/deciduous-pilot.sh finish "Verified outcome" HEAD
-bash scripts/deciduous-pilot.sh export "descriptive-branch-patch.json"
+bash scripts/deciduous-pilot.sh export "descriptive-graph-snapshot.json"
 ```
 
 - Run `bash scripts/deciduous-pilot.sh recover` when resuming work after context loss.
@@ -80,7 +80,7 @@ bash scripts/deciduous-pilot.sh export "descriptive-branch-patch.json"
 - Never record secrets, credentials, private environment values, or hidden chain-of-thought.
 - Do not run upstream `deciduous init` or `deciduous update`; they install generated assistant integrations outside this pilot's boundary.
 - Do not block edits or commits when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
-- See `tools/deciduous/README.md` and issue #57 for installation, persistence, evaluation, and rollback.
+- See `tools/deciduous/README.md` and issue #57 for installation, snapshot persistence, evaluation, and rollback.
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
