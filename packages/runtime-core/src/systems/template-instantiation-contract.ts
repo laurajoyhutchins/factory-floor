@@ -1,15 +1,46 @@
 import { createHash } from 'node:crypto';
-import type {
-  TemplateInstantiationRequest as ContractTemplateInstantiationRequest,
-  TemplateInstantiationResult as ContractTemplateInstantiationResult,
-} from '@factory-floor/contracts-ts';
 import type { Json } from '@factory-floor/db';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { DomainError } from '../declarations/errors.js';
 
 export type JsonObject = { [key: string]: Json };
+
 export type TemplateInstantiationSource =
-  ContractTemplateInstantiationRequest['source'];
+  | {
+      kind: 'system';
+      name: string;
+      version: string;
+      contentDigest: string;
+    }
+  | {
+      kind: 'regionRequest';
+      requestId: string;
+      parentRegionId: string;
+      requesterComponentInstanceId: string;
+    }
+  | {
+      kind: 'internal';
+      operation: string;
+    };
+
+/**
+ * Structural twin of the generated `TemplateInstantiationRequest` binding.
+ * Runtime validation below is intentionally lossless with the canonical schema,
+ * while the generated TypeScript/Python packages remain the public bindings.
+ */
+export interface CanonicalTemplateInstantiationRequest {
+  protocolVersion: '1.0';
+  requestId: string;
+  targetRegionId: string;
+  template: {
+    name: string;
+    version: string;
+    expectedContentDigest?: string;
+  };
+  parameters?: JsonObject;
+  componentConfiguration?: Record<string, JsonObject>;
+  source: TemplateInstantiationSource;
+}
 
 export interface LegacyTemplateInstantiationRequest {
   targetRegionId: string;
@@ -20,7 +51,7 @@ export interface LegacyTemplateInstantiationRequest {
 }
 
 export type TemplateInstantiationRequest =
-  | ContractTemplateInstantiationRequest
+  | CanonicalTemplateInstantiationRequest
   | LegacyTemplateInstantiationRequest;
 
 const normalizedRequestBrand = Symbol('normalizedTemplateInstantiationRequest');
@@ -45,11 +76,31 @@ export interface ResolvedInstantiationReference {
   contentDigest: string;
 }
 
-export type TemplateInstantiationResult = ContractTemplateInstantiationResult;
+/** Structural twin of the generated `TemplateInstantiationResult` binding. */
+export interface TemplateInstantiationResult {
+  protocolVersion: '1.0';
+  requestId: string;
+  disposition: 'created' | 'existing';
+  digest: string;
+  regionId: string;
+  topologyRevisionId: string;
+  template: {
+    id: string;
+    name: string;
+    version: string;
+    contentDigest: string;
+  };
+  parameters: JsonObject;
+  source: TemplateInstantiationSource;
+  referencedDefinitions: [
+    ResolvedInstantiationReference,
+    ...ResolvedInstantiationReference[],
+  ];
+}
 
 export interface TemplateInstantiationResultInput {
   request:
-    | ContractTemplateInstantiationRequest
+    | CanonicalTemplateInstantiationRequest
     | NormalizedTemplateInstantiationRequest;
   disposition: 'created' | 'existing';
   digest: string;
@@ -106,7 +157,9 @@ function requireString(value: unknown, label: string, maxLength = 128): string {
     value.trim().length === 0 ||
     value.length > maxLength
   ) {
-    invalid(`${label} must be a non-empty string of at most ${maxLength} characters`);
+    invalid(
+      `${label} must be a non-empty string of at most ${maxLength} characters`,
+    );
   }
   return value;
 }
@@ -430,6 +483,9 @@ export function toTemplateInstantiationResult(
     'result.revision.id',
     256,
   );
+  if (input.referencedDefinitions.length === 0) {
+    invalid('result.referencedDefinitions must contain at least one reference');
+  }
   return {
     protocolVersion: '1.0',
     requestId: request.requestId,
