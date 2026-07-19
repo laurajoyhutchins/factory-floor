@@ -2,14 +2,14 @@
 
 /**
  * This interface was referenced by `TemplateInstantiationRequest`'s JSON-Schema
- * via the `definition` "sha256Digest".
- */
-export type Sha256Digest = string;
-/**
- * This interface was referenced by `TemplateInstantiationRequest`'s JSON-Schema
  * via the `definition` "source".
  */
 export type Source = SystemSource | RegionRequestSource | InternalSource;
+/**
+ * This interface was referenced by `TemplateInstantiationRequest`'s JSON-Schema
+ * via the `definition` "sha256Digest".
+ */
+export type Sha256Digest = string;
 
 /**
  * Versioned authoritative request to instantiate one registered template into an eligible target region.
