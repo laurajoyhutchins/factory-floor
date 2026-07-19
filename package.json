@@ -2,6 +2,7 @@
   "name": "factory-floor",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.12.1",
   "engines": {
@@ -21,6 +22,9 @@
     "contracts:check": "bash scripts/check-contract-generation-drift.sh",
     "conformance:check": "node scripts/check-conformance-ledger.mjs",
     "ci:quality:check": "node scripts/check-ci-quality-gates.mjs",
+    "audit:publication:syntax": "bash -n scripts/audit-publication-history.sh scripts/audit-publication-github.sh scripts/audit-publication-workflow-attempts.sh scripts/audit-publication-github-all.sh",
+    "audit:publication:history": "bash scripts/audit-publication-history.sh",
+    "audit:publication:github": "bash scripts/audit-publication-github-all.sh laurajoyhutchins/factory-floor",
     "dev:worker-demo-ts": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/demo-ts-worker dev",
     "demo:investigation": "node scripts/run-with-env.mjs tsx examples/investigation/run-demo.ts",
     "bootstrap": "bash scripts/bootstrap-workspace.sh",

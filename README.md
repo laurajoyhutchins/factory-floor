@@ -42,7 +42,7 @@ The script validates Node 22 and Python 3.12, activates pnpm 10.12.1, installs `
 
 See [`docs/how-to/development-environment.md`](docs/how-to/development-environment.md) for the full environment contract and troubleshooting guidance.
 
-For environment setup, the investigation demo, inspection, artifact reconciliation, projection rebuild, and troubleshooting, see the [how-to guides](docs/README.md#how-to).
+For environment setup, the investigation demo, inspection, artifact reconciliation, projection rebuild, troubleshooting, and publication readiness, see the [how-to guides](docs/README.md#how-to).
 
 ### Workspace maintenance
 
@@ -142,3 +142,11 @@ The investigation example deliberately fails its first verification attempt, ret
 - Capabilities and policy decisions are enforced outside workers.
 - The first UI is an operator console, not a drag-and-drop builder.
 - Do not add Kafka, Temporal, Kubernetes operators, microservices, GraphQL, or dynamic child regions in Milestone 1.
+
+## License, security, and publication
+
+Factory Floor is licensed under the [Apache License, Version 2.0](LICENSE). Workspace packages remain marked private so publishing the repository does not publish packages to a registry.
+
+Report suspected vulnerabilities through the private process in [SECURITY.md](SECURITY.md). Do not place credentials, private data, or exploit details in public issues or pull requests.
+
+Bundled or adapted third-party material must be recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Before changing repository visibility, complete the fail-closed [publication audit](docs/how-to/publication-audit.md), including full-history secret and privacy scanning, retained Actions evidence review, license clearance, and post-conversion protection verification.
