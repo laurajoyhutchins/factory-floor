@@ -23,7 +23,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- agent-branch-sync:v1 -->';
-            const pullNumber = Number(core.getInput('pull-request'));
+            const pullNumber = Number(context.payload.inputs?.['pull-request']);
             const { owner, repo } = context.repo;
             if (!Number.isSafeInteger(pullNumber) || pullNumber < 1) {
               core.setFailed('pull-request must be a positive integer.');
