@@ -161,8 +161,7 @@ export interface LegacyTemplateInstantiationRequest {
 }
 
 export type TemplateInstantiationRequest =
-  | CanonicalTemplateInstantiationRequest
-  | LegacyTemplateInstantiationRequest;
+  CanonicalTemplateInstantiationRequest | LegacyTemplateInstantiationRequest;
 
 const normalizedRequestBrand = Symbol('normalizedTemplateInstantiationRequest');
 
@@ -234,14 +233,14 @@ function jsonObject(value: unknown, label: string): JsonObject {
   try {
     canonicalJsonDigest(value);
   } catch (error) {
-    invalid(`${label} must contain only JSON values: ${(error as Error).message}`);
+    invalid(
+      `${label} must contain only JSON values: ${(error as Error).message}`,
+    );
   }
   return structuredClone(value) as JsonObject;
 }
 
-function componentConfiguration(
-  value: unknown,
-): Record<string, JsonObject> {
+function componentConfiguration(value: unknown): Record<string, JsonObject> {
   const object = jsonObject(value, 'componentConfiguration');
   return Object.fromEntries(
     Object.entries(object).map(([name, configuration]) => [
