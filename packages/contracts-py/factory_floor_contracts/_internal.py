@@ -79,10 +79,36 @@ class SourceIdentity4(BaseModel):
     attemptId: UUID
 
 
+class SourceIdentity5(BaseModel):
+    """
+    Identity of the runtime object or actor that caused an invocation, proposal, or artifact.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['templateInstantiation']
+    instantiationId: UUID
+    templateId: UUID
+    regionId: UUID
+
+
 class SourceIdentity(
-    RootModel[SourceIdentity1 | SourceIdentity2 | SourceIdentity3 | SourceIdentity4]
+    RootModel[
+        SourceIdentity1
+        | SourceIdentity2
+        | SourceIdentity3
+        | SourceIdentity4
+        | SourceIdentity5
+    ]
 ):
-    root: SourceIdentity1 | SourceIdentity2 | SourceIdentity3 | SourceIdentity4 = Field(
+    root: (
+        SourceIdentity1
+        | SourceIdentity2
+        | SourceIdentity3
+        | SourceIdentity4
+        | SourceIdentity5
+    ) = Field(
         ...,
         description='Identity of the runtime object or actor that caused an invocation, proposal, or artifact.',
         title='SourceIdentity',
