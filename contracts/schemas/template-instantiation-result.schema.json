@@ -82,6 +82,11 @@
   "properties": {
     "protocolVersion": { "const": "1.0" },
     "requestId": { "type": "string", "format": "uuid" },
+    "instantiationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable durable identity of the authoritative instantiation record."
+    },
     "disposition": { "enum": ["created", "existing"] },
     "digest": { "$ref": "#/$defs/sha256Digest" },
     "regionId": { "type": "string", "format": "uuid" },
@@ -101,6 +106,7 @@
   "required": [
     "protocolVersion",
     "requestId",
+    "instantiationId",
     "disposition",
     "digest",
     "regionId",
