@@ -5,13 +5,20 @@ const runTimestamp = (run) => {
   return Number.isFinite(value) ? value : 0;
 };
 
-export const selectRepositoryVerificationRun = (runs, headSha) =>
+export const selectRepositoryVerificationRun = (
+  runs,
+  headSha,
+  pullNumber,
+) =>
   runs
     .filter(
       (run) =>
         run.name === REPOSITORY_VERIFICATION_WORKFLOW &&
         run.event === 'pull_request' &&
-        run.head_sha === headSha,
+        run.head_sha === headSha &&
+        run.pull_requests?.some(
+          (pullRequest) => pullRequest.number === pullNumber,
+        ),
     )
     .sort((left, right) => {
       const timestampDifference = runTimestamp(right) - runTimestamp(left);
