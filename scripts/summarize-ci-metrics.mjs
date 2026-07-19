@@ -69,13 +69,7 @@ if (!metricsDirectory || !testsDirectory || !output) {
 
   const hasAttribute = (attributes, name) =>
     new RegExp(`(?:^|\\s)${name}="[^"]*"`).test(attributes);
-  const numericAttributes = [
-    'tests',
-    'failures',
-    'errors',
-    'skipped',
-    'time',
-  ];
+  const numericAttributes = ['tests', 'failures', 'errors', 'skipped', 'time'];
 
   const testTotals = {
     files: 0,
