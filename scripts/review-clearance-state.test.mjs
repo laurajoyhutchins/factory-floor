@@ -11,7 +11,10 @@ import {
 const HEAD_SHA = 'a'.repeat(40);
 const OLD_SHA = 'b'.repeat(40);
 
-const clearanceBody = ({ sha = HEAD_SHA, disposition = 'Cleared for merge.' } = {}) => `<!-- review-clearance:v1 -->
+const clearanceBody = ({
+  sha = HEAD_SHA,
+  disposition = 'Cleared for merge.',
+} = {}) => `<!-- review-clearance:v1 -->
 
 ## Final review
 
@@ -199,7 +202,10 @@ describe('review clearance state', () => {
   });
 
   it.each([
-    ['draft', { draft: true, workflowRun: null, reviewThreads: null, clearance: null }],
+    [
+      'draft',
+      { draft: true, workflowRun: null, reviewThreads: null, clearance: null },
+    ],
     [
       'awaiting CI',
       {
@@ -266,7 +272,10 @@ describe('review clearance state', () => {
       'utf8',
     );
     const verificationWorkflow = readFileSync(
-      new URL('../.github/workflows/repository-verification.yml', import.meta.url),
+      new URL(
+        '../.github/workflows/repository-verification.yml',
+        import.meta.url,
+      ),
       'utf8',
     );
 
@@ -278,7 +287,9 @@ describe('review clearance state', () => {
     expect(clearanceWorkflow).toContain('persist-credentials: false');
     expect(clearanceWorkflow).toContain('scripts/review-clearance-state.mjs');
     expect(clearanceWorkflow).toContain('issue_comment:');
-    expect(clearanceWorkflow).not.toContain('github.event.pull_request.head.sha');
+    expect(clearanceWorkflow).not.toContain(
+      'github.event.pull_request.head.sha',
+    );
 
     expect(verificationWorkflow).toContain('verify:');
     expect(verificationWorkflow).toContain('name: verify');
