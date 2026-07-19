@@ -1,4 +1,3 @@
-import type { TemplateInstantiationRequest as ContractTemplateInstantiationRequest } from '@factory-floor/contracts-ts';
 import type {
   TemplateInstantiationRequest as InternalTemplateInstantiationRequest,
   TemplateInstantiationResult as InternalTemplateInstantiationResult,
@@ -6,6 +5,7 @@ import type {
 import {
   normalizeTemplateInstantiationRequest,
   toTemplateInstantiationResult,
+  type CanonicalTemplateInstantiationRequest,
   type TemplateInstantiationResult,
 } from './template-instantiation-contract.js';
 
@@ -36,7 +36,7 @@ export class TemplateInstantiationContractService {
   constructor(private readonly runtime: TemplateInstantiationRuntime) {}
 
   async instantiate(
-    request: ContractTemplateInstantiationRequest,
+    request: CanonicalTemplateInstantiationRequest,
   ): Promise<TemplateInstantiationResult> {
     const normalized = normalizeTemplateInstantiationRequest(request);
     const result = await this.runtime.instantiate({
