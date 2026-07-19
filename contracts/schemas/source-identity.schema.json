@@ -74,6 +74,28 @@
         }
       },
       "required": ["kind", "executionId", "attemptId"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "templateInstantiation"
+        },
+        "instantiationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "templateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "regionId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": ["kind", "instantiationId", "templateId", "regionId"]
     }
   ]
 }
