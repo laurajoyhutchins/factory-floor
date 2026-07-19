@@ -4,10 +4,33 @@ import { describe, expect, it } from 'vitest';
 import {
   determineHandoffState,
   readReviewThreadState,
+  selectPullNumbersForEvent,
   selectRepositoryVerificationRun,
 } from './agent-pr-handoff-state.mjs';
 
 describe('agent pull request handoff state', () => {
+  it('selects every associated pull request for a completed workflow run', () => {
+    expect(
+      selectPullNumbersForEvent({
+        eventName: 'workflow_run',
+        payload: {
+          workflow_run: {
+            pull_requests: [{ number: 69 }, { number: 70 }, { number: 69 }],
+          },
+        },
+      }),
+    ).toEqual([69, 70]);
+  });
+
+  it('selects the target pull request for pull_request_target events', () => {
+    expect(
+      selectPullNumbersForEvent({
+        eventName: 'pull_request_target',
+        payload: { pull_request: { number: 69 } },
+      }),
+    ).toEqual([69]);
+  });
+
   it('selects only the Repository Verification run for the exact head and pull request', () => {
     const runs = [
       {
@@ -102,6 +125,7 @@ describe('agent pull request handoff state', () => {
           head_sha: 'head-sha',
         },
         reviewThreads: { status: 'unavailable', unresolvedCount: null },
+        mergeable: true,
         mergeableState: 'clean',
       }),
     ).toMatchObject({
@@ -110,7 +134,7 @@ describe('agent pull request handoff state', () => {
     });
   });
 
-  it.each(['dirty', 'blocked', 'behind', 'unstable', 'unknown'])(
+  it.each(['dirty', 'blocked', 'behind', 'unknown', null])(
     'does not report ready when mergeable state is %s',
     (mergeableState) => {
       expect(
@@ -122,13 +146,14 @@ describe('agent pull request handoff state', () => {
             head_sha: 'head-sha',
           },
           reviewThreads: { status: 'available', unresolvedCount: 0 },
+          mergeable: true,
           mergeableState,
         }).state,
       ).not.toBe('ready');
     },
   );
 
-  it('reports ready only for clean mergeability, successful exact-head CI, and known resolved reviews', () => {
+  it('does not report ready when GitHub says the pull request is not mergeable', () => {
     expect(
       determineHandoffState({
         draft: false,
@@ -138,10 +163,30 @@ describe('agent pull request handoff state', () => {
           head_sha: 'head-sha',
         },
         reviewThreads: { status: 'available', unresolvedCount: 0 },
+        mergeable: false,
         mergeableState: 'clean',
-      }),
-    ).toMatchObject({ state: 'ready', externalBlocker: null });
+      }).state,
+    ).not.toBe('ready');
   });
+
+  it.each(['clean', 'unstable'])(
+    'reports ready for mergeable state %s after authoritative CI and reviews pass',
+    (mergeableState) => {
+      expect(
+        determineHandoffState({
+          draft: false,
+          verificationRun: {
+            status: 'completed',
+            conclusion: 'success',
+            head_sha: 'head-sha',
+          },
+          reviewThreads: { status: 'available', unresolvedCount: 0 },
+          mergeable: true,
+          mergeableState,
+        }),
+      ).toMatchObject({ state: 'ready', externalBlocker: null });
+    },
+  );
 
   it('loads state logic only from the trusted default branch', () => {
     const workflow = readFileSync(
@@ -154,6 +199,8 @@ describe('agent pull request handoff state', () => {
     );
     expect(workflow).toContain('persist-credentials: false');
     expect(workflow).toContain('scripts/agent-pr-handoff-state.mjs');
+    expect(workflow).toContain('selectPullNumbersForEvent');
+    expect(workflow).not.toContain('pull_requests?.[0]');
     expect(workflow).not.toContain('github.event.pull_request.head.sha');
   });
 });
