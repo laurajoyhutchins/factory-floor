@@ -307,8 +307,9 @@ export class TemplateInstantiationService {
           `Initial-state artifact ${artifactResult.artifact.id} has conflicting inline content`,
         );
       }
-      const versionResult =
-        await this.states.createInitialVersionIdempotently(transaction, {
+      const versionResult = await this.states.createInitialVersionIdempotently(
+        transaction,
+        {
           componentInstanceId,
           statePortName: state.portName,
           artifactId: artifactResult.artifact.id,
@@ -318,7 +319,8 @@ export class TemplateInstantiationService {
           sourceTemplateId: input.templateId,
           originTemplateInstantiationId: input.instantiationId,
           provenance,
-        });
+        },
+      );
       const version = versionResult.version;
       if (
         version.artifact_id !== artifactResult.artifact.id ||
