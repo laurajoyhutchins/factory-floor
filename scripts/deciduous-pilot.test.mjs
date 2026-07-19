@@ -252,10 +252,7 @@ describe('Deciduous pilot wrapper', () => {
     expect(
       JSON.parse(
         await readFile(
-          join(
-            harness.stateDirectory,
-            'exports/agent-deciduous-pilot.json',
-          ),
+          join(harness.stateDirectory, 'exports/agent-deciduous-pilot.json'),
           'utf8',
         ),
       ),
