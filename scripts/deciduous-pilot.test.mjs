@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -128,16 +135,25 @@ describe('Deciduous pilot wrapper', () => {
   test('creates and links the three workflow checkpoints into one chain', async () => {
     const harness = await makeHarness();
 
-    expect(runWrapper(['start', 'Implement issue #57'], harness).status).toBe(0);
+    expect(runWrapper(['start', 'Implement issue #57'], harness).status).toBe(
+      0,
+    );
     expect(
       runWrapper(
-        ['decision', 'Use a nonblocking wrapper', 'Avoid generated hook interference'],
+        [
+          'decision',
+          'Use a nonblocking wrapper',
+          'Avoid generated hook interference',
+        ],
         harness,
       ).status,
     ).toBe(0);
-    expect(runWrapper(['observe', 'CI must remain offline'], harness).status).toBe(0);
     expect(
-      runWrapper(['finish', 'Pilot wrapper implemented', 'HEAD'], harness).status,
+      runWrapper(['observe', 'CI must remain offline'], harness).status,
+    ).toBe(0);
+    expect(
+      runWrapper(['finish', 'Pilot wrapper implemented', 'HEAD'], harness)
+        .status,
     ).toBe(0);
 
     expect(await readCalls(harness)).toEqual([
@@ -151,14 +167,48 @@ describe('Deciduous pilot wrapper', () => {
         '-c',
         '85',
       ],
-      ['link', '1', '2', '-r', 'Avoid generated hook interference', '-t', 'leads_to'],
-      ['add', 'observation', 'CI must remain offline', '-d', 'CI must remain offline', '-c', '90'],
-      ['link', '2', '3', '-r', 'Observation recorded during pilot', '-t', 'leads_to'],
-      ['add', 'outcome', 'Pilot wrapper implemented', '-c', '95', '--commit', 'HEAD'],
+      [
+        'link',
+        '1',
+        '2',
+        '-r',
+        'Avoid generated hook interference',
+        '-t',
+        'leads_to',
+      ],
+      [
+        'add',
+        'observation',
+        'CI must remain offline',
+        '-d',
+        'CI must remain offline',
+        '-c',
+        '90',
+      ],
+      [
+        'link',
+        '2',
+        '3',
+        '-r',
+        'Observation recorded during pilot',
+        '-t',
+        'leads_to',
+      ],
+      [
+        'add',
+        'outcome',
+        'Pilot wrapper implemented',
+        '-c',
+        '95',
+        '--commit',
+        'HEAD',
+      ],
       ['link', '3', '4', '-r', 'Pilot task completed', '-t', 'leads_to'],
     ]);
 
-    await expect(stat(join(harness.stateDirectory, 'current-node'))).rejects.toMatchObject({
+    await expect(
+      stat(join(harness.stateDirectory, 'current-node')),
+    ).rejects.toMatchObject({
       code: 'ENOENT',
     });
   });
@@ -179,7 +229,11 @@ describe('Deciduous pilot wrapper', () => {
     const result = runWrapper(['recover'], harness);
 
     expect(result.status).toBe(0);
-    expect(await readCalls(harness)).toEqual([['nodes'], ['edges'], ['commands']]);
+    expect(await readCalls(harness)).toEqual([
+      ['nodes'],
+      ['edges'],
+      ['commands'],
+    ]);
   });
 
   test('exports a branch patch only inside the configured patch directory', async () => {
