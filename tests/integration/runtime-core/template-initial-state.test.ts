@@ -162,7 +162,10 @@ describe('template-provided initial state in PostgreSQL', () => {
       origin_template_instantiation_id: first.instantiationId,
     });
     expect(
-      await db.selectFrom('template_instantiation_state_links').selectAll().execute(),
+      await db
+        .selectFrom('template_instantiation_state_links')
+        .selectAll()
+        .execute(),
     ).toHaveLength(2);
     expect(
       await db.selectFrom('artifact_inline_payloads').selectAll().execute(),
