@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from 'vitest';
-import { canonicalJsonDigest, SystemApplicationService } from '../src/index.js';
+import { SystemApplicationService } from '../src/index.js';
 
 const systemDocument = {
   apiVersion: 'factoryfloor.dev/v1alpha1',
@@ -10,7 +10,7 @@ const systemDocument = {
     rootRegion: { id: 'investigation-demo-root' },
     regions: [
       { id: 'intake', template: 'request-intake@1' },
-      { id: 'investigation', template: 'bounded-investigation@1' },
+      { id: 'analysis-work', template: 'bounded-investigation@1' },
       { id: 'publication', template: 'controlled-publication@1' },
     ],
     connections: [],
@@ -22,6 +22,8 @@ const templateDocument = {
   kind: 'Template',
   metadata: { name: 'bounded-investigation', version: '1' },
   spec: {
+    inputs: [{ port: 'objective', schema: 'payload.1' }],
+    outputs: [{ port: 'result', schema: 'payload.1', required: true }],
     initialTopology: {
       instances: [
         { name: 'retrieve', component: 'retrieve@1' },
@@ -37,7 +39,7 @@ const templateDocument = {
 };
 
 describe('SystemApplicationService', () => {
-  it('resolves the registered investigation template and applies its static topology idempotently', async () => {
+  it('routes any topology-bearing region through generic instantiation and preserves static-system conflicts', async () => {
     const transaction = {};
     const db = {
       transaction: () => ({
@@ -46,11 +48,16 @@ describe('SystemApplicationService', () => {
     } as any;
     const roots = new Map<string, any>();
     const children = new Map<string, any>();
-    let activeRevision: any;
+    const activeRevisions = new Map<string, any>();
+    const revisions: any[] = [];
     const createdInstances: any[] = [];
     const createdConnections: any[] = [];
 
     const topology = {
+      findRegion: async (_db: unknown, id: string) =>
+        [...roots.values(), ...children.values()].find(
+          (region) => region.id === id,
+        ),
       findRoot: async (_db: unknown, name: string) => roots.get(name),
       createRegion: async (
         _db: unknown,
@@ -61,6 +68,8 @@ describe('SystemApplicationService', () => {
           id: `region-${name}`,
           name,
           parent_region_id: parentRegionId,
+          lifecycle_status: 'ready',
+          active_topology_revision_id: null,
         };
         if (parentRegionId === null) roots.set(name, row);
         else children.set(`${parentRegionId}:${name}`, row);
@@ -68,18 +77,23 @@ describe('SystemApplicationService', () => {
       },
       findChild: async (_db: unknown, parent: string, name: string) =>
         children.get(`${parent}:${name}`),
-      activeRevision: async () => activeRevision,
+      activeRevision: async (_db: unknown, regionId: string) =>
+        activeRevisions.get(regionId),
       createRevision: async (
         _db: unknown,
         regionId: string,
         digest: string,
         storedTopology: unknown,
-      ) => ({
-        id: 'revision-1',
-        region_id: regionId,
-        content_digest: digest,
-        topology: storedTopology,
-      }),
+      ) => {
+        const row = {
+          id: 'revision-1',
+          region_id: regionId,
+          content_digest: digest,
+          topology: storedTopology,
+        };
+        revisions.push(row);
+        return row;
+      },
       createInstance: async (_db: unknown, input: any) => {
         createdInstances.push(input);
         return { id: `instance-${input.name}`, ...input };
@@ -87,32 +101,73 @@ describe('SystemApplicationService', () => {
       createConnection: async (_db: unknown, input: any) => {
         createdConnections.push(input);
       },
-      activate: async (
-        _db: unknown,
-        _regionId: string,
-        _revisionId: string,
-      ) => {
-        activeRevision = {
-          content_digest: canonicalJsonDigest({
-            system: systemDocument,
-            templateDigest: 't'.repeat(64),
-          }),
-        };
+      activate: async (_db: unknown, regionId: string, revisionId: string) => {
+        activeRevisions.set(
+          regionId,
+          revisions.find((revision) => revision.id === revisionId),
+        );
       },
     } as any;
 
+    const schema = {
+      id: 'schema-payload',
+      name: 'payload',
+      version: '1',
+      content_digest: 's'.repeat(64),
+      retired_at: null,
+    };
     const definitions = {
-      findTemplate: async () => ({
-        template: templateDocument,
-        content_digest: 't'.repeat(64),
-      }),
-      findComponentDefinition: async (_db: unknown, name: string) => ({
+      findTemplate: async (_db: unknown, name: string) =>
+        name === 'bounded-investigation'
+          ? {
+              id: 'template-bounded-investigation',
+              name: 'bounded-investigation',
+              version: '1',
+              template: templateDocument,
+              content_digest: 't'.repeat(64),
+              retired_at: null,
+            }
+          : undefined,
+      findComponentDefinition: async (
+        _db: unknown,
+        name: string,
+        version: string,
+      ) => ({
         id: `definition-${name}`,
+        name,
+        version,
+        content_digest: `${name}-${version}`.padEnd(64, 'd').slice(0, 64),
+        retired_at: null,
       }),
       listPorts: async (_db: unknown, definitionId: string) =>
         definitionId.endsWith('retrieve')
-          ? [{ name: 'objective' }, { name: 'evidence' }]
-          : [{ name: 'evidence' }, { name: 'result' }],
+          ? [
+              {
+                name: 'objective',
+                direction: 'input',
+                schema_id: schema.id,
+              },
+              {
+                name: 'evidence',
+                direction: 'output',
+                schema_id: schema.id,
+              },
+            ]
+          : [
+              {
+                name: 'evidence',
+                direction: 'input',
+                schema_id: schema.id,
+              },
+              {
+                name: 'result',
+                direction: 'output',
+                schema_id: schema.id,
+              },
+            ],
+      findArtifactSchemaById: async () => schema,
+      findArtifactSchema: async () => schema,
+      findPolicy: async () => undefined,
     } as any;
 
     const service = new SystemApplicationService(db, definitions, topology);
@@ -130,6 +185,20 @@ describe('SystemApplicationService', () => {
       disposition: 'existing',
       digest: first.digest,
     });
+    expect(createdInstances).toHaveLength(2);
+    expect(activeRevisions.has('region-analysis-work')).toBe(true);
+
+    await expect(
+      service.apply({
+        ...systemDocument,
+        spec: {
+          ...systemDocument.spec,
+          connections: [
+            { from: 'intake.accepted', to: 'analysis-work.objective' },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'template_instantiation_conflict' });
     expect(createdInstances).toHaveLength(2);
   });
 });

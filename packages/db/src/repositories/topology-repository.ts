@@ -1,6 +1,13 @@
 import type { Json, RuntimeDb } from '../database.js';
 import { createUuidV7 } from '../ids.js';
 export class TopologyRepository {
+  findRegion(db: RuntimeDb, id: string) {
+    return db
+      .selectFrom('regions')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirst();
+  }
   findRoot(db: RuntimeDb, name: string) {
     return db
       .selectFrom('regions')

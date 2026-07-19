@@ -9,6 +9,13 @@ export class DefinitionRepository {
       .where('version', '=', version)
       .executeTakeFirst();
   }
+  findArtifactSchemaById(db: RuntimeDb, id: string) {
+    return db
+      .selectFrom('artifact_schemas')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirst();
+  }
   findComponentDefinition(db: RuntimeDb, name: string, version: string) {
     return db
       .selectFrom('component_definitions')
