@@ -6,6 +6,7 @@ export type DomainErrorCode =
   | 'duplicate_ingress_target'
   | 'duplicate_component_instance'
   | 'duplicate_region_identity'
+  | 'duplicate_connection'
   | 'unsupported_declaration_version'
   | 'component_definition_not_found'
   | 'component_definition_retired'
