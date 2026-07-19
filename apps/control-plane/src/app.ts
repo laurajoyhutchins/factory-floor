@@ -33,6 +33,14 @@ import {
   registerControlPlaneSecurity,
   type ControlPlaneSecurity,
 } from './security.js';
+import {
+  registerServiceAuth,
+  type ServiceAuthConfig,
+  type ServiceAuthKeys,
+} from './service-auth.js';
+import { createNonceRepository } from './nonce-repository.js';
+import { ActivitySessionService } from './activity-session-service.js';
+import { registerActivityRoutes } from './routes/activity.js';
 
 export interface StartupRecoveryBounds {
   expiredAttempts: number;
@@ -62,7 +70,10 @@ export interface AppDependencies {
   startupRecoveryService?: StartupRecoveryService;
   runStartupRecovery?: boolean;
   controlPlaneSecurity?: ControlPlaneSecurity;
+  serviceAuthKeys?: ServiceAuthKeys;
 }
+
+export type { ServiceAuthKeys, ServiceAuthConfig } from './service-auth.js';
 
 export function withResultPrevalidation(
   service: WorkerProtocolService,
@@ -354,6 +365,15 @@ export async function buildApp(
             app.log.error({ err: error }, 'startup projection catch-up failed');
           });
     });
+  }
+
+  if (deps.serviceAuthKeys && db) {
+    const serviceAuthConfig: ServiceAuthConfig = {
+      keys: deps.serviceAuthKeys,
+      db: createNonceRepository(db),
+    };
+    registerServiceAuth(app, serviceAuthConfig);
+    await registerActivityRoutes(app, new ActivitySessionService(db));
   }
 
   if (db)

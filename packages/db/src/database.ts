@@ -324,6 +324,42 @@ export interface Database {
     last_sequence_number: BigIntString;
     updated_at: Timestamp;
   };
+  activity_instance_bindings: Row & {
+    application_id: string;
+    instance_id: string;
+    installation_id: string;
+    guild_id: string | null;
+    channel_id: string | null;
+    thread_id: string | null;
+    launch_id: string;
+    installation_identifier: string;
+    bound_run_id: string | null;
+    bound_view: Jsonb;
+    principal_id: string;
+    adapter: string;
+    expires_at: Timestamp;
+    closed_at: Timestamp | null;
+  };
+  activity_sessions: Row & {
+    instance_binding_id: string;
+    principal_id: string;
+    token_digest: string;
+    expires_at: Timestamp;
+    idle_expires_at: Timestamp;
+    revoked_at: Timestamp | null;
+    refreshed_at: Timestamp | null;
+  };
+  activity_collaborative_state: Row & {
+    instance_binding_id: string;
+    state_key: string;
+    state_value: Jsonb;
+    revision: number;
+    updated_at: Timestamp;
+  };
+  service_request_nonces: Row & {
+    key_id: string;
+    nonce: string;
+  };
 }
 
 export function createDatabase(connectionString: string): Kysely<Database> {

@@ -30,13 +30,26 @@ function securityError(code: 'authentication_required' | 'forbidden') {
   };
 }
 
+function isServiceAuthenticatedActivityRoute(path: string): boolean {
+  return (
+    path === '/api/v1/discord/activity/sessions' ||
+    path === '/api/v1/discord/activity/sessions/refresh' ||
+    path === '/api/v1/discord/activity/sessions/revoke'
+  );
+}
+
 export function registerControlPlaneSecurity(
   app: FastifyInstance,
   security: ControlPlaneSecurity,
 ): void {
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?', 1)[0] ?? request.url;
-    if (path === '/health' || path.startsWith('/worker/v1/')) return;
+    if (
+      path === '/health' ||
+      path.startsWith('/worker/v1/') ||
+      isServiceAuthenticatedActivityRoute(path)
+    )
+      return;
     if (!path.startsWith('/api/v1/')) return;
 
     const supplied = bearer(request);
