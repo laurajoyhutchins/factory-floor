@@ -8,12 +8,13 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
 const repositoryRoot = resolve(import.meta.dirname, '..');
 const wrapper = join(repositoryRoot, 'scripts/deciduous-pilot.sh');
+const nodeDirectory = dirname(process.execPath);
 const temporaryDirectories = [];
 
 async function makeHarness(version = 'deciduous 0.16.0') {
@@ -60,7 +61,9 @@ async function makeHarness(version = 'deciduous 0.16.0') {
 }
 
 function runWrapper(args, harness, environment = {}) {
-  const path = harness ? `${harness.directory}:/usr/bin:/bin` : '/usr/bin:/bin';
+  const path = harness
+    ? `${harness.directory}:${nodeDirectory}:/usr/bin:/bin`
+    : '/usr/bin:/bin';
   return spawnSync('bash', [wrapper, ...args], {
     cwd: repositoryRoot,
     encoding: 'utf8',
