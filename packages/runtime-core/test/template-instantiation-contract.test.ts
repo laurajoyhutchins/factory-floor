@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { TemplateInstantiationContractService } from '../src/systems/template-instantiation-contract-service.js';
 import {
   normalizeTemplateInstantiationRequest,
   toTemplateInstantiationResult,
@@ -74,18 +75,18 @@ describe('template instantiation contract adapter', () => {
     );
   });
 
-  it('rejects a malformed canonical request before a service can query the database', () => {
-    expect(() =>
-      normalizeTemplateInstantiationRequest({
+  it('rejects malformed canonical input before invoking the database-backed runtime', async () => {
+    const instantiate = vi.fn();
+    const service = new TemplateInstantiationContractService({ instantiate });
+
+    await expect(
+      service.instantiate({
         ...canonicalRequest,
         requestId: 'not-a-uuid',
         unexpected: true,
-      }),
-    ).toThrowError(
-      expect.objectContaining({
-        code: 'invalid_declaration',
-      }),
-    );
+      } as never),
+    ).rejects.toMatchObject({ code: 'invalid_declaration' });
+    expect(instantiate).not.toHaveBeenCalled();
   });
 
   it('converts implementation rows into the stable canonical result', () => {
