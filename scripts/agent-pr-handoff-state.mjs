@@ -1,8 +1,36 @@
 const REPOSITORY_VERIFICATION_WORKFLOW = 'Repository Verification';
+const BLOCKING_MERGEABLE_STATES = new Set([
+  'blocked',
+  'behind',
+  'dirty',
+  'draft',
+  'unknown',
+]);
 
 const runTimestamp = (run) => {
   const value = Date.parse(run.created_at ?? '');
   return Number.isFinite(value) ? value : 0;
+};
+
+const isPullNumber = (value) => Number.isInteger(value) && value > 0;
+
+export const selectPullNumbersForEvent = ({ eventName, payload }) => {
+  if (eventName === 'pull_request_target') {
+    const pullNumber = payload.pull_request?.number;
+    return isPullNumber(pullNumber) ? [pullNumber] : [];
+  }
+
+  if (eventName === 'workflow_run') {
+    return [
+      ...new Set(
+        (payload.workflow_run?.pull_requests ?? [])
+          .map((pullRequest) => pullRequest.number)
+          .filter(isPullNumber),
+      ),
+    ];
+  }
+
+  return [];
 };
 
 export const selectRepositoryVerificationRun = (runs, headSha, pullNumber) =>
@@ -70,6 +98,7 @@ export const determineHandoffState = ({
   draft,
   verificationRun,
   reviewThreads,
+  mergeable,
   mergeableState,
 }) => {
   if (draft) {
@@ -117,10 +146,17 @@ export const determineHandoffState = ({
     };
   }
 
-  if (mergeableState !== 'clean') {
+  if (
+    mergeable !== true ||
+    !mergeableState ||
+    BLOCKING_MERGEABLE_STATES.has(mergeableState)
+  ) {
     return {
       state: 'needs-attention',
-      externalBlocker: `mergeable-state:${mergeableState ?? 'unknown'}`,
+      externalBlocker:
+        mergeable === false
+          ? 'pull-request-not-mergeable'
+          : `mergeable-state:${mergeableState ?? 'unknown'}`,
       nextAction:
         mergeableState === 'behind'
           ? 'Synchronize the pull-request branch with its base, then verify the new exact head.'
