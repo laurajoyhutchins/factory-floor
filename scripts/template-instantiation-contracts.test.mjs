@@ -31,8 +31,7 @@ const revisionId = '019bb22e-58b0-7d87-8000-000000000003';
 const templateId = '019bb22e-58b0-7d87-8000-000000000004';
 const definitionId = '019bb22e-58b0-7d87-8000-000000000005';
 const parentRegionId = '019bb22e-58b0-7d87-8000-000000000006';
-const requesterComponentInstanceId =
-  '019bb22e-58b0-7d87-8000-000000000007';
+const requesterComponentInstanceId = '019bb22e-58b0-7d87-8000-000000000007';
 const regionRequestId = '019bb22e-58b0-7d87-8000-000000000008';
 const digestA = 'a'.repeat(64);
 const digestB = 'b'.repeat(64);
@@ -103,8 +102,12 @@ const conflictError = {
 
 describe('template instantiation contracts', () => {
   it('accepts canonical system and region-request sources', () => {
-    expect(validateRequest?.(systemRequest), validateRequest?.errors).toBe(true);
-    expect(validateRequest?.(regionRequest), validateRequest?.errors).toBe(true);
+    expect(validateRequest?.(systemRequest), validateRequest?.errors).toBe(
+      true,
+    );
+    expect(validateRequest?.(regionRequest), validateRequest?.errors).toBe(
+      true,
+    );
   });
 
   it('accepts created/existing results and stable errors', () => {
