@@ -2,7 +2,7 @@
 
 Factory Floor is piloting Deciduous as non-normative development-history tooling. The pilot records why AI-assisted work evolved without changing Factory Floor runtime behavior or replacing existing project records.
 
-See issue #57 for evaluation tracking, `pilot-design.md` for the approved design, and `implementation-plan.md` for the implementation sequence.
+See issue #57 for evaluation tracking and `pilot-design.md` for the approved design.
 
 ## Authority boundaries
 
@@ -105,16 +105,16 @@ The filename must be a simple `.json` filename. Review the patch before committi
 
 ## Command reference
 
-| Command | Purpose |
-|---|---|
-| `doctor` | Verify that the reviewed executable version is available. |
-| `init` | Create local graph state without generated assistant integration. |
-| `recover` | Show nodes, edges, and recent commands for context recovery. |
-| `start <goal>` | Start a new goal chain. |
-| `decision <title> <reason>` | Add and link a consequential decision. |
-| `observe <observation>` | Add and link a discovery or constraint. |
-| `finish <outcome> [commit]` | Add the linked outcome and close the active chain. |
-| `export <file.json> [branch]` | Export reviewable branch history under `.deciduous/patches/`. |
+| Command                       | Purpose                                                           |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `doctor`                      | Verify that the reviewed executable version is available.         |
+| `init`                        | Create local graph state without generated assistant integration. |
+| `recover`                     | Show nodes, edges, and recent commands for context recovery.      |
+| `start <goal>`                | Start a new goal chain.                                           |
+| `decision <title> <reason>`   | Add and link a consequential decision.                            |
+| `observe <observation>`       | Add and link a discovery or constraint.                           |
+| `finish <outcome> [commit]`   | Add the linked outcome and close the active chain.                |
+| `export <file.json> [branch]` | Export reviewable branch history under `.deciduous/patches/`.     |
 
 Run all commands as `bash scripts/deciduous-pilot.sh <command> ...`.
 
