@@ -24,16 +24,23 @@ if (( ${#missing[@]} > 0 )); then
   exit 2
 fi
 
+if ! git -C "${repo_root}" remote get-url origin >/dev/null 2>&1; then
+  echo 'Publication audit requires an authenticated origin remote.' >&2
+  exit 2
+fi
+
+git -C "${repo_root}" ls-remote origin | sort >"${raw_dir}/remote-refs-before.txt"
+
 if [[ "$(git -C "${repo_root}" rev-parse --is-shallow-repository)" == "true" ]]; then
   git -C "${repo_root}" fetch --unshallow origin
 fi
 
-if git -C "${repo_root}" remote get-url origin >/dev/null 2>&1; then
-  git -C "${repo_root}" fetch --force --prune origin \
-    '+refs/heads/*:refs/remotes/origin/*' \
-    '+refs/tags/*:refs/tags/*' \
-    '+refs/pull/*/head:refs/remotes/origin/pull/*'
-fi
+git -C "${repo_root}" fetch --force --prune origin \
+  '+refs/heads/*:refs/remotes/origin/*' \
+  '+refs/tags/*:refs/tags/*' \
+  '+refs/pull/*/head:refs/remotes/origin/pull/*' \
+  '+refs/pull/*/merge:refs/remotes/origin/pull-merge/*' \
+  '+refs/notes/*:refs/notes/*'
 
 if [[ "$(git -C "${repo_root}" rev-parse --is-shallow-repository)" != "false" ]]; then
   echo 'Publication audit requires a complete, non-shallow clone.' >&2
@@ -107,6 +114,16 @@ jq -s 'map({
   timestamp: .SourceMetadata.Data.Git.timestamp
 })' "${raw_dir}/trufflehog.ndjson" >"${safe_dir}/trufflehog-findings.json"
 
+git -C "${repo_root}" ls-remote origin | sort >"${raw_dir}/remote-refs-after.txt"
+remote_refs_stable=true
+if ! cmp -s "${raw_dir}/remote-refs-before.txt" "${raw_dir}/remote-refs-after.txt"; then
+  remote_refs_stable=false
+  diff -u \
+    "${raw_dir}/remote-refs-before.txt" \
+    "${raw_dir}/remote-refs-after.txt" \
+    >"${raw_dir}/remote-ref-changes.diff" || true
+fi
+
 gitleaks_count="$(jq 'length' "${safe_dir}/gitleaks-findings.json")"
 trufflehog_count="$(jq 'length' "${safe_dir}/trufflehog-findings.json")"
 suspicious_path_count="$(wc -l <"${raw_dir}/suspicious-paths.txt" | tr -d ' ')"
@@ -121,13 +138,15 @@ jq -n \
   --argjson trufflehogFindings "${trufflehog_count}" \
   --argjson suspiciousHistoricalPaths "${suspicious_path_count}" \
   --argjson blobsAtLeastOneMiB "${large_blob_count}" \
+  --argjson remoteRefsStable "${remote_refs_stable}" \
   '{
     schemaVersion: 1,
     generatedAt: $generatedAt,
     headSha: $headSha,
-    scope: "all fetched branches, tags, pull-request heads, commits, deleted paths, and reachable blobs",
+    scope: "all fetched branches, tags, pull-request heads and merge refs, notes, commits, deleted paths, and reachable blobs",
     commitCount: $commitCount,
     refCount: $refCount,
+    remoteRefsStable: $remoteRefsStable,
     automatedFindings: {
       gitleaks: $gitleaksFindings,
       trufflehogVerifiedOrUnknown: $trufflehogFindings,
@@ -143,6 +162,7 @@ cat >"${safe_dir}/manual-review.md" <<EOF
 
 Automated history scan completed at \`${head_sha}\`.
 
+- Confirm \`remoteRefsStable\` is true. If it is false, freeze merges and rerun the entire audit.
 - Review every entry in \`sensitive-raw/suspicious-paths.txt\`.
 - Review \`sanitized/gitleaks-findings.json\` and the protected raw report.
 - Review \`sanitized/trufflehog-findings.json\` and the protected raw report.
@@ -158,6 +178,11 @@ EOF
 printf 'Publication history audit written to %s\n' "${out_dir}"
 printf 'Gitleaks findings: %s; TruffleHog verified/unknown: %s; suspicious paths: %s\n' \
   "${gitleaks_count}" "${trufflehog_count}" "${suspicious_path_count}"
+
+if [[ "${remote_refs_stable}" != "true" ]]; then
+  echo 'Remote refs changed during the scan; publication evidence is inconsistent.' >&2
+  exit 3
+fi
 
 if (( gitleaks_count > 0 || trufflehog_count > 0 )); then
   echo 'Automated credential findings require classification; publication remains blocked.' >&2
