@@ -1,13 +1,22 @@
 import type { Kysely } from 'kysely';
 import type { Database, Json, RuntimeDb } from '@factory-floor/db';
 import {
+  ArtifactRepository,
+  ComponentStateRepository,
   DefinitionRepository,
   isUniqueViolation,
   TemplateInstantiationRepository,
   TopologyRepository,
 } from '@factory-floor/db';
-import { canonicalJsonDigest } from '../declarations/canonical-json.js';
+import {
+  canonicalizeJson,
+  canonicalJsonDigest,
+} from '../declarations/canonical-json.js';
 import { DomainError } from '../declarations/errors.js';
+import {
+  TemplateInitialStateResolver,
+  type ResolvedTemplateInitialState,
+} from './template-initial-state-resolver.js';
 import {
   TemplateInstantiationService as TopologyTemplateInstantiationService,
   type TemplateInstantiationRequest as TopologyTemplateInstantiationRequest,
@@ -55,12 +64,39 @@ function rowId(value: unknown, label: string): string {
   return (value as { id: string }).id;
 }
 
+function assertArtifactIdentity(
+  artifact: {
+    schema_id: string;
+    media_type: string;
+    size_bytes: string;
+    state: string;
+  },
+  input: { schemaId: string; mediaType: string; sizeBytes: string },
+): void {
+  if (
+    artifact.schema_id !== input.schemaId ||
+    artifact.media_type !== input.mediaType ||
+    artifact.size_bytes !== input.sizeBytes ||
+    artifact.state !== 'committed'
+  ) {
+    throw new DomainError(
+      'template_instantiation_conflict',
+      'Initial-state artifact digest already exists with incompatible immutable metadata',
+    );
+  }
+}
+
 export class TemplateInstantiationService {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly definitions = new DefinitionRepository(),
     private readonly topology = new TopologyRepository(),
     private readonly instantiations = new TemplateInstantiationRepository(),
+    private readonly artifacts = new ArtifactRepository(),
+    private readonly states = new ComponentStateRepository(),
+    private readonly initialStateResolver = new TemplateInitialStateResolver(
+      definitions,
+    ),
     private readonly topologyService = new TopologyTemplateInstantiationService(
       db,
       definitions,
@@ -118,6 +154,13 @@ export class TemplateInstantiationService {
       );
     }
 
+    const resolvedInitialStates = await this.initialStateResolver.resolve(
+      transaction,
+      {
+        template: request.template,
+        parameters,
+      },
+    );
     const topologyResult = await this.topologyService.instantiateInTransaction(
       transaction,
       {
@@ -149,6 +192,13 @@ export class TemplateInstantiationService {
           `Template instantiation request ${requestId} no longer resolves to its recorded outcome`,
         );
       }
+      await this.publishInitialStates(transaction, {
+        instantiationId: existing.id,
+        regionId,
+        topologyRevisionId,
+        templateId: topologyResult.template.id,
+        initialStates: resolvedInitialStates,
+      });
       return {
         ...topologyResult,
         disposition: 'existing',
@@ -177,10 +227,116 @@ export class TemplateInstantiationService {
       referencedDefinitions,
       initialDisposition: topologyResult.disposition,
     });
+    await this.publishInitialStates(transaction, {
+      instantiationId: instantiation.id,
+      regionId,
+      topologyRevisionId,
+      templateId: topologyResult.template.id,
+      initialStates: resolvedInitialStates,
+    });
 
     return {
       ...topologyResult,
       instantiationId: instantiation.id,
     };
+  }
+
+  private async publishInitialStates(
+    transaction: RuntimeDb,
+    input: {
+      instantiationId: string;
+      regionId: string;
+      topologyRevisionId: string;
+      templateId: string;
+      initialStates: ResolvedTemplateInitialState[];
+    },
+  ): Promise<void> {
+    if (input.initialStates.length === 0) return;
+    const instanceRows = await transaction
+      .selectFrom('component_instances')
+      .select(['id', 'name'])
+      .where('topology_revision_id', '=', input.topologyRevisionId)
+      .execute();
+    const instanceIds = new Map(instanceRows.map((row) => [row.name, row.id]));
+
+    for (const state of input.initialStates) {
+      const componentInstanceId = instanceIds.get(state.componentInstanceName);
+      if (componentInstanceId === undefined) {
+        throw new DomainError(
+          'template_instantiation_conflict',
+          `Initial-state owner ${state.componentInstanceName} was not published in topology ${input.topologyRevisionId}`,
+        );
+      }
+      const canonical = canonicalizeJson(state.value);
+      const digest = canonicalJsonDigest(state.value);
+      const sizeBytes = Buffer.byteLength(canonical, 'utf8').toString();
+      const provenance: Json = {
+        kind: 'templateInstantiation',
+        instantiationId: input.instantiationId,
+        templateId: input.templateId,
+        regionId: input.regionId,
+      };
+      const artifactResult =
+        await this.artifacts.createCommittedArtifactIdempotently(transaction, {
+          digest,
+          sizeBytes,
+          schemaId: state.schemaId,
+          mediaType: 'application/json',
+          locator: `inline-json://${digest}`,
+          provenance,
+        });
+      assertArtifactIdentity(artifactResult.artifact, {
+        schemaId: state.schemaId,
+        mediaType: 'application/json',
+        sizeBytes,
+      });
+      const inlineResult = await this.states.createInlinePayloadIdempotently(
+        transaction,
+        {
+          artifactId: artifactResult.artifact.id,
+          payload: state.value,
+          canonicalSizeBytes: sizeBytes,
+        },
+      );
+      if (
+        canonicalizeJson(inlineResult.payload.payload) !== canonical ||
+        inlineResult.payload.canonical_size_bytes !== sizeBytes
+      ) {
+        throw new DomainError(
+          'template_instantiation_conflict',
+          `Initial-state artifact ${artifactResult.artifact.id} has conflicting inline content`,
+        );
+      }
+      const versionResult =
+        await this.states.createInitialVersionIdempotently(transaction, {
+          componentInstanceId,
+          statePortName: state.portName,
+          artifactId: artifactResult.artifact.id,
+          schemaId: state.schemaId,
+          topologyRevisionId: input.topologyRevisionId,
+          regionId: input.regionId,
+          sourceTemplateId: input.templateId,
+          originTemplateInstantiationId: input.instantiationId,
+          provenance,
+        });
+      const version = versionResult.version;
+      if (
+        version.artifact_id !== artifactResult.artifact.id ||
+        version.schema_id !== state.schemaId ||
+        version.topology_revision_id !== input.topologyRevisionId ||
+        version.region_id !== input.regionId ||
+        version.source_template_id !== input.templateId
+      ) {
+        throw new DomainError(
+          'template_instantiation_conflict',
+          `Initial state for ${state.componentInstanceName}.${state.portName} conflicts with its recorded version`,
+        );
+      }
+      await this.states.linkInstantiationIdempotently(
+        transaction,
+        input.instantiationId,
+        version.id,
+      );
+    }
   }
 }
