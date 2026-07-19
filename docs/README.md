@@ -23,6 +23,7 @@ This directory contains the authoritative, reader-facing documentation for Facto
 - [Runtime terminology glossary](reference/glossary.md)
 - [Worker HTTP protocol v1](reference/worker-protocol-v1.md)
 - [Operator HTTP API v1](reference/operator-http-api-v1.md)
+- [Template instantiation protocol v1](reference/template-instantiation-protocol-v1.md)
 - [Durable Reactive Graph conformance ledger](reference/conformance-ledger.yaml)
 - [Milestone 1 acceptance evidence](reference/acceptance/m1-durable-reactive-graph.md)
 
@@ -35,7 +36,7 @@ This directory contains the authoritative, reader-facing documentation for Facto
 
 ## Authority and status
 
-- The runtime contract, architecture decisions, worker protocol, operator API, and conformance ledger are current normative references for v0.1.
+- The runtime contract, architecture decisions, worker protocol, operator API, template-instantiation protocol, and conformance ledger are current normative references.
 - The acceptance evidence is a frozen historical record for the released v0.1.0 baseline.
 - Product and architecture explanations describe intent and rationale; they do not override the normative reference pages.
 - Implementation plans, agent scratch work, and task handoffs do not belong in `docs/`. They are retained in Git history or task-specific tooling instead.
