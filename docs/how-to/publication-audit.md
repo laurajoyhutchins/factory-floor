@@ -20,7 +20,7 @@ Use a trusted workstation or Codespace with authenticated access to the private 
 git
 gh
 jq
-unzip
+python3
 rg
 gitleaks
 trufflehog
@@ -28,7 +28,7 @@ pnpm
 uv
 ```
 
-Record every tool version in the final audit evidence.
+The collectors write their tool versions into the local evidence bundle. Preserve that file with the final audit record.
 
 ## 1. Freeze the publication candidate
 
@@ -38,10 +38,11 @@ Pause merges while the final scan runs. Record the candidate commit:
 git fetch origin main --tags
 git switch main
 git pull --ff-only
+git status --short
 git rev-parse HEAD
 ```
 
-Do not reuse evidence generated for an earlier SHA.
+The working tree must be clean. Do not reuse evidence generated for an earlier SHA.
 
 ## 2. Scan every reachable Git object
 
@@ -51,13 +52,15 @@ Run:
 bash scripts/audit-publication-history.sh
 ```
 
-The script fetches all branch heads, tags, and pull-request heads; requires a non-shallow clone; scans all fetched history with Gitleaks and TruffleHog; inventories commit metadata, historical paths, and reachable blobs; and writes local evidence below:
+The script creates an isolated fresh mirror of every ref advertised by `origin`, verifies the candidate is the remote default-branch commit, checks that the mirror captured every advertised ref at the expected object ID, verifies that remote refs did not move during the scan, runs Git object integrity checks, scans the mirrored history with Gitleaks and TruffleHog, and inventories commit metadata, historical paths, and reachable blobs.
+
+Local evidence is written below:
 
 ```text
 .factory-floor/publication-audit/history-<UTC timestamp>/
 ```
 
-The `sensitive-raw/` directory is mode-restricted and may contain secret values, personal information, private paths, and credential-validation metadata. Never upload it. The `sanitized/` directory omits secret values but still requires review before sharing.
+The `sensitive-raw/` directory includes the private mirror and may contain secret values, personal information, private paths, and credential-validation metadata. Never upload it. The `sanitized/` directory omits secret values but still requires review before sharing.
 
 Manually inspect:
 
@@ -81,11 +84,12 @@ bash scripts/audit-publication-github.sh laurajoyhutchins/factory-floor
 
 The script:
 
-- enumerates retained workflow runs, artifacts, and cache metadata;
-- downloads and extracts every retained workflow log and artifact available through the API;
-- scans them without printing matching content;
-- snapshots repository metadata, rulesets, branch protection, Actions permissions, fork approval policy, environments, webhooks, deploy keys, collaborators, code-security configuration, and private vulnerability reporting;
-- expands repository rulesets and protected-branch settings into individual files.
+- enumerates retained workflow runs, workflow artifacts, cache metadata, releases, and release assets;
+- downloads every retained workflow log, workflow artifact, and release asset available through the API;
+- rejects unsafe ZIP paths, symbolic links, excessive entry counts, and excessive expansion before extracting workflow evidence;
+- scans downloaded evidence without printing matching content;
+- snapshots repository metadata, rulesets, branch protection, Actions permissions, fork approval policy, repository and environment secret and variable names, environments, runners, installed apps, webhooks, deploy keys, collaborators, Pages, code-security configuration, and private vulnerability reporting;
+- expands repository rulesets, protected-branch settings, and environment settings into individual files.
 
 Evidence is written below:
 
@@ -93,7 +97,7 @@ Evidence is written below:
 .factory-floor/publication-audit/github-<UTC timestamp>/
 ```
 
-Review every downloaded log and artifact manually. Confirm unavailable items are expired or deleted rather than inaccessible because of an authorization problem. Actions caches cannot be downloaded by this audit; classify or purge them before publication.
+Review every downloaded log, workflow artifact, and release asset manually. Confirm unavailable items are expired or deleted rather than inaccessible because of an authorization problem. Actions caches cannot be downloaded by this audit; classify or purge them before publication.
 
 Pay particular attention to `.github/workflows/agent-pr-handoff.yml`. It uses `pull_request_target`, so verify that it always checks out trusted default-branch code, never executes pull-request-controlled code with elevated permissions, and remains safe for public forks.
 
@@ -107,6 +111,8 @@ Generate dependency evidence locally:
 mkdir -p .factory-floor/publication-audit/licenses
 pnpm licenses list --json \
   > .factory-floor/publication-audit/licenses/pnpm-licenses.json
+uv export --project packages/contracts-py --format cyclonedx1.5 \
+  --output-file .factory-floor/publication-audit/licenses/contracts-py-sbom.json
 uv export --project packages/worker-sdk-py --format cyclonedx1.5 \
   --output-file .factory-floor/publication-audit/licenses/worker-sdk-py-sbom.json
 uv export --project workers/demo-py --format cyclonedx1.5 \
@@ -127,7 +133,7 @@ Review the current and historical content of:
 - issue and pull-request templates, contribution guidance, security policy, support statements, and roadmap language;
 - repository description, homepage, topics, social preview, and branding.
 
-Confirm `.env.example` contains synthetic local-only values that have never been reused outside disposable development environments. Replace credential-shaped defaults with unmistakable placeholders when that improves clarity or secret-scanner behavior.
+The example environment uses unmistakable `change_me_...` disposable values. Confirm no historical example value was ever reused outside disposable local or CI environments.
 
 ## 6. Record the pre-change protection baseline
 
@@ -139,7 +145,7 @@ Preserve the entire `sensitive-raw/settings/` snapshot from the GitHub audit out
 - linear-history, signed-commit, force-push, deletion, and tag restrictions;
 - merge methods, auto-merge, default branch, and head-branch deletion;
 - Actions permissions, default token permissions, allowed actions, fork approval, and retention;
-- environments, deployment rules, webhooks, deploy keys, apps, collaborators, and Codespaces settings;
+- environments, deployment rules, secret and variable names, runners, webhooks, deploy keys, apps, collaborators, and Codespaces settings;
 - dependency graph, Dependabot, secret scanning, push protection, code scanning, advisories, and private vulnerability reporting.
 
 The visibility change must not begin until the exact recreation plan for every push ruleset is prepared.
