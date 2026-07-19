@@ -60,6 +60,26 @@ Unknown fields, malformed UUIDs, unsupported source variants, and non-JSON param
 
 A `regionRequest` source is a contract shape only in this slice. Child-region authority, bounds, construction, and lifecycle remain owned by issues #36–#38.
 
+## Template-provided initial state
+
+A template instance may seed one explicit state port:
+
+```yaml
+instances:
+  - name: verifier
+    component: verify@1
+    initialState:
+      port: checkpoint
+      value:
+        completedSteps: []
+```
+
+The target port must be declared with direction `state` by the immutable component definition. Its registered artifact schema is authoritative; a template cannot override or weaken it. Parameter references inside `value` are resolved before validation.
+
+Factory Floor treats the value as a seed artifact entering the component state port, not as opaque topology metadata. It canonicalizes the JSON, publishes a content-addressed artifact and inline canonical payload, creates component state version 1, and records template-instantiation lineage. Validation happens before topology or artifact writes, and topology activation, durable instantiation history, the seed artifact, state version, and lineage links commit or roll back together.
+
+Retries with the same request reuse the original seed publication. A distinct request that resolves to the same effective topology receives its own durable instantiation record and lineage link without duplicating the artifact or component state version. Later accepted execution-produced state is projected into the same monotonically ordered component state history, so worker claims and process restarts observe the latest committed version rather than a special initialization-only record.
+
 ## Result
 
 A successful result contains:
@@ -90,4 +110,4 @@ Existing static-system application continues to use the implementation-local req
 
 ## Authority and deferred work
 
-Successful authoritative requests are recorded atomically with their topology outcome. Template-provided initial-state publication and lineage remain issue #79; projections and operator inspection remain issue #80. PostgreSQL concurrency hardening and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.
+Successful authoritative requests are recorded atomically with their topology outcome and any template-provided initial state. Projections and operator inspection remain issue #80. PostgreSQL concurrency hardening and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.
