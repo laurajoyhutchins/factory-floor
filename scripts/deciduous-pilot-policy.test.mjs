@@ -24,7 +24,9 @@ describe('Deciduous pilot repository policy', () => {
 
     expect(agents).toContain('## Deciduous pilot');
     expect(agents).toContain('Do not block edits or commits');
-    expect(agents).toContain('GitHub issues, ADRs, pull requests, and commits remain authoritative');
+    expect(agents).toContain(
+      'GitHub issues, ADRs, pull requests, and commits remain authoritative',
+    );
     expect(agents).toContain('bash scripts/deciduous-pilot.sh start');
     expect(agents).toContain('bash scripts/deciduous-pilot.sh finish');
   });
