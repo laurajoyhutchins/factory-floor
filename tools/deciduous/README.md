@@ -48,9 +48,9 @@ Local state includes:
 - `.deciduous/deciduous.db` — local graph database;
 - `.deciduous/current-node` — pointer used to link the active pilot chain;
 - `.deciduous/documents/` — optional local attachments;
-- `.deciduous/patches/` — reviewable exported JSON patches.
+- `.deciduous/exports/` — reviewable full-graph JSON snapshots.
 
-Everything under `.deciduous/` is ignored except `.deciduous/patches/.gitkeep` and JSON patch exports.
+Everything under `.deciduous/` is ignored except `.deciduous/exports/.gitkeep` and JSON graph snapshots.
 
 ## Three-checkpoint workflow
 
@@ -91,30 +91,28 @@ bash scripts/deciduous-pilot.sh finish \
 
 Finishing records the outcome, links it to the chain, associates the commit, and clears the active-chain pointer.
 
-### Export durable history
+### Export a durable snapshot
 
-When the chain contains useful history that should survive an ephemeral workspace:
+When the graph contains useful history that should survive an ephemeral workspace:
 
 ```bash
-bash scripts/deciduous-pilot.sh export \
-  "agent-deciduous-pilot.json" \
-  "agent/deciduous-pilot"
+bash scripts/deciduous-pilot.sh export "agent-deciduous-pilot.json"
 ```
 
-The filename must be a simple `.json` filename. Review the patch before committing it. Do not export empty, routine, or duplicative histories merely to satisfy a checkbox.
+The filename must be a simple `.json` filename. The wrapper uses the supported `deciduous graph` command, validates the JSON, and atomically writes the snapshot under `.deciduous/exports/`. Some upstream 0.16.0 documentation still mentions `diff export`, but that command is not exposed by the released CLI. Review the snapshot before committing it. Do not export empty, routine, or duplicative histories merely to satisfy a checkbox.
 
 ## Command reference
 
-| Command                       | Purpose                                                           |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `doctor`                      | Verify that the reviewed executable version is available.         |
-| `init`                        | Create local graph state without generated assistant integration. |
-| `recover`                     | Show nodes, edges, and recent commands for context recovery.      |
-| `start <goal>`                | Start a new goal chain.                                           |
-| `decision <title> <reason>`   | Add and link a consequential decision.                            |
-| `observe <observation>`       | Add and link a discovery or constraint.                           |
-| `finish <outcome> [commit]`   | Add the linked outcome and close the active chain.                |
-| `export <file.json> [branch]` | Export reviewable branch history under `.deciduous/patches/`.     |
+| Command                     | Purpose                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| `doctor`                    | Verify that the reviewed executable version is available.           |
+| `init`                      | Create local graph state without generated assistant integration.   |
+| `recover`                   | Show nodes, edges, and recent commands for context recovery.        |
+| `start <goal>`              | Start a new goal chain.                                             |
+| `decision <title> <reason>` | Add and link a consequential decision.                              |
+| `observe <observation>`     | Add and link a discovery or constraint.                             |
+| `finish <outcome> [commit]` | Add the linked outcome and close the active chain.                  |
+| `export <file.json>`        | Export a validated full-graph snapshot under `.deciduous/exports/`. |
 
 Run all commands as `bash scripts/deciduous-pilot.sh <command> ...`.
 
@@ -137,7 +135,7 @@ Do not record:
 - hidden chain-of-thought or private scratch reasoning;
 - credentials, tokens, private environment values, customer data, or sensitive attachments.
 
-**Never record secrets.** Deciduous patch files are reviewable repository content and must be treated accordingly.
+**Never record secrets.** Deciduous snapshot files are reviewable repository content and must be treated accordingly.
 
 ## CI and failure behavior
 
@@ -148,8 +146,7 @@ The wrapper fails before mutation when:
 - Deciduous is absent or its version differs from `VERSION`;
 - a required argument is missing;
 - a decision, observation, or outcome is attempted without an active chain;
-- an export filename contains path separators or is not JSON;
-- the current Git branch cannot be determined and none is supplied.
+- an export filename contains path separators or is not JSON.
 
 A Deciduous failure does not relax Factory Floor's normal verification requirements.
 
@@ -182,6 +179,6 @@ Remove:
 - this directory and the version pin;
 - the Deciduous section in `AGENTS.md`;
 - the `.deciduous` exceptions in `.gitignore`;
-- committed pilot patch exports and local `.deciduous` state.
+- committed pilot graph snapshots and local `.deciduous` state.
 
 No Factory Floor migration, runtime cleanup, deployment change, or data conversion is required.
