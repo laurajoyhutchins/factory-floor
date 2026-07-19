@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "protocol": "factory-floor-service-auth",
+  "signatureVersion": "1",
+  "vectors": [
+    {
+      "name": "agent-create-session",
+      "direction": "agent-to-ff",
+      "key": "agent-secret-key-abcdef123456",
+      "method": "POST",
+      "path": "/api/v1/discord/activity/sessions",
+      "timestamp": "1721234567890",
+      "nonce": "018f1234-5678-7abc-8def-0123456789ab",
+      "body": "{\"instanceId\":\"test\",\"principalId\":\"user-1\"}",
+      "keyId": "ff-agent-to-ff-v1",
+      "bodySha256": "b561bf8d55337bb8cf5fa28832471e99c4e19cb8745327f8fb9574496fa909e3",
+      "signature": "98ba27680a747304366c8657605fe3147c033bf2d27fc0eba519e3e0452abcef"
+    },
+    {
+      "name": "factory-revalidate-principal",
+      "direction": "ff-to-agent",
+      "key": "factory-secret-key-abcdef123456",
+      "method": "POST",
+      "path": "/api/v1/discord/activity/revalidate",
+      "timestamp": "1721234567999",
+      "nonce": "018f1234-5678-7abc-8def-0123456789ac",
+      "body": "{\"principalId\":\"user-1\",\"action\":\"approve\"}",
+      "keyId": "ff-ff-to-agent-v1",
+      "bodySha256": "3d380938d618134fb0c012177d5a0b9973b2893c2f668378cb3d5f211d349d94",
+      "signature": "8ffc008b93f422cb14163194df1621c15d961887ec799673acce43ded31dddf0"
+    }
+  ]
+}
