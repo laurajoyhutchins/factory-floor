@@ -151,6 +151,16 @@ describe('TemplateInstantiationService', () => {
     expect(alpha.disposition).toBe('created');
     expect(beta.disposition).toBe('created');
     expect(alpha.digest).not.toBe(beta.digest);
+    expect(
+      alpha.referencedDefinitions.map(({ kind, name, version }) => ({
+        kind,
+        name,
+        version,
+      })),
+    ).toEqual([
+      { kind: 'component', name: 'alpha-worker', version: '1' },
+      { kind: 'template', name: 'alpha', version: '1' },
+    ]);
     expect(revisions).toHaveLength(2);
     expect(instances).toEqual([
       expect.objectContaining({
