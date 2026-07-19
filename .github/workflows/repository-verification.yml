@@ -31,10 +31,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -45,7 +45,7 @@ jobs:
           pnpm --version
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
@@ -64,34 +64,35 @@ jobs:
       - name: Run canonical static verification
         env:
           FACTORY_FLOOR_FORMAT_DIAGNOSTICS: '1'
-        run: |
-          set -o pipefail
-          pnpm verify:static 2>&1 | tee fast-static.log
+        run: node scripts/run-ci-stage.mjs --stage static --output .factory-floor/ci-metrics/static.json -- bash -c 'set -o pipefail; pnpm verify:static 2>&1 | tee fast-static.log'
 
-      - name: Upload static verification diagnostics
+      - name: Run canonical unit verification
+        run: node scripts/run-ci-stage.mjs --stage unit --output .factory-floor/ci-metrics/unit.json -- bash -c 'set -o pipefail; pnpm verify:unit 2>&1 | tee unit-verification.log'
+
+      - name: Summarize fast verification metrics
         if: always()
-        uses: actions/upload-artifact@v4
+        run: node scripts/summarize-ci-metrics.mjs --metrics .factory-floor/ci-metrics --tests .factory-floor/test-results --output .factory-floor/ci-metrics/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write agent CI handoff
+        if: always()
+        env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AGENT_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job fast-verification --artifact fast-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload fast verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: static-verification-${{ github.run_number }}
+          name: fast-verification-${{ github.run_number }}
           path: |
+            .factory-floor/ci-metrics/
+            .factory-floor/test-results/
             fast-static.log
+            unit-verification.log
             format.log
             formatted-files.txt
             formatted-files.tar.gz
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Run canonical unit verification
-        run: |
-          set -o pipefail
-          pnpm verify:unit 2>&1 | tee unit-verification.log
-
-      - name: Upload unit verification log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-verification-${{ github.run_number }}
-          path: unit-verification.log
           if-no-files-found: ignore
           retention-days: 30
 
@@ -106,10 +107,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -120,7 +121,7 @@ jobs:
           pnpm --version
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
@@ -137,50 +138,42 @@ jobs:
         run: bash scripts/bootstrap-workspace.sh
 
       - name: Start services and run migrations
-        run: |
-          set -o pipefail
-          pnpm verify:services 2>&1 | tee services-verification.log
-
-      - name: Upload service verification log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: services-verification-${{ github.run_number }}
-          path: services-verification.log
-          if-no-files-found: ignore
-          retention-days: 30
+        run: node scripts/run-ci-stage.mjs --stage services --output .factory-floor/ci-metrics/services.json -- bash -c 'set -o pipefail; pnpm verify:services 2>&1 | tee services-verification.log'
 
       - name: Run canonical integration verification
-        run: |
-          set -o pipefail
-          pnpm verify:integration 2>&1 | tee integration-verification.log
-
-      - name: Upload integration verification log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-verification-${{ github.run_number }}
-          path: integration-verification.log
-          if-no-files-found: ignore
-          retention-days: 30
+        run: node scripts/run-ci-stage.mjs --stage integration --output .factory-floor/ci-metrics/integration.json -- bash -c 'set -o pipefail; pnpm verify:integration 2>&1 | tee integration-verification.log'
 
       - name: Run canonical live-restart acceptance
-        run: |
-          set -o pipefail
-          pnpm verify:acceptance 2>&1 | tee acceptance-verification.log
-
-      - name: Upload acceptance verification log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: acceptance-verification-${{ github.run_number }}
-          path: acceptance-verification.log
-          if-no-files-found: ignore
-          retention-days: 30
+        run: node scripts/run-ci-stage.mjs --stage acceptance --output .factory-floor/ci-metrics/acceptance.json -- bash -c 'set -o pipefail; pnpm verify:acceptance 2>&1 | tee acceptance-verification.log'
 
       - name: Stop development services
         if: always()
         run: pnpm services:clean
+
+      - name: Summarize Docker-backed verification metrics
+        if: always()
+        run: node scripts/summarize-ci-metrics.mjs --metrics .factory-floor/ci-metrics --tests .factory-floor/test-results --output .factory-floor/ci-metrics/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write agent CI handoff
+        if: always()
+        env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AGENT_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job service-verification --artifact service-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Docker-backed verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: service-verification-${{ github.run_number }}
+          path: |
+            .factory-floor/ci-metrics/
+            .factory-floor/test-results/
+            services-verification.log
+            integration-verification.log
+            acceptance-verification.log
+          if-no-files-found: ignore
+          retention-days: 30
 
   m1-acceptance:
     name: Milestone 1 clean acceptance
@@ -190,10 +183,10 @@ jobs:
 
     steps:
       - name: Check out reviewed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -204,7 +197,7 @@ jobs:
           pnpm --version
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
@@ -214,21 +207,32 @@ jobs:
           DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
           ARTIFACT_STORE_ROOT: .factory-floor/demo-artifacts
           FACTORY_FLOOR_CLEAN_CHECKOUT: '1'
-        run: |
-          set -o pipefail
-          pnpm accept:m1 2>&1 | tee m1-acceptance.log
-
-      - name: Upload Milestone 1 evidence bundle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: m1-acceptance-evidence-${{ github.run_number }}
-          path: |
-            .factory-floor/evidence/m1/
-            m1-acceptance.log
-          if-no-files-found: error
-          retention-days: 30
+        run: node scripts/run-ci-stage.mjs --stage m1-clean-acceptance --output .factory-floor/ci-metrics/m1-clean-acceptance.json -- bash -c 'set -o pipefail; pnpm accept:m1 2>&1 | tee m1-acceptance.log'
 
       - name: Stop development services
         if: always()
         run: pnpm services:clean
+
+      - name: Summarize clean acceptance metrics
+        if: always()
+        run: node scripts/summarize-ci-metrics.mjs --metrics .factory-floor/ci-metrics --tests .factory-floor/test-results --output .factory-floor/ci-metrics/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write agent CI handoff
+        if: always()
+        env:
+          AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AGENT_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job m1-acceptance --artifact m1-acceptance-evidence-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Milestone 1 evidence bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: m1-acceptance-evidence-${{ github.run_number }}
+          path: |
+            .factory-floor/ci-metrics/
+            .factory-floor/test-results/
+            .factory-floor/evidence/m1/
+            m1-acceptance.log
+          if-no-files-found: error
+          retention-days: 30

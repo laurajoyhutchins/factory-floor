@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "stages": [
+    {
+      "name": "static",
+      "command": "pnpm verify:static",
+      "logs": ["fast-static.log"]
+    },
+    {
+      "name": "unit",
+      "command": "pnpm verify:unit",
+      "logs": ["unit-verification.log"]
+    },
+    {
+      "name": "services",
+      "command": "pnpm verify:services",
+      "logs": ["services-verification.log"]
+    },
+    {
+      "name": "integration",
+      "command": "pnpm verify:integration",
+      "logs": ["integration-verification.log"]
+    },
+    {
+      "name": "acceptance",
+      "command": "pnpm verify:acceptance",
+      "logs": ["acceptance-verification.log"]
+    },
+    {
+      "name": "m1-clean-acceptance",
+      "command": "pnpm accept:m1",
+      "logs": ["m1-acceptance.log"]
+    }
+  ]
+}

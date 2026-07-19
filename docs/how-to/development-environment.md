@@ -49,7 +49,7 @@ pnpm verify:unit
 pnpm verify:fast
 ```
 
-`verify:static` validates contracts, generated-code drift, the conformance ledger, lint, types, and formatting. `verify:unit` runs the root TypeScript and TSX projects, locked Python tests, and the console production build. JavaScript unit tests run without inherited database URLs, so caller service configuration cannot silently turn them into integration tests. `verify:fast` runs both stages and is the closest local reproduction of the pull request's fast CI job.
+`verify:static` validates contracts, generated-code drift, the conformance ledger, the repository CI quality policy, lint, types, and formatting. `verify:unit` runs the root TypeScript and TSX projects, locked Python tests, and the console production build. JavaScript unit tests run without inherited database URLs, so caller service configuration cannot silently turn them into integration tests. `verify:fast` runs both stages and is the closest local reproduction of the pull request's fast CI job.
 
 The root Vitest project includes the console's `.test.tsx` component tests while preserving its jsdom setup. The root TypeScript project references the console, and the unit stage retains its production build as a permanent gate.
 
@@ -73,6 +73,20 @@ pnpm verify
 ```
 
 Set `FACTORY_FLOOR_VERIFY_CLEAN=1` only when you intentionally need fresh service volumes. See the [investigation run guide](run-investigation.md) for the operator-facing demo and inspection workflow.
+
+## Inspect CI quality evidence
+
+Run the repository-owned workflow policy check directly with:
+
+```bash
+pnpm ci:quality:check
+```
+
+The policy in `quality-gates.json` records required jobs and measured stages, fast and complete verification duration targets, the maximum flaky-rerun target, change-size review thresholds, immutable GitHub Action requirements, and the future changed-line and changed-branch coverage ratchet. Coverage targets are recorded but remain non-blocking until enough successful runs establish a trustworthy baseline.
+
+GitHub Actions wraps each canonical verification stage with `scripts/run-ci-stage.mjs`. Every job retains `.factory-floor/ci-metrics/`, including command outcome, timestamps, duration, and reviewed commit identity. CI unit verification also writes Vitest and pytest JUnit XML to `.factory-floor/test-results/`. `scripts/summarize-ci-metrics.mjs` publishes the same evidence as a job-summary table and aggregate JSON.
+
+Local `pnpm test` and `pnpm test:python` output is unchanged. The JUnit-producing `test:ci` and `test:python:ci` commands are selected automatically only when `CI=true`.
 
 ## Environment boundaries
 

@@ -15,6 +15,7 @@ verify_static() {
   pnpm contracts:validate
   pnpm contracts:check
   pnpm conformance:check
+  pnpm ci:quality:check
   pnpm lint
   pnpm typecheck
 
@@ -34,9 +35,17 @@ verify_static() {
 verify_unit() {
   (
     unset DATABASE_URL TEST_DATABASE_URL
-    pnpm test
+    if [[ "${CI:-false}" == "true" ]]; then
+      pnpm test:ci
+    else
+      pnpm test
+    fi
   )
-  pnpm test:python
+  if [[ "${CI:-false}" == "true" ]]; then
+    pnpm test:python:ci
+  else
+    pnpm test:python
+  fi
   pnpm --filter @factory-floor/console build
 }
 
