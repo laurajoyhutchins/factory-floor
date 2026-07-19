@@ -67,6 +67,16 @@ if (!metricsDirectory || !testsDirectory || !output) {
     return Number.isFinite(value) ? value : 0;
   };
 
+  const hasAttribute = (attributes, name) =>
+    new RegExp(`(?:^|\\s)${name}="[^"]*"`).test(attributes);
+  const numericAttributes = [
+    'tests',
+    'failures',
+    'errors',
+    'skipped',
+    'time',
+  ];
+
   const testTotals = {
     files: 0,
     tests: 0,
@@ -78,18 +88,36 @@ if (!metricsDirectory || !testsDirectory || !output) {
 
   for (const path of listFiles(resolve(testsDirectory), '.xml')) {
     const xml = readFileSync(path, 'utf8');
-    const root = xml.match(/<(?:testsuites|testsuite)\b([^>]*)>/i);
-    if (!root) {
-      console.error(`Ignoring JUnit file without a test-suite root: ${path}`);
+    const aggregateRoot = xml.match(/<testsuites\b([^>]*)>/i);
+    const singleRoot = xml.match(/<testsuite\b([^>]*)>/i);
+    let attributeGroups = [];
+
+    if (
+      aggregateRoot &&
+      numericAttributes.some((name) => hasAttribute(aggregateRoot[1], name))
+    ) {
+      attributeGroups = [aggregateRoot[1]];
+    } else if (aggregateRoot) {
+      attributeGroups = [...xml.matchAll(/<testsuite\b([^>]*)>/gi)].map(
+        (match) => match[1],
+      );
+    } else if (singleRoot) {
+      attributeGroups = [singleRoot[1]];
+    }
+
+    if (attributeGroups.length === 0) {
+      console.error(`Ignoring JUnit file without test-suite totals: ${path}`);
       continue;
     }
 
     testTotals.files += 1;
-    testTotals.tests += readNumericAttribute(root[1], 'tests');
-    testTotals.failures += readNumericAttribute(root[1], 'failures');
-    testTotals.errors += readNumericAttribute(root[1], 'errors');
-    testTotals.skipped += readNumericAttribute(root[1], 'skipped');
-    testTotals.durationSeconds += readNumericAttribute(root[1], 'time');
+    for (const attributes of attributeGroups) {
+      testTotals.tests += readNumericAttribute(attributes, 'tests');
+      testTotals.failures += readNumericAttribute(attributes, 'failures');
+      testTotals.errors += readNumericAttribute(attributes, 'errors');
+      testTotals.skipped += readNumericAttribute(attributes, 'skipped');
+      testTotals.durationSeconds += readNumericAttribute(attributes, 'time');
+    }
   }
   testTotals.durationSeconds = Number(testTotals.durationSeconds.toFixed(3));
 
