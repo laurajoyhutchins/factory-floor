@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "durationTargetsSeconds": {
+    "fastVerificationP95": 120,
+    "completeVerificationP95": 600
+  },
+  "reliabilityTargets": {
+    "maximumFlakyRerunPercent": 0.5
+  },
+  "futureCoverageRatchet": {
+    "changedLinesPercent": 90,
+    "changedBranchesPercent": 85,
+    "totalCoverageMustNotDecrease": true,
+    "enforced": false
+  },
+  "changeReviewThresholds": {
+    "executableLines": 1000,
+    "files": 20
+  },
+  "requiredJobs": [
+    "fast-verification",
+    "service-verification",
+    "m1-acceptance"
+  ],
+  "requiredStages": [
+    "static",
+    "unit",
+    "services",
+    "integration",
+    "acceptance",
+    "m1-clean-acceptance"
+  ],
+  "supplyChain": {
+    "requireImmutableActionReferences": true
+  }
+}
