@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 umask 077
 
-required=(gh jq unzip gitleaks rg)
+required=(gh jq python3 gitleaks rg)
 missing=()
 for command_name in "${required[@]}"; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
@@ -25,8 +25,16 @@ safe_dir="${out_dir}/sanitized"
 settings_dir="${raw_dir}/settings"
 logs_dir="${raw_dir}/workflow-logs"
 artifacts_dir="${raw_dir}/workflow-artifacts"
-mkdir -p "${settings_dir}" "${logs_dir}" "${artifacts_dir}" "${safe_dir}"
-chmod 700 "${out_dir}" "${raw_dir}" "${safe_dir}" "${settings_dir}" "${logs_dir}" "${artifacts_dir}"
+release_assets_dir="${raw_dir}/release-assets"
+mkdir -p "${settings_dir}" "${logs_dir}" "${artifacts_dir}" "${release_assets_dir}" "${safe_dir}"
+chmod 700 \
+  "${out_dir}" \
+  "${raw_dir}" \
+  "${safe_dir}" \
+  "${settings_dir}" \
+  "${logs_dir}" \
+  "${artifacts_dir}" \
+  "${release_assets_dir}"
 
 api_capture() {
   local name="$1"
@@ -51,6 +59,44 @@ api_capture_pages() {
   return 0
 }
 
+safe_extract_zip() {
+  local archive="$1"
+  local destination="$2"
+  python3 - "${archive}" "${destination}" <<'PY'
+import pathlib
+import stat
+import sys
+import zipfile
+
+archive_path = pathlib.Path(sys.argv[1])
+destination = pathlib.Path(sys.argv[2]).resolve()
+maximum_entries = 100_000
+maximum_uncompressed_bytes = 5 * 1024 * 1024 * 1024
+
+with zipfile.ZipFile(archive_path) as bundle:
+    entries = bundle.infolist()
+    if len(entries) > maximum_entries:
+        raise SystemExit(f"archive contains too many entries: {len(entries)}")
+
+    total_size = sum(entry.file_size for entry in entries)
+    if total_size > maximum_uncompressed_bytes:
+        raise SystemExit(f"archive expands beyond limit: {total_size} bytes")
+
+    for entry in entries:
+        name = entry.filename.replace("\\", "/")
+        target = (destination / name).resolve()
+        if target != destination and destination not in target.parents:
+            raise SystemExit(f"archive path escapes destination: {entry.filename}")
+
+        file_type = (entry.external_attr >> 16) & 0o170000
+        if file_type == stat.S_IFLNK:
+            raise SystemExit(f"archive contains a symbolic link: {entry.filename}")
+
+    destination.mkdir(parents=True, exist_ok=True)
+    bundle.extractall(destination)
+PY
+}
+
 # Repository and protection snapshot. These files can reveal collaborators,
 # private infrastructure names, and configuration details. Keep them local.
 api_capture repository "repos/${repo}"
@@ -60,10 +106,18 @@ api_capture actions-permissions "repos/${repo}/actions/permissions"
 api_capture actions-workflow-permissions "repos/${repo}/actions/permissions/workflow"
 api_capture actions-fork-approval "repos/${repo}/actions/permissions/fork-pr-contributor-approval"
 api_capture actions-selected "repos/${repo}/actions/permissions/selected-actions"
+api_capture_pages actions-secrets "repos/${repo}/actions/secrets?per_page=100"
+api_capture_pages actions-variables "repos/${repo}/actions/variables?per_page=100"
+api_capture_pages dependabot-secrets "repos/${repo}/dependabot/secrets?per_page=100"
+api_capture_pages codespaces-secrets "repos/${repo}/codespaces/secrets?per_page=100"
 api_capture_pages environments "repos/${repo}/environments?per_page=100"
 api_capture_pages webhooks "repos/${repo}/hooks?per_page=100"
 api_capture_pages deploy-keys "repos/${repo}/keys?per_page=100"
 api_capture_pages collaborators "repos/${repo}/collaborators?affiliation=all&per_page=100"
+api_capture_pages runners "repos/${repo}/actions/runners?per_page=100"
+api_capture_pages installations "repos/${repo}/installations?per_page=100"
+api_capture_pages releases "repos/${repo}/releases?per_page=100"
+api_capture pages "repos/${repo}/pages"
 api_capture code-security-configuration "repos/${repo}/code-security-configuration"
 api_capture private-vulnerability-reporting "repos/${repo}/private-vulnerability-reporting"
 
@@ -72,7 +126,7 @@ jq -r '.[]? | .[]? | select(.protected == true) | .name' "${settings_dir}/branch
 while IFS= read -r branch; do
   [[ -n "${branch}" ]] || continue
   encoded_branch="$(jq -nr --arg value "${branch}" '$value | @uri')"
-  safe_name="$(printf '%s' "${branch}" | tr '/ ' '__')"
+  safe_name="$(printf '%s' "${branch}" | tr -cs 'A-Za-z0-9._-' '_')"
   api_capture "branch-protection-${safe_name}" "repos/${repo}/branches/${encoded_branch}/protection"
 done <"${raw_dir}/protected-branches.txt"
 
@@ -82,6 +136,17 @@ while IFS= read -r ruleset_id; do
   [[ -n "${ruleset_id}" ]] || continue
   api_capture "ruleset-${ruleset_id}" "repos/${repo}/rulesets/${ruleset_id}?includes_parents=true"
 done <"${raw_dir}/ruleset-ids.txt"
+
+jq -r '.[]?.environments[]?.name // empty' "${settings_dir}/environments.json" \
+  >"${raw_dir}/environment-names.txt" || true
+while IFS= read -r environment_name; do
+  [[ -n "${environment_name}" ]] || continue
+  encoded_environment="$(jq -nr --arg value "${environment_name}" '$value | @uri')"
+  safe_name="$(printf '%s' "${environment_name}" | tr -cs 'A-Za-z0-9._-' '_')"
+  api_capture "environment-${safe_name}" "repos/${repo}/environments/${encoded_environment}"
+  api_capture_pages "environment-${safe_name}-secrets" "repos/${repo}/environments/${encoded_environment}/secrets?per_page=100"
+  api_capture_pages "environment-${safe_name}-variables" "repos/${repo}/environments/${encoded_environment}/variables?per_page=100"
+done <"${raw_dir}/environment-names.txt"
 
 # Enumerate every retained workflow run, artifact, and cache visible through the
 # API. Run and artifact payloads may contain private branch, actor, and path data.
@@ -109,9 +174,8 @@ while IFS= read -r run_id; do
   zip_path="${logs_dir}/${run_id}.zip"
   extract_path="${logs_dir}/${run_id}"
   if gh api "repos/${repo}/actions/runs/${run_id}/logs" >"${zip_path}" 2>/dev/null; then
-    mkdir -p "${extract_path}"
-    if ! unzip -qq -o "${zip_path}" -d "${extract_path}"; then
-      printf '%s\tinvalid-archive\n' "${run_id}" >>"${raw_dir}/unavailable-workflow-logs.txt"
+    if ! safe_extract_zip "${zip_path}" "${extract_path}"; then
+      printf '%s\tunsafe-or-invalid-archive\n' "${run_id}" >>"${raw_dir}/unavailable-workflow-logs.txt"
     fi
   else
     rm -f "${zip_path}"
@@ -126,9 +190,8 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   zip_path="${artifacts_dir}/${artifact_id}-${safe_name}.zip"
   extract_path="${artifacts_dir}/${artifact_id}-${safe_name}"
   if gh api "repos/${repo}/actions/artifacts/${artifact_id}/zip" >"${zip_path}" 2>/dev/null; then
-    mkdir -p "${extract_path}"
-    if ! unzip -qq -o "${zip_path}" -d "${extract_path}"; then
-      printf '%s\t%s\tinvalid-archive\n' "${artifact_id}" "${artifact_name}" \
+    if ! safe_extract_zip "${zip_path}" "${extract_path}"; then
+      printf '%s\t%s\tunsafe-or-invalid-archive\n' "${artifact_id}" "${artifact_name}" \
         >>"${raw_dir}/unavailable-artifacts.txt"
     fi
   else
@@ -138,9 +201,24 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   fi
 done < <(jq -r '.[] | [.id, .name] | @tsv' "${raw_dir}/artifacts.json")
 
-# Scan downloaded logs and artifacts without printing matches. Gitleaks redacts
-# secret values; raw reports still remain protected because paths and context
-# can be sensitive.
+: >"${raw_dir}/unavailable-release-assets.txt"
+while IFS=$'\t' read -r asset_id asset_name; do
+  [[ -n "${asset_id}" ]] || continue
+  safe_name="$(printf '%s' "${asset_name}" | tr -cs 'A-Za-z0-9._-' '_')"
+  asset_path="${release_assets_dir}/${asset_id}-${safe_name}"
+  if ! gh api \
+    -H 'Accept: application/octet-stream' \
+    "repos/${repo}/releases/assets/${asset_id}" \
+    >"${asset_path}" 2>/dev/null; then
+    rm -f "${asset_path}"
+    printf '%s\t%s\tunavailable\n' "${asset_id}" "${asset_name}" \
+      >>"${raw_dir}/unavailable-release-assets.txt"
+  fi
+done < <(jq -r '.[]? | .[]? | .assets[]? | [.id, .name] | @tsv' "${settings_dir}/releases.json")
+
+# Scan downloaded logs, workflow artifacts, and release assets without printing
+# matches. Gitleaks redacts secret values; raw reports still remain protected
+# because paths and context can be sensitive.
 gitleaks dir "${logs_dir}" \
   --redact=100 --no-banner --no-color --log-level=error \
   --max-archive-depth=3 --max-decode-depth=3 \
@@ -153,25 +231,37 @@ gitleaks dir "${artifacts_dir}" \
   --report-format=json --report-path="${raw_dir}/gitleaks-artifacts.json" \
   --exit-code=0
 
+gitleaks dir "${release_assets_dir}" \
+  --redact=100 --no-banner --no-color --log-level=error \
+  --max-archive-depth=5 --max-decode-depth=3 \
+  --report-format=json --report-path="${raw_dir}/gitleaks-release-assets.json" \
+  --exit-code=0
+
 jq 'map({ruleId: .RuleID, description: .Description, file: .File, startLine: .StartLine, fingerprint: .Fingerprint})' \
   "${raw_dir}/gitleaks-workflow-logs.json" >"${safe_dir}/workflow-log-findings.json"
 jq 'map({ruleId: .RuleID, description: .Description, file: .File, startLine: .StartLine, fingerprint: .Fingerprint})' \
   "${raw_dir}/gitleaks-artifacts.json" >"${safe_dir}/artifact-findings.json"
+jq 'map({ruleId: .RuleID, description: .Description, file: .File, startLine: .StartLine, fingerprint: .Fingerprint})' \
+  "${raw_dir}/gitleaks-release-assets.json" >"${safe_dir}/release-asset-findings.json"
 
 # This search records file names only. Review matches locally; do not quote the
 # matching lines into the sanitized report.
 rg -l -i --hidden --no-ignore \
   '(authorization:|bearer[[:space:]]+[A-Za-z0-9._~+/-]+|api[_-]?key|client[_-]?secret|private[_-]?key|password=|token=|secret=|github_token|aws_access_key|database_url|postgres://|mysql://|mongodb(\+srv)?://|https?://[^[:space:]]+:[^[:space:]@]+@)' \
-  "${logs_dir}" "${artifacts_dir}" >"${raw_dir}/pattern-matching-files.txt" || true
+  "${logs_dir}" "${artifacts_dir}" "${release_assets_dir}" \
+  >"${raw_dir}/pattern-matching-files.txt" || true
 
 run_count="$(jq 'length' "${raw_dir}/workflow-runs.json")"
 artifact_count="$(jq 'length' "${raw_dir}/artifacts.json")"
 cache_count="$(jq 'length' "${raw_dir}/caches.json")"
+release_asset_count="$(jq '[.[]? | .[]? | .assets[]?] | length' "${settings_dir}/releases.json")"
 log_findings="$(jq 'length' "${safe_dir}/workflow-log-findings.json")"
 artifact_findings="$(jq 'length' "${safe_dir}/artifact-findings.json")"
+release_asset_findings="$(jq 'length' "${safe_dir}/release-asset-findings.json")"
 pattern_file_count="$(wc -l <"${raw_dir}/pattern-matching-files.txt" | tr -d ' ')"
 unavailable_log_count="$(wc -l <"${raw_dir}/unavailable-workflow-logs.txt" | tr -d ' ')"
 unavailable_artifact_count="$(wc -l <"${raw_dir}/unavailable-artifacts.txt" | tr -d ' ')"
+unavailable_release_asset_count="$(wc -l <"${raw_dir}/unavailable-release-assets.txt" | tr -d ' ')"
 ruleset_count="$(wc -l <"${raw_dir}/ruleset-ids.txt" | tr -d ' ')"
 protected_branch_count="$(wc -l <"${raw_dir}/protected-branches.txt" | tr -d ' ')"
 
@@ -181,11 +271,14 @@ jq -n \
   --argjson workflowRuns "${run_count}" \
   --argjson artifacts "${artifact_count}" \
   --argjson caches "${cache_count}" \
+  --argjson releaseAssets "${release_asset_count}" \
   --argjson workflowLogFindings "${log_findings}" \
   --argjson artifactFindings "${artifact_findings}" \
+  --argjson releaseAssetFindings "${release_asset_findings}" \
   --argjson patternMatchingFiles "${pattern_file_count}" \
   --argjson unavailableWorkflowLogs "${unavailable_log_count}" \
   --argjson unavailableArtifacts "${unavailable_artifact_count}" \
+  --argjson unavailableReleaseAssets "${unavailable_release_asset_count}" \
   --argjson rulesets "${ruleset_count}" \
   --argjson protectedBranches "${protected_branch_count}" \
   '{
@@ -196,12 +289,15 @@ jq -n \
       workflowRuns: $workflowRuns,
       artifacts: $artifacts,
       caches: $caches,
+      releaseAssets: $releaseAssets,
       unavailableWorkflowLogs: $unavailableWorkflowLogs,
-      unavailableArtifacts: $unavailableArtifacts
+      unavailableArtifacts: $unavailableArtifacts,
+      unavailableReleaseAssets: $unavailableReleaseAssets
     },
     automatedFindings: {
       workflowLogs: $workflowLogFindings,
       artifacts: $artifactFindings,
+      releaseAssets: $releaseAssetFindings,
       patternMatchingFiles: $patternMatchingFiles
     },
     protectionSnapshot: {
@@ -215,23 +311,27 @@ jq -n \
 cat >"${safe_dir}/manual-review.md" <<'EOF'
 # Manual GitHub publication review
 
-- Review every downloaded workflow log and every extracted artifact, including nested archives, screenshots, coverage, test reports, databases, environment files, generated documentation, and stack traces.
+- Review every downloaded workflow log, extracted workflow artifact, and release asset, including nested archives, screenshots, coverage, test reports, databases, environment files, generated documentation, and stack traces.
 - Review the protected raw scanner reports and every file listed by the pattern search.
-- Confirm unavailable logs or artifacts are expired or deleted rather than inaccessible because of an authorization failure.
+- Confirm unavailable logs, workflow artifacts, or release assets are expired or deleted rather than inaccessible because of an authorization failure.
 - Classify every Actions cache. Purge caches that may contain source, generated configuration, local paths, or private dependency material.
-- Review workflow permissions, `pull_request_target`, reusable workflows, environments, OIDC, secrets and variable names, self-hosted runners, and fork approval policy.
+- Review workflow permissions, `pull_request_target`, reusable workflows, environments, OIDC, secret and variable names, self-hosted runners, installed apps, and fork approval policy.
 - Review the complete settings snapshot before conversion. Immediately repeat this script after conversion and diff the settings directories.
 - Recreate every disabled push ruleset and verify required checks, review requirements, force-push/deletion restrictions, and fork isolation with a harmless test PR.
 - Never upload `sensitive-raw/` or paste secret values into an issue, pull request, workflow summary, or artifact.
 EOF
 
 printf 'GitHub publication audit written to %s\n' "${out_dir}"
-printf 'Runs: %s; artifacts: %s; caches: %s; scanner findings: %s\n' \
-  "${run_count}" "${artifact_count}" "${cache_count}" "$((log_findings + artifact_findings))"
+printf 'Runs: %s; workflow artifacts: %s; release assets: %s; caches: %s; scanner findings: %s\n' \
+  "${run_count}" \
+  "${artifact_count}" \
+  "${release_asset_count}" \
+  "${cache_count}" \
+  "$((log_findings + artifact_findings + release_asset_findings))"
 
-if (( log_findings > 0 || artifact_findings > 0 || pattern_file_count > 0 )); then
-  echo 'Actions evidence requires classification; publication remains blocked.' >&2
+if (( log_findings > 0 || artifact_findings > 0 || release_asset_findings > 0 || pattern_file_count > 0 )); then
+  echo 'GitHub evidence requires classification; publication remains blocked.' >&2
   exit 1
 fi
 
-echo 'Automated Actions scans found no results. Manual evidence and configuration review remains mandatory; publication is not approved.'
+echo 'Automated GitHub evidence scans found no results. Manual evidence and configuration review remains mandatory; publication is not approved.'
