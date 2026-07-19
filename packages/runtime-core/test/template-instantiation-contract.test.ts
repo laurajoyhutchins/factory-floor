@@ -7,7 +7,10 @@ import {
   templateInstantiationRequestSchema,
   toTemplateInstantiationResult,
 } from '../src/systems/template-instantiation-contract.js';
-import { toTemplateInstantiationError } from '../src/systems/template-instantiation-error.js';
+import {
+  templateInstantiationErrorCodes,
+  toTemplateInstantiationError,
+} from '../src/systems/template-instantiation-error.js';
 
 const requestId = '019bb22e-58b0-7d87-8000-000000000001';
 const targetRegionId = '019bb22e-58b0-7d87-8000-000000000002';
@@ -72,18 +75,25 @@ const contractResult = {
   referencedDefinitions: runtimeResult.referencedDefinitions,
 };
 
+const loadSchema = (name: string) =>
+  JSON.parse(
+    readFileSync(
+      new URL(`../../../contracts/schemas/${name}.schema.json`, import.meta.url),
+      'utf8',
+    ),
+  );
+
 describe('template instantiation contract adapter', () => {
   it('uses the exact canonical request schema', () => {
-    const canonicalSchema = JSON.parse(
-      readFileSync(
-        new URL(
-          '../../../contracts/schemas/template-instantiation-request.schema.json',
-          import.meta.url,
-        ),
-        'utf8',
-      ),
+    expect(templateInstantiationRequestSchema).toEqual(
+      loadSchema('template-instantiation-request'),
     );
-    expect(templateInstantiationRequestSchema).toEqual(canonicalSchema);
+  });
+
+  it('keeps stable error codes synchronized with the canonical schema', () => {
+    expect(templateInstantiationErrorCodes).toEqual(
+      loadSchema('template-instantiation-error').properties.code.enum,
+    );
   });
 
   it('accepts a canonical request without changing its identity or source', () => {
