@@ -107,7 +107,9 @@ describe('agent CI summary', () => {
     expect(summary.firstActionableError).toBe('FAIL src/example.test.ts');
     expect(summary.reproductionCommand).toBe('pnpm test');
     expect(summary.artifacts).toEqual(['test-evidence']);
-    expect(summary.runUrl).toBe('https://github.com/owner/repo/actions/runs/123');
+    expect(summary.runUrl).toBe(
+      'https://github.com/owner/repo/actions/runs/123',
+    );
   });
 
   it('writes a successful handoff without a false failure', () => {
@@ -126,7 +128,10 @@ describe('agent CI summary', () => {
         ],
       }),
     );
-    writeFileSync(join(directory, 'check.log'), '0 errors\nAll checks passed\n');
+    writeFileSync(
+      join(directory, 'check.log'),
+      '0 errors\nAll checks passed\n',
+    );
 
     const result = spawnSync(
       process.execPath,
