@@ -23,6 +23,12 @@ export type SourceIdentity =
       kind: 'execution';
       executionId: string;
       attemptId: string;
+    }
+  | {
+      kind: 'templateInstantiation';
+      instantiationId: string;
+      templateId: string;
+      regionId: string;
     };
 
 export interface ExternalActionProposal {
