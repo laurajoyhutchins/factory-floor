@@ -90,7 +90,10 @@ class TemplateInstantiationResult(BaseModel):
     )
     protocolVersion: Literal['1.0']
     requestId: UUID
-    instantiationId: UUID
+    instantiationId: UUID = Field(
+        ...,
+        description='Stable durable identity of the authoritative instantiation record.',
+    )
     disposition: Disposition
     digest: Sha256Digest
     regionId: UUID
