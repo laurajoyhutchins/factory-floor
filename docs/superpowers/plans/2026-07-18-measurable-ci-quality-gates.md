@@ -21,10 +21,12 @@
 ### Task 1: Add failing CI policy and metrics tests
 
 **Files:**
+
 - Create: `scripts/ci-quality.test.mjs`
 - Modify: `scripts/verification.test.mjs`
 
 **Interfaces:**
+
 - Consumes: repository files and Node.js process spawning.
 - Produces: executable expectations for `run-ci-stage.mjs`, `summarize-ci-metrics.mjs`, `check-ci-quality-gates.mjs`, `quality-gates.json`, and workflow wiring.
 
@@ -56,12 +58,14 @@ git commit -m "test: specify measurable CI quality gates"
 ### Task 2: Implement repository-owned quality policy
 
 **Files:**
+
 - Create: `quality-gates.json`
 - Create: `scripts/check-ci-quality-gates.mjs`
 - Modify: `package.json`
 - Modify: `scripts/verify.sh`
 
 **Interfaces:**
+
 - Consumes: `quality-gates.json` and `.github/workflows/repository-verification.yml`.
 - Produces: `pnpm ci:quality:check`, exiting nonzero with all policy violations.
 
@@ -93,12 +97,14 @@ git commit -m "chore: enforce repository CI quality policy"
 ### Task 3: Record stage and test metrics
 
 **Files:**
+
 - Create: `scripts/run-ci-stage.mjs`
 - Create: `scripts/summarize-ci-metrics.mjs`
 - Modify: `package.json`
 - Modify: `scripts/verify.sh`
 
 **Interfaces:**
+
 - `run-ci-stage.mjs --stage <name> --output <path> -- <command...>` writes one metric and returns the command status.
 - `summarize-ci-metrics.mjs --metrics <dir> --tests <dir> --output <path>` writes aggregate JSON and Markdown to stdout.
 
@@ -130,9 +136,11 @@ git commit -m "feat: record CI stage and test metrics"
 ### Task 4: Harden Repository Verification workflow
 
 **Files:**
+
 - Modify: `.github/workflows/repository-verification.yml`
 
 **Interfaces:**
+
 - Consumes: canonical `pnpm verify:*` commands and metrics scripts.
 - Produces: pinned Actions, per-stage JSON, JUnit artifacts, aggregate summaries, and unchanged required jobs.
 
@@ -164,10 +172,12 @@ git commit -m "ci: publish measured immutable verification"
 ### Task 5: Add change-assurance guidance
 
 **Files:**
+
 - Create: `.github/pull_request_template.md`
 - Modify: `docs/how-to/development-environment.md`
 
 **Interfaces:**
+
 - Produces: explicit PR risk/invariant declarations and documented local/CI commands and artifacts.
 
 - [ ] **Step 1: Add the PR template**
@@ -194,6 +204,7 @@ git commit -m "docs: require change-assurance evidence"
 ### Task 6: Complete verification and publish the PR
 
 **Files:**
+
 - Review all changed files.
 
 - [ ] **Step 1: Run fast verification**
