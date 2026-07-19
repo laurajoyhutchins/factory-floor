@@ -33,6 +33,7 @@ const definitionId = '019bb22e-58b0-7d87-8000-000000000005';
 const parentRegionId = '019bb22e-58b0-7d87-8000-000000000006';
 const requesterComponentInstanceId = '019bb22e-58b0-7d87-8000-000000000007';
 const regionRequestId = '019bb22e-58b0-7d87-8000-000000000008';
+const instantiationId = '019bb22e-58b0-7d87-8000-000000000009';
 const digestA = 'a'.repeat(64);
 const digestB = 'b'.repeat(64);
 const digestC = 'c'.repeat(64);
@@ -65,6 +66,7 @@ const regionRequest = {
 const createdResult = {
   protocolVersion: '1.0',
   requestId,
+  instantiationId,
   disposition: 'created',
   digest: digestB,
   regionId: targetRegionId,
