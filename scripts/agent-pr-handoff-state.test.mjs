@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
   determineHandoffState,
+  readReviewThreadState,
   selectRepositoryVerificationRun,
 } from './agent-pr-handoff-state.mjs';
 
@@ -39,6 +41,40 @@ describe('agent pull request handoff state', () => {
       conclusion: 'failure',
       head_sha: 'head-sha',
     });
+  });
+
+  it('paginates every review thread before calculating unresolved state', async () => {
+    const cursors = [];
+    const pages = [
+      {
+        nodes: [{ isResolved: false }, { isResolved: true }],
+        pageInfo: { hasNextPage: true, endCursor: 'next-page' },
+      },
+      {
+        nodes: [{ isResolved: false }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    ];
+    const graphql = async (_query, variables) => {
+      cursors.push(variables.after);
+      return {
+        repository: {
+          pullRequest: {
+            reviewThreads: pages.shift(),
+          },
+        },
+      };
+    };
+
+    await expect(
+      readReviewThreadState({
+        graphql,
+        owner: 'owner',
+        repo: 'repo',
+        pullNumber: 69,
+      }),
+    ).resolves.toEqual({ status: 'available', unresolvedCount: 2 });
+    expect(cursors).toEqual([null, 'next-page']);
   });
 
   it('blocks ready state when review-thread state is unavailable', () => {
@@ -90,5 +126,19 @@ describe('agent pull request handoff state', () => {
         mergeableState: 'clean',
       }),
     ).toMatchObject({ state: 'ready', externalBlocker: null });
+  });
+
+  it('loads state logic only from the trusted default branch', () => {
+    const workflow = readFileSync(
+      new URL('../.github/workflows/agent-pr-handoff.yml', import.meta.url),
+      'utf8',
+    );
+
+    expect(workflow).toContain(
+      'ref: ${{ github.event.repository.default_branch }}',
+    );
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).toContain('scripts/agent-pr-handoff-state.mjs');
+    expect(workflow).not.toContain('github.event.pull_request.head.sha');
   });
 });
