@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { TemplateInstantiationService } from '../src/systems/template-instantiation-service.js';
 
 describe('TemplateInstantiationService routing validation', () => {
+  // Multiple producers require an explicit aggregation contract so scheduling
+  // cannot leave extra ready deliveries behind after consuming one input.
   it('rejects multiple producers for one input without an explicit fan-in rule', async () => {
     const transaction = {};
     const db = {
