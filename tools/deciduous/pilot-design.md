@@ -29,7 +29,7 @@ The pilot must:
 - avoid production dependencies and database migrations;
 - avoid requiring Deciduous or network access in ordinary CI;
 - keep local SQLite state ignored;
-- permit reviewable exported graph patches to be committed;
+- permit reviewable full-graph JSON snapshots to be committed;
 - require only three workflow checkpoints: task start or resume, consequential decision or pivot, and final outcome with commit or PR linkage.
 
 ## Components
@@ -59,7 +59,9 @@ The wrapper validates prerequisites and arguments, invokes the external CLI, and
 
 ### Persistence
 
-`.deciduous/deciduous.db` and other local state remain ignored. `.deciduous/patches/*.json` may be committed when a task has meaningful decision history that must survive ephemeral workspaces.
+`.deciduous/deciduous.db` and other local state remain ignored. `.deciduous/exports/*.json` may be committed when the graph contains meaningful decision history that must survive ephemeral workspaces.
+
+The pinned Deciduous 0.16.0 CLI exposes `graph` but does not expose the `diff export` command still described by some upstream documentation. The repository wrapper therefore captures the supported full graph output, validates it as JSON, and atomically publishes the snapshot. Branch metadata remains embedded in graph nodes.
 
 Phase one does not deploy the Deciduous HTTP daemon. Central persistence may be considered only after the pilot demonstrates value and its security model is separately reviewed.
 
@@ -79,7 +81,8 @@ The wrapper must fail with actionable messages when:
 - the installed version differs from the reviewed version;
 - required arguments are missing;
 - the repository has not been initialized;
-- an export destination is invalid.
+- an export filename is invalid;
+- Deciduous emits an invalid JSON graph snapshot.
 
 `doctor` may report an absent or mismatched executable without modifying repository state. No command may install or upgrade Deciduous automatically.
 
@@ -100,4 +103,4 @@ The exit decision is one of: retain as-is, retain with central persistence, narr
 
 ## Rollback
 
-Remove the wrapper, operating guide, version pin, tests, agent instructions, and pilot graph state. No product migration or runtime cleanup is permitted or required.
+Remove the wrapper, operating guide, version pin, tests, agent instructions, graph snapshots, and local pilot state. No product migration or runtime cleanup is permitted or required.
