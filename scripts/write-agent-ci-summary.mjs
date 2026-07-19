@@ -13,10 +13,17 @@ const manifestPath = readOption('--manifest');
 const outputPath = readOption('--output');
 const job = readOption('--job');
 const artifact = readOption('--artifact');
-const ansiEscapePattern = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
+const ansiEscapePattern = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`,
+  'g',
+);
 const normalizeLine = (line) => line.replace(ansiEscapePattern, '').trim();
-const errorPattern =
-  /(?:^|\b)(?:error|fail|failed|failure|fatal|exception|assertionerror|typeerror|referenceerror|syntaxerror|not ok)(?:\b|:)/i;
+const actionablePatterns = [
+  /^(?:error|fail|failed|failure|fatal|exception|not ok)(?:\b|:)/i,
+  /\b(?:AssertionError|TypeError|ReferenceError|SyntaxError)\b/,
+  /\b(?:Command failed|Code style issues found|ELIFECYCLE)\b/i,
+  /\bERR_[A-Z0-9_]+\b/,
+];
 const noisePattern =
   /(?:0 errors?|0 failures?|no errors?|without errors?|error count:\s*0|failures?\s*[:=]\s*0)/i;
 
@@ -25,25 +32,38 @@ export const findActionableError = (text) => {
     .split(/\r?\n/)
     .map(normalizeLine)
     .filter(Boolean)
-    .find((line) => errorPattern.test(line) && !noisePattern.test(line));
+    .find(
+      (line) =>
+        actionablePatterns.some((pattern) => pattern.test(line)) &&
+        !noisePattern.test(line),
+    );
   return match ? match.slice(0, 500) : null;
 };
 
-export const buildSummary = ({ manifest, environment, jobStatus, artifactName }) => {
+export const buildSummary = ({
+  manifest,
+  environment,
+  jobStatus,
+  artifactName,
+}) => {
   const stages = manifest.stages
     .map((stage) => {
-      const log = stage.logs.find((candidate) => existsSync(resolve(candidate)));
+      const log = stage.logs.find((candidate) =>
+        existsSync(resolve(candidate)),
+      );
       if (!log) return null;
       return {
         name: stage.name,
         command: stage.command,
         log,
-        firstActionableError: findActionableError(readFileSync(resolve(log), 'utf8')),
+        firstActionableError: findActionableError(
+          readFileSync(resolve(log), 'utf8'),
+        ),
       };
     })
     .filter(Boolean);
   const failed = jobStatus !== 'success';
-  const failedStage = failed ? stages.at(-1) ?? null : null;
+  const failedStage = failed ? (stages.at(-1) ?? null) : null;
   const repository = environment.GITHUB_REPOSITORY ?? null;
   const runId = environment.GITHUB_RUN_ID ?? null;
   const serverUrl = environment.GITHUB_SERVER_URL ?? 'https://github.com';
@@ -69,7 +89,10 @@ export const buildSummary = ({ manifest, environment, jobStatus, artifactName })
       result: failed && index === stages.length - 1 ? 'failed' : 'passed',
     })),
     artifacts: artifactName ? [artifactName] : [],
-    runUrl: repository && runId ? `${serverUrl}/${repository}/actions/runs/${runId}` : null,
+    runUrl:
+      repository && runId
+        ? `${serverUrl}/${repository}/actions/runs/${runId}`
+        : null,
   };
 };
 
@@ -80,7 +103,8 @@ const run = () => {
     return;
   }
   const manifest = JSON.parse(readFileSync(resolve(manifestPath), 'utf8'));
-  if (!Array.isArray(manifest.stages)) throw new TypeError('Agent CI manifest must contain a stages array.');
+  if (!Array.isArray(manifest.stages))
+    throw new TypeError('Agent CI manifest must contain a stages array.');
   const summary = buildSummary({
     manifest,
     environment: process.env,
@@ -90,7 +114,11 @@ const run = () => {
   const destination = resolve(outputPath);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, `${JSON.stringify(summary, null, 2)}\n`);
-  process.stdout.write(`## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Verification SHA: \`${summary.verificationSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`);
+  process.stdout.write(
+    `## Agent CI handoff\n\n- Result: **${summary.result}**\n- Head: \`${summary.headSha ?? 'unknown'}\`\n- Verification SHA: \`${summary.verificationSha ?? 'unknown'}\`\n- Job: \`${summary.job}\`\n- Failed stage: ${summary.failedStage ? `\`${summary.failedStage}\`` : 'none'}\n- Reproduce: ${summary.reproductionCommand ? `\`${summary.reproductionCommand}\`` : 'not applicable'}\n- First actionable error: ${summary.firstActionableError ?? 'none'}\n- Artifact: ${summary.artifacts[0] ? `\`${summary.artifacts[0]}\`` : 'none'}\n`,
+  );
 };
-const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isMain =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) run();
