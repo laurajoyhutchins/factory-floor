@@ -3,6 +3,7 @@ name = "factory-floor-contracts"
 version = "0.1.0"
 description = "Generated Python Pydantic contract models for Factory Floor."
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
 dependencies = ["pydantic>=2.13,<3"]
 
