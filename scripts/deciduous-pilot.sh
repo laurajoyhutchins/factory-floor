@@ -18,7 +18,7 @@ Usage:
   bash scripts/deciduous-pilot.sh decision <decision> <reason>
   bash scripts/deciduous-pilot.sh observe <observation>
   bash scripts/deciduous-pilot.sh finish <outcome> [commit]
-  bash scripts/deciduous-pilot.sh export <filename.json> [branch]
+  bash scripts/deciduous-pilot.sh export <filename.json>
 EOF
 }
 
@@ -54,7 +54,7 @@ require_arguments() {
 }
 
 ensure_state_directories() {
-  mkdir -p "$state_dir/documents" "$state_dir/patches"
+  mkdir -p "$state_dir/documents" "$state_dir/exports"
 }
 
 read_current_node() {
@@ -167,16 +167,25 @@ case "$command" in
     check_version
     ensure_state_directories
     filename="$1"
-    branch="${2:-$(git branch --show-current)}"
     if [[ ! "$filename" =~ ^[A-Za-z0-9._-]+\.json$ ]]; then
       printf 'Export filename must be a simple .json filename without path separators.\n' >&2
       exit 2
     fi
-    if [[ -z "$branch" ]]; then
-      printf 'Cannot infer a Git branch for the Deciduous patch export. Supply the branch explicitly.\n' >&2
-      exit 2
+
+    destination="$state_dir/exports/$filename"
+    temporary="$state_dir/exports/.$filename.tmp.$$"
+    if ! deciduous graph > "$temporary"; then
+      rm -f "$temporary"
+      printf 'Deciduous could not export the graph snapshot.\n' >&2
+      exit 1
     fi
-    deciduous diff export --branch "$branch" -o "$state_dir/patches/$filename"
+    if ! node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));' "$temporary"; then
+      rm -f "$temporary"
+      printf 'Deciduous produced an invalid JSON graph snapshot.\n' >&2
+      exit 1
+    fi
+    mv "$temporary" "$destination"
+    printf 'Exported Deciduous graph snapshot to %s\n' "$destination"
     ;;
   *)
     usage
