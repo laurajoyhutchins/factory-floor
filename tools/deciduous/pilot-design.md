@@ -1,6 +1,6 @@
 # Deciduous Pilot Design
 
-**Status:** Approved for implementation
+**Status:** Implemented for review in PR #58
 
 **Tracking issue:** #57
 
@@ -80,7 +80,7 @@ The wrapper must fail with actionable messages when:
 - the executable is absent;
 - the installed version differs from the reviewed version;
 - required arguments are missing;
-- the repository has not been initialized;
+- a decision, observation, or outcome is attempted without an active chain;
 - an export filename is invalid;
 - Deciduous emits an invalid JSON graph snapshot.
 
