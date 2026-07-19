@@ -1,0 +1,84 @@
+name: Diagnose PR 54 fix runner
+
+on:
+  push:
+    branches:
+      - feat/generic-template-instantiation
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose-and-apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/generic-template-instantiation
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Execute embedded patch with diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import textwrap
+          import traceback
+
+          source_workflow = Path('.github/workflows/pr54-review-fixes.yml')
+          diagnostic_workflow = Path('.github/workflows/pr54-diagnose-fixes.yml')
+          raw = source_workflow.read_text()
+          marker = "          python - <<'PY'\n"
+          start = raw.index(marker) + len(marker)
+          end = raw.index("\n          PY\n", start)
+          script = textwrap.dedent(raw[start:end])
+
+          try:
+              exec(compile(script, str(source_workflow), 'exec'), {})
+              subprocess.run(
+                  [
+                      'pnpm',
+                      'exec',
+                      'prettier',
+                      '--write',
+                      'packages/runtime-core/src/systems/template-instantiation-service.ts',
+                      'packages/runtime-core/src/systems/system-application-service.ts',
+                      'packages/runtime-core/test/system-application-service.test.ts',
+                      'packages/runtime-core/test/template-instantiation-service.test.ts',
+                      'packages/runtime-core/src/declarations/errors.ts',
+                  ],
+                  check=True,
+              )
+          except BaseException:
+              Path('PR54_PATCH_ERROR.txt').write_text(traceback.format_exc())
+
+          source_workflow.unlink()
+          diagnostic_workflow.unlink()
+          PY
+
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f PR54_PATCH_ERROR.txt ]; then
+            git add PR54_PATCH_ERROR.txt .github/workflows/pr54-review-fixes.yml .github/workflows/pr54-diagnose-fixes.yml
+            git commit -m "chore: record PR 54 patch diagnostic"
+          else
+            git add .
+            git commit -m "fix(runtime): address template instantiation review"
+          fi
+          git push origin HEAD:feat/generic-template-instantiation
