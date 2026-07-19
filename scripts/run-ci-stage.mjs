@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import console from 'node:console';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -77,7 +78,9 @@ if (separatorIndex === -1) {
     }
 
     if (result.error) {
-      console.error(`Failed to execute CI stage ${stage}: ${result.error.message}`);
+      console.error(
+        `Failed to execute CI stage ${stage}: ${result.error.message}`,
+      );
     }
 
     if (process.exitCode !== 1) {
