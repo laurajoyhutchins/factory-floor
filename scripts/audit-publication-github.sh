@@ -36,6 +36,14 @@ chmod 700 \
   "${artifacts_dir}" \
   "${release_assets_dir}"
 
+{
+  gh --version | head -n 1
+  jq --version
+  python3 --version
+  gitleaks version
+  rg --version | head -n 1
+} >"${safe_dir}/tool-versions.txt" 2>&1
+
 api_capture() {
   local name="$1"
   local endpoint="$2"
@@ -57,6 +65,14 @@ api_capture_pages() {
   fi
   printf '[]\n' >"${settings_dir}/${name}.json"
   return 0
+}
+
+stable_key() {
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode("utf-8")).hexdigest())
+PY
 }
 
 safe_extract_zip() {
@@ -126,8 +142,8 @@ jq -r '.[]? | .[]? | select(.protected == true) | .name' "${settings_dir}/branch
 while IFS= read -r branch; do
   [[ -n "${branch}" ]] || continue
   encoded_branch="$(jq -nr --arg value "${branch}" '$value | @uri')"
-  safe_name="$(printf '%s' "${branch}" | tr -cs 'A-Za-z0-9._-' '_')"
-  api_capture "branch-protection-${safe_name}" "repos/${repo}/branches/${encoded_branch}/protection"
+  key="$(stable_key "${branch}")"
+  api_capture "branch-protection-${key}" "repos/${repo}/branches/${encoded_branch}/protection"
 done <"${raw_dir}/protected-branches.txt"
 
 jq -r '.[]? | .[]? | .id // empty' "${settings_dir}/rulesets.json" \
@@ -142,10 +158,10 @@ jq -r '.[]?.environments[]?.name // empty' "${settings_dir}/environments.json" \
 while IFS= read -r environment_name; do
   [[ -n "${environment_name}" ]] || continue
   encoded_environment="$(jq -nr --arg value "${environment_name}" '$value | @uri')"
-  safe_name="$(printf '%s' "${environment_name}" | tr -cs 'A-Za-z0-9._-' '_')"
-  api_capture "environment-${safe_name}" "repos/${repo}/environments/${encoded_environment}"
-  api_capture_pages "environment-${safe_name}-secrets" "repos/${repo}/environments/${encoded_environment}/secrets?per_page=100"
-  api_capture_pages "environment-${safe_name}-variables" "repos/${repo}/environments/${encoded_environment}/variables?per_page=100"
+  key="$(stable_key "${environment_name}")"
+  api_capture "environment-${key}" "repos/${repo}/environments/${encoded_environment}"
+  api_capture_pages "environment-${key}-secrets" "repos/${repo}/environments/${encoded_environment}/secrets?per_page=100"
+  api_capture_pages "environment-${key}-variables" "repos/${repo}/environments/${encoded_environment}/variables?per_page=100"
 done <"${raw_dir}/environment-names.txt"
 
 # Enumerate every retained workflow run, artifact, and cache visible through the
@@ -168,13 +184,15 @@ else
   printf '[]\n' >"${raw_dir}/caches.json"
 fi
 
+: >"${raw_dir}/archive-validation-errors.txt"
 : >"${raw_dir}/unavailable-workflow-logs.txt"
 while IFS= read -r run_id; do
   [[ -n "${run_id}" ]] || continue
   zip_path="${logs_dir}/${run_id}.zip"
   extract_path="${logs_dir}/${run_id}"
   if gh api "repos/${repo}/actions/runs/${run_id}/logs" >"${zip_path}" 2>/dev/null; then
-    if ! safe_extract_zip "${zip_path}" "${extract_path}"; then
+    if ! safe_extract_zip "${zip_path}" "${extract_path}" \
+      2>>"${raw_dir}/archive-validation-errors.txt"; then
       printf '%s\tunsafe-or-invalid-archive\n' "${run_id}" >>"${raw_dir}/unavailable-workflow-logs.txt"
     fi
   else
@@ -184,37 +202,36 @@ while IFS= read -r run_id; do
 done < <(jq -r '.[].id' "${raw_dir}/workflow-runs.json")
 
 : >"${raw_dir}/unavailable-artifacts.txt"
-while IFS=$'\t' read -r artifact_id artifact_name; do
+while IFS= read -r artifact_id; do
   [[ -n "${artifact_id}" ]] || continue
-  safe_name="$(printf '%s' "${artifact_name}" | tr -cs 'A-Za-z0-9._-' '_')"
-  zip_path="${artifacts_dir}/${artifact_id}-${safe_name}.zip"
-  extract_path="${artifacts_dir}/${artifact_id}-${safe_name}"
+  zip_path="${artifacts_dir}/${artifact_id}.zip"
+  extract_path="${artifacts_dir}/${artifact_id}"
   if gh api "repos/${repo}/actions/artifacts/${artifact_id}/zip" >"${zip_path}" 2>/dev/null; then
-    if ! safe_extract_zip "${zip_path}" "${extract_path}"; then
-      printf '%s\t%s\tunsafe-or-invalid-archive\n' "${artifact_id}" "${artifact_name}" \
+    if ! safe_extract_zip "${zip_path}" "${extract_path}" \
+      2>>"${raw_dir}/archive-validation-errors.txt"; then
+      printf '%s\tunsafe-or-invalid-archive\n' "${artifact_id}" \
         >>"${raw_dir}/unavailable-artifacts.txt"
     fi
   else
     rm -f "${zip_path}"
-    printf '%s\t%s\tunavailable-or-expired\n' "${artifact_id}" "${artifact_name}" \
+    printf '%s\tunavailable-or-expired\n' "${artifact_id}" \
       >>"${raw_dir}/unavailable-artifacts.txt"
   fi
-done < <(jq -r '.[] | [.id, .name] | @tsv' "${raw_dir}/artifacts.json")
+done < <(jq -r '.[].id' "${raw_dir}/artifacts.json")
 
 : >"${raw_dir}/unavailable-release-assets.txt"
-while IFS=$'\t' read -r asset_id asset_name; do
+while IFS= read -r asset_id; do
   [[ -n "${asset_id}" ]] || continue
-  safe_name="$(printf '%s' "${asset_name}" | tr -cs 'A-Za-z0-9._-' '_')"
-  asset_path="${release_assets_dir}/${asset_id}-${safe_name}"
+  asset_path="${release_assets_dir}/${asset_id}.asset"
   if ! gh api \
     -H 'Accept: application/octet-stream' \
     "repos/${repo}/releases/assets/${asset_id}" \
     >"${asset_path}" 2>/dev/null; then
     rm -f "${asset_path}"
-    printf '%s\t%s\tunavailable\n' "${asset_id}" "${asset_name}" \
+    printf '%s\tunavailable\n' "${asset_id}" \
       >>"${raw_dir}/unavailable-release-assets.txt"
   fi
-done < <(jq -r '.[]? | .[]? | .assets[]? | [.id, .name] | @tsv' "${settings_dir}/releases.json")
+done < <(jq -r '.[]? | .[]? | .assets[]? | .id' "${settings_dir}/releases.json")
 
 # Scan downloaded logs, workflow artifacts, and release assets without printing
 # matches. Gitleaks redacts secret values; raw reports still remain protected
@@ -223,19 +240,25 @@ gitleaks dir "${logs_dir}" \
   --redact=100 --no-banner --no-color --log-level=error \
   --max-archive-depth=3 --max-decode-depth=3 \
   --report-format=json --report-path="${raw_dir}/gitleaks-workflow-logs.json" \
-  --exit-code=0
+  --exit-code=0 \
+  >"${raw_dir}/gitleaks-workflow-logs.stdout.txt" \
+  2>"${raw_dir}/gitleaks-workflow-logs.stderr.txt"
 
 gitleaks dir "${artifacts_dir}" \
   --redact=100 --no-banner --no-color --log-level=error \
   --max-archive-depth=5 --max-decode-depth=3 \
   --report-format=json --report-path="${raw_dir}/gitleaks-artifacts.json" \
-  --exit-code=0
+  --exit-code=0 \
+  >"${raw_dir}/gitleaks-artifacts.stdout.txt" \
+  2>"${raw_dir}/gitleaks-artifacts.stderr.txt"
 
 gitleaks dir "${release_assets_dir}" \
   --redact=100 --no-banner --no-color --log-level=error \
   --max-archive-depth=5 --max-decode-depth=3 \
   --report-format=json --report-path="${raw_dir}/gitleaks-release-assets.json" \
-  --exit-code=0
+  --exit-code=0 \
+  >"${raw_dir}/gitleaks-release-assets.stdout.txt" \
+  2>"${raw_dir}/gitleaks-release-assets.stderr.txt"
 
 jq 'map({ruleId: .RuleID, description: .Description, file: .File, startLine: .StartLine, fingerprint: .Fingerprint})' \
   "${raw_dir}/gitleaks-workflow-logs.json" >"${safe_dir}/workflow-log-findings.json"
@@ -312,6 +335,7 @@ cat >"${safe_dir}/manual-review.md" <<'EOF'
 # Manual GitHub publication review
 
 - Review every downloaded workflow log, extracted workflow artifact, and release asset, including nested archives, screenshots, coverage, test reports, databases, environment files, generated documentation, and stack traces.
+- Use the retained API metadata to map numeric evidence directories and files back to workflow artifact and release asset names.
 - Review the protected raw scanner reports and every file listed by the pattern search.
 - Confirm unavailable logs, workflow artifacts, or release assets are expired or deleted rather than inaccessible because of an authorization failure.
 - Classify every Actions cache. Purge caches that may contain source, generated configuration, local paths, or private dependency material.
