@@ -1,7 +1,125 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHash } from 'node:crypto';
+import Ajv2020Module from 'ajv/dist/2020.js';
 import type { Json } from '@factory-floor/db';
 import { canonicalJsonDigest } from '../declarations/canonical-json.js';
 import { DomainError } from '../declarations/errors.js';
+
+const Ajv2020 = (Ajv2020Module as any).default ?? (Ajv2020Module as any);
+const uuidPattern =
+  '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
+
+/**
+ * Runtime copy of the canonical request schema. A focused test requires this
+ * object to remain byte-for-byte equivalent as JSON to the source contract.
+ */
+export const templateInstantiationRequestSchema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://factory-floor.local/contracts/template-instantiation-request.schema.json',
+  title: 'TemplateInstantiationRequest',
+  description:
+    'Versioned authoritative request to instantiate one registered template into an eligible target region.',
+  type: 'object',
+  additionalProperties: false,
+  $defs: {
+    sha256Digest: {
+      type: 'string',
+      pattern: '^[a-f0-9]{64}$',
+    },
+    naturalKey: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 128 },
+        version: { type: 'string', minLength: 1, maxLength: 128 },
+      },
+      required: ['name', 'version'],
+    },
+    systemSource: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: { const: 'system' },
+        name: { type: 'string', minLength: 1, maxLength: 128 },
+        version: { type: 'string', minLength: 1, maxLength: 128 },
+        contentDigest: { $ref: '#/$defs/sha256Digest' },
+      },
+      required: ['kind', 'name', 'version', 'contentDigest'],
+    },
+    regionRequestSource: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: { const: 'regionRequest' },
+        requestId: { type: 'string', format: 'uuid' },
+        parentRegionId: { type: 'string', format: 'uuid' },
+        requesterComponentInstanceId: { type: 'string', format: 'uuid' },
+      },
+      required: [
+        'kind',
+        'requestId',
+        'parentRegionId',
+        'requesterComponentInstanceId',
+      ],
+    },
+    internalSource: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: { const: 'internal' },
+        operation: { type: 'string', minLength: 1, maxLength: 128 },
+      },
+      required: ['kind', 'operation'],
+    },
+    source: {
+      oneOf: [
+        { $ref: '#/$defs/systemSource' },
+        { $ref: '#/$defs/regionRequestSource' },
+        { $ref: '#/$defs/internalSource' },
+      ],
+    },
+  },
+  properties: {
+    protocolVersion: { const: '1.0' },
+    requestId: { type: 'string', format: 'uuid' },
+    targetRegionId: { type: 'string', format: 'uuid' },
+    template: { $ref: '#/$defs/naturalKey' },
+    parameters: {
+      type: 'object',
+      additionalProperties: true,
+      default: {},
+    },
+    componentConfiguration: {
+      type: 'object',
+      additionalProperties: {
+        type: 'object',
+        additionalProperties: true,
+      },
+      default: {},
+    },
+    source: { $ref: '#/$defs/source' },
+  },
+  required: [
+    'protocolVersion',
+    'requestId',
+    'targetRegionId',
+    'template',
+    'source',
+  ],
+} as const;
+
+const ajv = new Ajv2020({
+  strict: true,
+  allErrors: true,
+  formats: { uuid: new RegExp(uuidPattern) },
+});
+ajv.addSchema(templateInstantiationRequestSchema);
+const validateCanonicalRequest = ajv.getSchema(
+  templateInstantiationRequestSchema.$id,
+)!;
+const validateSource = ajv.compile({
+  $ref: `${templateInstantiationRequestSchema.$id}#/$defs/source`,
+});
 
 export type JsonObject = { [key: string]: Json };
 
@@ -23,20 +141,12 @@ export type TemplateInstantiationSource =
       operation: string;
     };
 
-/**
- * Structural twin of the generated `TemplateInstantiationRequest` binding.
- * Runtime validation below is intentionally lossless with the canonical schema,
- * while the generated TypeScript/Python packages remain the public bindings.
- */
+/** Structural twin of the generated TypeScript request binding. */
 export interface CanonicalTemplateInstantiationRequest {
   protocolVersion: '1.0';
   requestId: string;
   targetRegionId: string;
-  template: {
-    name: string;
-    version: string;
-    expectedContentDigest?: string;
-  };
+  template: { name: string; version: string };
   parameters?: JsonObject;
   componentConfiguration?: Record<string, JsonObject>;
   source: TemplateInstantiationSource;
@@ -62,7 +172,6 @@ export interface NormalizedTemplateInstantiationRequest {
   requestId: string;
   targetRegionId: string;
   template: string;
-  expectedTemplateContentDigest?: string;
   parameters: JsonObject;
   componentConfiguration: Record<string, JsonObject>;
   source: TemplateInstantiationSource;
@@ -76,7 +185,7 @@ export interface ResolvedInstantiationReference {
   contentDigest: string;
 }
 
-/** Structural twin of the generated `TemplateInstantiationResult` binding. */
+/** Structural twin of the generated TypeScript result binding. */
 export interface TemplateInstantiationResult {
   protocolVersion: '1.0';
   requestId: string;
@@ -106,20 +215,11 @@ export interface TemplateInstantiationResultInput {
   digest: string;
   region: { id: string };
   revision: { id: string };
-  template: {
-    id: string;
-    name: string;
-    version: string;
-    contentDigest: string;
-  };
+  template: TemplateInstantiationResult['template'];
   parameters: JsonObject;
   source: TemplateInstantiationSource;
   referencedDefinitions: ResolvedInstantiationReference[];
 }
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const digestPattern = /^[a-f0-9]{64}$/;
 
 function invalid(message: string): never {
   throw new DomainError('invalid_declaration', message);
@@ -129,196 +229,51 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function requireObject(value: unknown, label: string): Record<string, unknown> {
+function jsonObject(value: unknown, label: string): JsonObject {
   if (!isObject(value)) invalid(`${label} must be an object`);
-  return value;
+  try {
+    canonicalJsonDigest(value);
+  } catch (error) {
+    invalid(`${label} must contain only JSON values: ${(error as Error).message}`);
+  }
+  return structuredClone(value) as JsonObject;
 }
 
-function requireClosedObject(
+function componentConfiguration(
   value: unknown,
-  label: string,
-  allowedKeys: readonly string[],
-  requiredKeys: readonly string[],
-): Record<string, unknown> {
-  const object = requireObject(value, label);
-  const allowed = new Set(allowedKeys);
-  for (const key of Object.keys(object)) {
-    if (!allowed.has(key)) invalid(`${label}.${key} is not allowed`);
-  }
-  for (const key of requiredKeys) {
-    if (!(key in object)) invalid(`${label}.${key} is required`);
-  }
-  return object;
-}
-
-function requireString(value: unknown, label: string, maxLength = 128): string {
-  if (
-    typeof value !== 'string' ||
-    value.trim().length === 0 ||
-    value.length > maxLength
-  ) {
-    invalid(
-      `${label} must be a non-empty string of at most ${maxLength} characters`,
-    );
-  }
-  return value;
-}
-
-function requireUuid(value: unknown, label: string): string {
-  const text = requireString(value, label, 64);
-  if (!uuidPattern.test(text)) invalid(`${label} must be a UUID`);
-  return text;
-}
-
-function requireDigest(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !digestPattern.test(value)) {
-    invalid(`${label} must be a lowercase SHA-256 digest`);
-  }
-  return value;
-}
-
-function requireJson(value: unknown, label: string): Json {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean'
-  ) {
-    return value;
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) invalid(`${label} must contain finite numbers`);
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((item, index) => requireJson(item, `${label}[${index}]`));
-  }
-  if (isObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        requireJson(item, `${label}.${key}`),
-      ]),
-    );
-  }
-  invalid(`${label} must contain only JSON values`);
-}
-
-function requireJsonObject(value: unknown, label: string): JsonObject {
-  const object = requireObject(value, label);
-  return requireJson(object, label) as JsonObject;
-}
-
-function requireComponentConfiguration(
-  value: unknown,
-  label: string,
 ): Record<string, JsonObject> {
-  const object = requireObject(value, label);
+  const object = jsonObject(value, 'componentConfiguration');
   return Object.fromEntries(
     Object.entries(object).map(([name, configuration]) => [
-      requireString(name, `${label} instance name`),
-      requireJsonObject(configuration, `${label}.${name}`),
+      name,
+      jsonObject(configuration, `componentConfiguration.${name}`),
     ]),
   );
 }
 
-function requireNaturalKey(value: unknown): {
-  name: string;
-  version: string;
-  expectedContentDigest?: string;
-} {
-  const object = requireClosedObject(
-    value,
-    'template',
-    ['name', 'version', 'expectedContentDigest'],
-    ['name', 'version'],
-  );
-  return {
-    name: requireString(object.name, 'template.name'),
-    version: requireString(object.version, 'template.version'),
-    ...(object.expectedContentDigest === undefined
-      ? {}
-      : {
-          expectedContentDigest: requireDigest(
-            object.expectedContentDigest,
-            'template.expectedContentDigest',
-          ),
-        }),
-  };
+function source(value: unknown): TemplateInstantiationSource {
+  if (!validateSource(value)) {
+    invalid(
+      `source does not satisfy the template-instantiation contract: ${JSON.stringify(validateSource.errors ?? [])}`,
+    );
+  }
+  return structuredClone(value) as TemplateInstantiationSource;
 }
 
-function requireSource(value: unknown): TemplateInstantiationSource {
-  const object = requireObject(value, 'source');
-  const kind = requireString(object.kind, 'source.kind');
-  if (kind === 'system') {
-    const source = requireClosedObject(
-      object,
-      'source',
-      ['kind', 'name', 'version', 'contentDigest'],
-      ['kind', 'name', 'version', 'contentDigest'],
-    );
-    return {
-      kind,
-      name: requireString(source.name, 'source.name'),
-      version: requireString(source.version, 'source.version'),
-      contentDigest: requireDigest(source.contentDigest, 'source.contentDigest'),
-    };
+function templateReference(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    invalid('template must be a non-empty name@version reference');
   }
-  if (kind === 'regionRequest') {
-    const source = requireClosedObject(
-      object,
-      'source',
-      [
-        'kind',
-        'requestId',
-        'parentRegionId',
-        'requesterComponentInstanceId',
-      ],
-      [
-        'kind',
-        'requestId',
-        'parentRegionId',
-        'requesterComponentInstanceId',
-      ],
-    );
-    return {
-      kind,
-      requestId: requireUuid(source.requestId, 'source.requestId'),
-      parentRegionId: requireUuid(source.parentRegionId, 'source.parentRegionId'),
-      requesterComponentInstanceId: requireUuid(
-        source.requesterComponentInstanceId,
-        'source.requesterComponentInstanceId',
-      ),
-    };
-  }
-  if (kind === 'internal') {
-    const source = requireClosedObject(
-      object,
-      'source',
-      ['kind', 'operation'],
-      ['kind', 'operation'],
-    );
-    return {
-      kind,
-      operation: requireString(source.operation, 'source.operation'),
-    };
-  }
-  invalid(`source.kind ${kind} is not supported`);
-}
-
-function requireTemplateReference(value: unknown): string {
-  const reference = requireString(value, 'template', 257);
-  const separator = reference.lastIndexOf('@');
-  if (separator < 1 || separator === reference.length - 1) {
+  const separator = value.lastIndexOf('@');
+  if (separator < 1 || separator === value.length - 1) {
     invalid('template must be a name@version reference');
   }
-  requireString(reference.slice(0, separator), 'template name');
-  requireString(reference.slice(separator + 1), 'template version');
-  return reference;
+  return value;
 }
 
 function deterministicUuid(value: unknown): string {
   const bytes = createHash('sha256')
-    .update(typeof value === 'string' ? value : canonicalJsonDigest(value))
+    .update(canonicalJsonDigest(value))
     .digest()
     .subarray(0, 16);
   bytes[6] = (bytes[6]! & 0x0f) | 0x50;
@@ -353,110 +308,72 @@ function isNormalized(
 function normalizeCanonicalRequest(
   value: unknown,
 ): NormalizedTemplateInstantiationRequest {
-  const request = requireClosedObject(
-    value,
-    'request',
-    [
-      'protocolVersion',
-      'requestId',
-      'targetRegionId',
-      'template',
-      'parameters',
-      'componentConfiguration',
-      'source',
-    ],
-    [
-      'protocolVersion',
-      'requestId',
-      'targetRegionId',
-      'template',
-      'source',
-    ],
-  );
-  if (request.protocolVersion !== '1.0') {
-    invalid('request.protocolVersion must be 1.0');
+  if (!validateCanonicalRequest(value)) {
+    invalid(
+      `request does not satisfy the template-instantiation contract: ${JSON.stringify(validateCanonicalRequest.errors ?? [])}`,
+    );
   }
-  const template = requireNaturalKey(request.template);
+  const request = structuredClone(
+    value,
+  ) as CanonicalTemplateInstantiationRequest;
   return branded({
     protocolVersion: '1.0',
-    requestId: requireUuid(request.requestId, 'request.requestId'),
-    targetRegionId: requireUuid(
-      request.targetRegionId,
-      'request.targetRegionId',
-    ),
-    template: `${template.name}@${template.version}`,
-    ...(template.expectedContentDigest === undefined
-      ? {}
-      : { expectedTemplateContentDigest: template.expectedContentDigest }),
-    parameters:
-      request.parameters === undefined
-        ? {}
-        : requireJsonObject(request.parameters, 'request.parameters'),
-    componentConfiguration:
-      request.componentConfiguration === undefined
-        ? {}
-        : requireComponentConfiguration(
-            request.componentConfiguration,
-            'request.componentConfiguration',
-          ),
-    source: requireSource(request.source),
+    requestId: request.requestId,
+    targetRegionId: request.targetRegionId,
+    template: `${request.template.name}@${request.template.version}`,
+    parameters: request.parameters ?? {},
+    componentConfiguration: request.componentConfiguration ?? {},
+    source: request.source,
   });
 }
 
 function normalizeLegacyRequest(
   value: LegacyTemplateInstantiationRequest,
 ): NormalizedTemplateInstantiationRequest {
-  const request = requireClosedObject(
-    value,
-    'request',
-    [
-      'targetRegionId',
-      'template',
-      'parameters',
-      'componentConfiguration',
-      'source',
-    ],
-    ['targetRegionId', 'template'],
-  );
-  const targetRegionId = requireString(
-    request.targetRegionId,
-    'request.targetRegionId',
-    256,
-  );
-  const template = requireTemplateReference(request.template);
-  const parameters =
-    request.parameters === undefined
-      ? {}
-      : requireJsonObject(request.parameters, 'request.parameters');
-  const componentConfiguration =
-    request.componentConfiguration === undefined
-      ? {}
-      : requireComponentConfiguration(
-          request.componentConfiguration,
-          'request.componentConfiguration',
-        );
-  const source =
-    request.source === undefined
+  if (!isObject(value)) invalid('request must be an object');
+  const allowed = new Set([
+    'targetRegionId',
+    'template',
+    'parameters',
+    'componentConfiguration',
+    'source',
+  ]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) invalid(`request.${key} is not allowed`);
+  }
+  if (
+    typeof value.targetRegionId !== 'string' ||
+    value.targetRegionId.trim().length === 0
+  ) {
+    invalid('targetRegionId must be a non-empty string');
+  }
+  const normalizedSource =
+    value.source === undefined
       ? ({
           kind: 'internal',
           operation: 'template-instantiation',
         } as const)
-      : requireSource(request.source);
+      : source(value.source);
+  const parameters = jsonObject(value.parameters ?? {}, 'parameters');
+  const normalizedConfiguration = componentConfiguration(
+    value.componentConfiguration ?? {},
+  );
+  const template = templateReference(value.template);
   const requestId = deterministicUuid({
-    targetRegionId,
+    targetRegionId: value.targetRegionId,
     template,
     parameters,
-    componentConfiguration,
-    source,
+    componentConfiguration: normalizedConfiguration,
+    source: normalizedSource,
   });
   return branded({
     protocolVersion: '1.0',
     requestId,
-    targetRegionId,
+    targetRegionId: value.targetRegionId,
     template,
     parameters,
-    componentConfiguration,
-    source,
+    componentConfiguration: normalizedConfiguration,
+    source: normalizedSource,
   });
 }
 
@@ -477,22 +394,16 @@ export function toTemplateInstantiationResult(
   input: TemplateInstantiationResultInput,
 ): TemplateInstantiationResult {
   const request = normalizeTemplateInstantiationRequest(input.request);
-  const regionId = requireString(input.region.id, 'result.region.id', 256);
-  const topologyRevisionId = requireString(
-    input.revision.id,
-    'result.revision.id',
-    256,
-  );
   if (input.referencedDefinitions.length === 0) {
-    invalid('result.referencedDefinitions must contain at least one reference');
+    invalid('referencedDefinitions must contain at least one reference');
   }
   return {
     protocolVersion: '1.0',
     requestId: request.requestId,
     disposition: input.disposition,
     digest: input.digest,
-    regionId,
-    topologyRevisionId,
+    regionId: input.region.id,
+    topologyRevisionId: input.revision.id,
     template: structuredClone(input.template),
     parameters: structuredClone(input.parameters),
     source: structuredClone(input.source),
