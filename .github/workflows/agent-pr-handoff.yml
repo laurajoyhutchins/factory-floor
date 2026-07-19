@@ -27,10 +27,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Check out trusted handoff logic
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
       - name: Update the sticky agent handoff
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
+            const { pathToFileURL } = require('node:url');
+            const logic = await import(
+              pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/agent-pr-handoff-state.mjs`).href
+            );
             const marker = '<!-- agent-handoff:v1 -->';
             const { owner, repo } = context.repo;
             const pullNumber = context.eventName === 'pull_request_target'
@@ -40,86 +50,96 @@ jobs:
               core.info('The workflow run is not associated with a pull request.');
               return;
             }
-            const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: pullNumber });
-            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
-              owner, repo, head_sha: pull.head.sha, event: 'pull_request', per_page: 100,
+
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullNumber,
             });
-            const latestRun = runs
-              .filter((run) => run.name !== 'Agent PR handoff')
-              .sort((left, right) => new Date(right.created_at) - new Date(left.created_at))[0] ?? null;
-            let unresolvedReviewThreads = 0;
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              {
+                owner,
+                repo,
+                head_sha: pull.head.sha,
+                event: 'pull_request',
+                per_page: 100,
+              },
+            );
+            const latestRun = logic.selectRepositoryVerificationRun(
+              runs,
+              pull.head.sha,
+            );
+
+            let reviewThreads;
             try {
-              const data = await github.graphql(
-                `query($owner: String!, $repo: String!, $number: Int!) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      reviewThreads(first: 100) { nodes { isResolved } }
-                    }
-                  }
-                }`,
-                { owner, repo, number: pullNumber },
-              );
-              unresolvedReviewThreads = data.repository.pullRequest.reviewThreads.nodes
-                .filter((thread) => !thread.isResolved).length;
+              reviewThreads = await logic.readReviewThreadState({
+                graphql: github.graphql,
+                owner,
+                repo,
+                pullNumber,
+              });
             } catch (error) {
-              core.warning(`Could not read review threads: ${error.message}`);
+              core.warning(`Could not read complete review-thread state: ${error.message}`);
+              reviewThreads = {
+                status: 'unavailable',
+                unresolvedCount: null,
+              };
             }
-            let state;
-            let nextAction;
-            if (pull.draft) {
-              state = 'implementing';
-              nextAction = 'Complete implementation, run a fresh self-review, and verify the current head.';
-            } else if (!latestRun || latestRun.status !== 'completed') {
-              state = 'awaiting-ci';
-              nextAction = 'Re-evaluate this handoff when the current-head verification completes.';
-            } else if (latestRun.conclusion !== 'success') {
-              state = 'needs-attention';
-              nextAction = 'Address the first actionable error from the retained CI handoff artifact.';
-            } else if (unresolvedReviewThreads > 0) {
-              state = 'review';
-              nextAction = 'Resolve outstanding review threads, then re-run exact-head verification.';
-            } else {
-              state = 'ready';
-              nextAction = 'Perform the final independent review and merge according to AGENTS.md.';
-            }
+
+            const decision = logic.determineHandoffState({
+              draft: pull.draft,
+              verificationRun: latestRun,
+              reviewThreads,
+              mergeableState: pull.mergeable_state,
+            });
             const handoff = {
               schemaVersion: 1,
               repository: `${owner}/${repo}`,
               pullRequest: pullNumber,
-              state,
+              state: decision.state,
               draft: pull.draft,
               headRef: pull.head.ref,
               headSha: pull.head.sha,
               baseRef: pull.base.ref,
               baseSha: pull.base.sha,
               mergeableState: pull.mergeable_state,
-              unresolvedReviewThreads,
-              latestWorkflow: latestRun ? {
-                name: latestRun.name,
-                runId: latestRun.id,
-                status: latestRun.status,
-                conclusion: latestRun.conclusion,
-                headSha: latestRun.head_sha,
-                url: latestRun.html_url,
-              } : null,
-              externalBlocker: null,
-              nextAction,
+              reviewThreadsStatus: reviewThreads.status,
+              unresolvedReviewThreads: reviewThreads.unresolvedCount,
+              latestWorkflow: latestRun
+                ? {
+                    name: latestRun.name,
+                    runId: latestRun.id,
+                    status: latestRun.status,
+                    conclusion: latestRun.conclusion,
+                    headSha: latestRun.head_sha,
+                    url: latestRun.html_url,
+                  }
+                : null,
+              externalBlocker: decision.externalBlocker,
+              nextAction: decision.nextAction,
               updatedAt: new Date().toISOString(),
             };
             const workflowCell = latestRun
               ? `[${latestRun.name} #${latestRun.run_number}](${latestRun.html_url}) — ${latestRun.status}${latestRun.conclusion ? ` / ${latestRun.conclusion}` : ''}`
-              : 'No current-head run found';
+              : 'No exact-head Repository Verification run found';
+            const reviewThreadCell = reviewThreads.status === 'available'
+              ? String(reviewThreads.unresolvedCount)
+              : 'unknown';
             const body = `${marker}
             ## Agent handoff
 
             | Field | Value |
             | --- | --- |
-            | State | **${state}** |
+            | State | **${decision.state}** |
             | Head | \`${pull.head.ref}\` at \`${pull.head.sha}\` |
             | Base | \`${pull.base.ref}\` at \`${pull.base.sha}\` |
+            | Mergeability | \`${pull.mergeable_state ?? 'unknown'}\` |
             | Latest workflow | ${workflowCell} |
-            | Unresolved review threads | ${unresolvedReviewThreads} |
-            | Next action | ${nextAction} |
+            | Review-thread state | ${reviewThreads.status} |
+            | Unresolved review threads | ${reviewThreadCell} |
+            | External blocker | ${decision.externalBlocker ?? 'none'} |
+            | Next action | ${decision.nextAction} |
 
             <details>
             <summary>Machine-readable state</summary>
@@ -130,12 +150,30 @@ jobs:
             </details>
 
             _This comment is updated in place; it is not an approval or merge decision._`.replace(/^ {12}/gm, '');
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner, repo, issue_number: pullNumber, per_page: 100,
-            });
-            const existing = comments.find((comment) => comment.body?.includes(marker));
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner,
+                repo,
+                issue_number: pullNumber,
+                per_page: 100,
+              },
+            );
+            const existing = comments.find((comment) =>
+              comment.body?.includes(marker),
+            );
             if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
             } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number: pullNumber, body });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pullNumber,
+                body,
+              });
             }
