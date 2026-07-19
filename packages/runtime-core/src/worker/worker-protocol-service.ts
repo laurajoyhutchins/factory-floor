@@ -749,12 +749,7 @@ export class WorkerProtocolService {
           409,
         );
       }
-      await this.activeAttempt(attempt, transaction, true);
-      await this.validateStagedArtifacts(transaction, attempt.attemptId, [
-        ...stagedArtifacts,
-        ...(proposedState ? [proposedState] : []),
-      ]);
-      await transaction
+      const inserted = await transaction
         .insertInto('worker_result_submissions')
         .values({
           id: createUuidV7(),
@@ -763,7 +758,29 @@ export class WorkerProtocolService {
           submission_digest: digest,
           result: input as unknown as Json,
         })
-        .execute();
+        .onConflict((conflict) => conflict.column('attempt_id').doNothing())
+        .returning('submission_digest')
+        .executeTakeFirst();
+      if (!inserted) {
+        const concurrent = await transaction
+          .selectFrom('worker_result_submissions')
+          .select('submission_digest')
+          .where('attempt_id', '=', attempt.attemptId)
+          .executeTakeFirstOrThrow();
+        if (concurrent.submission_digest === digest)
+          return { duplicate: true as const };
+        throw new WorkerProtocolError(
+          'duplicate_conflicting_result',
+          'attempt already has a different proposed result',
+          false,
+          409,
+        );
+      }
+      await this.activeAttempt(attempt, transaction, true);
+      await this.validateStagedArtifacts(transaction, attempt.attemptId, [
+        ...stagedArtifacts,
+        ...(proposedState ? [proposedState] : []),
+      ]);
       return { duplicate: false as const };
     });
     try {
