@@ -30,16 +30,23 @@ export const readReviewThreadState = async ({
 
   do {
     const data = await graphql(
-      `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
-        repository(owner: $owner, name: $repo) {
-          pullRequest(number: $number) {
-            reviewThreads(first: 100, after: $after) {
-              nodes { isResolved }
-              pageInfo { hasNextPage endCursor }
+      `
+        query ($owner: String!, $repo: String!, $number: Int!, $after: String) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $number) {
+              reviewThreads(first: 100, after: $after) {
+                nodes {
+                  isResolved
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
             }
           }
         }
-      }`,
+      `,
       { owner, repo, number: pullNumber, after },
     );
     const page = data.repository?.pullRequest?.reviewThreads;
