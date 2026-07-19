@@ -20,4 +20,11 @@ export {
   type TemplateInstantiationDisposition,
   type TemplateInstantiationTable,
 } from './repositories/template-instantiation-repository.js';
+export {
+  ComponentStateRepository,
+  type ArtifactInlinePayloadTable,
+  type ComponentStateVersionTable,
+  type TemplateInstantiationStateLinkTable,
+  type CreateInitialStateVersionInput,
+} from './repositories/component-state-repository.js';
 export { isUniqueViolation } from './repositories/definition-repository.js';
