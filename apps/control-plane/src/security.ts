@@ -46,6 +46,7 @@ export function registerControlPlaneSecurity(
     const path = request.url.split('?', 1)[0] ?? request.url;
     if (
       path === '/health' ||
+      path.startsWith('/health/') ||
       path.startsWith('/worker/v1/') ||
       isServiceAuthenticatedActivityRoute(path)
     )

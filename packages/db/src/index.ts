@@ -5,6 +5,8 @@ export {
   type Json,
 } from './database.js';
 export {
+  assertMigrationsCurrent,
+  migrationStatus,
   migrateDown,
   migrateToLatest,
   resetDatabaseForDevelopment,

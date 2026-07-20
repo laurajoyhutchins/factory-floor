@@ -18,6 +18,28 @@ function migrator(db: Kysely<Database>) {
     }),
   });
 }
+
+export async function migrationStatus(db: Kysely<Database>) {
+  const migrations = await migrator(db).getMigrations();
+  const pending = migrations
+    .filter((migration) => migration.executedAt === undefined)
+    .map((migration) => migration.name);
+  return {
+    total: migrations.length,
+    applied: migrations.length - pending.length,
+    pending,
+  };
+}
+
+export async function assertMigrationsCurrent(db: Kysely<Database>) {
+  const status = await migrationStatus(db);
+  if (status.pending.length > 0)
+    throw new Error(
+      `database migrations pending: ${status.pending.join(', ')}`,
+    );
+  return status;
+}
+
 export async function migrateToLatest(db: Kysely<Database>) {
   return migrator(db).migrateToLatest();
 }
