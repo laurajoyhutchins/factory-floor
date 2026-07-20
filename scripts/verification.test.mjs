@@ -10,55 +10,65 @@ const read = (relativePath) =>
   readFileSync(new URL(relativePath, root), 'utf8');
 
 describe('repository verification wiring', () => {
-  it('discovers unit tests and preserves the console test project', () => {
-    const projects = rootVitestConfig.test.projects;
-    const rootProject = projects.find(
-      (project) => typeof project === 'object' && project !== null,
-    );
+  it('discovers unit tests and preserves browser test projects', () => {
+  const projects = rootVitestConfig.test.projects;
+  const rootProject = projects.find(
+    (project) => typeof project === 'object' && project !== null,
+  );
 
-    expect(projects).toEqual(
-      expect.arrayContaining(['apps/console/vitest.config.ts']),
-    );
-    expect(rootProject.test.include).toEqual(
-      expect.arrayContaining([
-        'apps/**/*.test.ts',
-        'apps/**/*.test.tsx',
-        'packages/**/*.test.ts',
-        'packages/**/*.test.tsx',
-        'workers/**/*.test.ts',
-        'workers/**/*.test.tsx',
-        'scripts/**/*.test.mjs',
-      ]),
-    );
-    expect(rootProject.test.include).not.toEqual(
-      expect.arrayContaining([
-        'tests/**/*.test.ts',
-        'tests/integration/**/*.test.ts',
-        'tests/acceptance/**/*.test.ts',
-      ]),
-    );
-    expect(rootProject.test.exclude).toEqual(
-      expect.arrayContaining([
-        'tests/**',
-        '**/node_modules/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/coverage/**',
-        '**/generated/**',
-        'apps/console/**',
-      ]),
-    );
-    const consoleVitestConfig = read('apps/console/vitest.config.ts');
-    expect(consoleVitestConfig).toContain("environment: 'jsdom'");
-    expect(consoleVitestConfig).toContain(
-      "setupFiles: ['./src/test/setup.ts']",
-    );
-    expect(
-      existsSync(
-        new URL('../apps/console/src/pages/pages.test.tsx', import.meta.url),
+  expect(projects).toEqual(
+    expect.arrayContaining([
+      'apps/console/vitest.config.ts',
+      'packages/operator-ui-react/vitest.config.ts',
+    ]),
+  );
+  expect(rootProject.test.include).toEqual(
+    expect.arrayContaining([
+      'apps/**/*.test.ts',
+      'apps/**/*.test.tsx',
+      'packages/**/*.test.ts',
+      'packages/**/*.test.tsx',
+      'workers/**/*.test.ts',
+      'workers/**/*.test.tsx',
+      'scripts/**/*.test.mjs',
+    ]),
+  );
+  expect(rootProject.test.include).not.toEqual(
+    expect.arrayContaining([
+      'tests/**/*.test.ts',
+      'tests/integration/**/*.test.ts',
+      'tests/acceptance/**/*.test.ts',
+    ]),
+  );
+  expect(rootProject.test.exclude).toEqual(
+    expect.arrayContaining([
+      'tests/**',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/generated/**',
+      'apps/console/**',
+      'packages/operator-ui-react/**',
+    ]),
+  );
+  const consoleVitestConfig = read('apps/console/vitest.config.ts');
+  const operatorUiVitestConfig = read(
+    'packages/operator-ui-react/vitest.config.ts',
+  );
+  for (const config of [consoleVitestConfig, operatorUiVitestConfig]) {
+    expect(config).toContain("environment: 'jsdom'");
+    expect(config).toContain("setupFiles: ['./src/test/setup.ts']");
+  }
+  expect(
+    existsSync(
+      new URL(
+        '../packages/operator-ui-react/src/pages/pages.test.tsx',
+        import.meta.url,
       ),
-    ).toBe(true);
-  });
+    ),
+  ).toBe(true);
+});
 
   it('maps package verification commands to explicit canonical stages', () => {
     const packageJson = JSON.parse(read('package.json'));
