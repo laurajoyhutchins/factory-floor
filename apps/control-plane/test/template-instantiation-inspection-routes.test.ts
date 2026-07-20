@@ -26,10 +26,9 @@ describe('template-instantiation inspection routes', () => {
       nextCursor: 'next',
     });
     app = Fastify();
-    await registerInspectionRoutes(
-      app,
-      { listTemplateInstantiations } as unknown as ObservabilityService,
-    );
+    await registerInspectionRoutes(app, {
+      listTemplateInstantiations,
+    } as unknown as ObservabilityService);
 
     const response = await app.inject({
       method: 'GET',
@@ -53,13 +52,10 @@ describe('template-instantiation inspection routes', () => {
       .mockRejectedValue(new Error('invalid_scope'));
     const templateInstantiation = vi.fn().mockResolvedValue(null);
     app = Fastify();
-    await registerInspectionRoutes(
-      app,
-      {
-        listTemplateInstantiations,
-        templateInstantiation,
-      } as unknown as ObservabilityService,
-    );
+    await registerInspectionRoutes(app, {
+      listTemplateInstantiations,
+      templateInstantiation,
+    } as unknown as ObservabilityService);
 
     const invalid = await app.inject({
       method: 'GET',
