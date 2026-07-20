@@ -8,11 +8,9 @@ async function sourceFiles(root: string): Promise<string[]> {
     await Promise.all(
       entries.map(async (entry) => {
         const path = join(root, entry.name);
-        return entry.isDirectory()
-          ? sourceFiles(path)
-          : /\.[cm]?[jt]sx?$/.test(entry.name)
-            ? [path]
-            : [];
+        if (entry.isDirectory()) return sourceFiles(path);
+        if (/\.test\.[cm]?[jt]sx?$/.test(entry.name)) return [];
+        return /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
       }),
     )
   ).flat();

@@ -3,12 +3,7 @@ import {
   QueryClientProvider,
   useQuery,
 } from '@tanstack/react-query';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
-import { consoleApi } from './api/client.js';
-import { Shell } from './components/ui.js';
-import { useLiveEvents } from './hooks/liveEvents.js';
+import { consoleApi } from '@factory-floor/operator-client-ts';
 import {
   ArtifactDetail,
   Artifacts,
@@ -17,13 +12,17 @@ import {
   NotFound,
   Operations,
   Overview,
-  Topology,
-} from './pages/pages.js';
-import {
+  Shell,
   TemplateInstantiationDetail,
   TemplateInstantiations,
-} from './pages/template-instantiations.js';
-import './styles.css';
+  Topology,
+  useLiveEvents,
+} from '@factory-floor/operator-ui-react';
+import '@factory-floor/operator-ui-react/styles.css';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
+import './api/client.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -22,6 +22,7 @@ export const rootUnitTestExclude = [
 export const rootNodeUnitTestExclude = [
   ...rootUnitTestExclude,
   'apps/console/**',
+  'packages/operator-ui-react/**',
 ];
 
 export default defineConfig({
@@ -35,6 +36,7 @@ export default defineConfig({
         },
       },
       'apps/console/vitest.config.ts',
+      'packages/operator-ui-react/vitest.config.ts',
     ],
   },
 });

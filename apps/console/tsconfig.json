@@ -10,5 +10,13 @@
     "moduleResolution": "NodeNext",
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
+  "references": [
+    {
+      "path": "../../packages/operator-client-ts"
+    },
+    {
+      "path": "../../packages/operator-ui-react"
+    }
+  ],
   "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
 }

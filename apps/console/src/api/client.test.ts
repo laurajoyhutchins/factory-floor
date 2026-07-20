@@ -1,92 +1,31 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { ApiError, consoleApi, readOnlyInspectionPaths } from './client.js';
-const json = (body: unknown, init?: ResponseInit) =>
+import { describe, expect, it, vi } from 'vitest';
+import { createStandaloneConsoleClient } from './client.js';
+
+const json = (body: unknown) =>
   new Response(JSON.stringify(body), {
     status: 200,
     headers: { 'content-type': 'application/json' },
-    ...init,
   });
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
-describe('console read-only api', () => {
-  it('retrieves pages and preserves opaque cursors', async () => {
-    const fetch = vi.fn(async () =>
-      json({ items: [{ id: 'a' }], nextCursor: 'opaque==' }),
+
+describe('standalone console client bootstrap', () => {
+  it('injects shell-owned credentials and attribution without exposing them to UI modules', async () => {
+    const fetch = vi.fn(async () => json({ status: 'healthy' }));
+    const client = createStandaloneConsoleClient(
+      { token: 'operator-secret' },
+      fetch,
     );
-    vi.stubGlobal('fetch', fetch);
-    await expect(
-      consoleApi.events({ cursor: 'opaque==', limit: 1 }),
-    ).resolves.toEqual({ items: [{ id: 'a' }], nextCursor: 'opaque==' });
-    const firstCall = (
-      fetch.mock.calls as unknown as [string, RequestInit][]
-    )[0]!;
-    expect(firstCall[0]).toContain('cursor=opaque');
-    expect(firstCall[1].method).toBe('GET');
-  });
-  it('classifies invalid cursor/limit http responses', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        json({ error: { code: 'invalid_cursor' } }, { status: 400 }),
-      ),
-    );
-    await expect(consoleApi.regions({ cursor: 'bad' })).rejects.toMatchObject({
-      kind: 'http',
-      status: 400,
-    });
-  });
-  it('classifies 404 execution and artifact responses', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        json({ error: { code: 'execution_not_found' } }, { status: 404 }),
-      ),
-    );
-    await expect(consoleApi.execution('missing')).rejects.toMatchObject({
-      kind: 'not-found',
-    });
-    await expect(consoleApi.artifactLineage('missing')).rejects.toMatchObject({
-      kind: 'not-found',
-    });
-  });
-  it('classifies aborted requests', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new DOMException('stop', 'AbortError');
+
+    await client.operatorStatus();
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/operator/status',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: 'Bearer operator-secret',
+          'x-factory-floor-principal-id': 'standalone-console',
+          'x-factory-floor-adapter': 'standalone-console',
+        }),
       }),
     );
-    await expect(consoleApi.health()).rejects.toMatchObject({
-      kind: 'aborted',
-    });
-  });
-  it('classifies malformed json and non-json errors', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('{bad', { status: 200 })),
-    );
-    await expect(consoleApi.health()).rejects.toBeInstanceOf(ApiError);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('nope', { status: 500 })),
-    );
-    await expect(consoleApi.health()).rejects.toMatchObject({ kind: 'http' });
-  });
-  it('handles empty pages normally and exposes no mutation paths', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => json({ items: [], nextCursor: null })),
-    );
-    await expect(consoleApi.artifacts()).resolves.toEqual({
-      items: [],
-      nextCursor: null,
-    });
-    expect(JSON.stringify(readOnlyInspectionPaths)).not.toContain('rebuild');
-    expect(
-      Object.values(readOnlyInspectionPaths).every(
-        (p) => !p.includes('/worker/') && !p.includes('/registrations'),
-      ),
-    ).toBe(true);
   });
 });
