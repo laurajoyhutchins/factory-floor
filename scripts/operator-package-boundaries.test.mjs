@@ -1,9 +1,4 @@
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -74,9 +69,10 @@ describe('reusable operator package extraction', () => {
     const combined = reusableSources.map(read).join('\n');
 
     for (const banned of bannedReusableImports) {
-      expect(combined, `unexpected reusable-package dependency: ${banned}`).not.toContain(
-        banned,
-      );
+      expect(
+        combined,
+        `unexpected reusable-package dependency: ${banned}`,
+      ).not.toContain(banned);
     }
   });
 
@@ -103,9 +99,10 @@ describe('reusable operator package extraction', () => {
       'apps/console/src/pages/pages.tsx',
       'apps/console/src/pages/template-instantiations.tsx',
     ]) {
-      expect(existsSync(join(root, migrated)), `${migrated} should be migrated`).toBe(
-        false,
-      );
+      expect(
+        existsSync(join(root, migrated)),
+        `${migrated} should be migrated`,
+      ).toBe(false);
     }
   });
 
