@@ -15,7 +15,6 @@
     "test": "vitest run --config vitest.config.ts",
     "test:ci": "mkdir -p .factory-floor/test-results && vitest run --config vitest.config.ts --reporter=default --reporter=junit --outputFile=.factory-floor/test-results/vitest-unit.xml",
     "test:integration": "node scripts/run-with-env.mjs vitest run --config vitest.integration.config.ts && pnpm demo:investigation",
-    "dev:services": "docker compose up -d postgres minio",
     "dev:control-plane": "node scripts/run-with-env.mjs pnpm --filter @factory-floor/control-plane dev",
     "contracts:validate": "node scripts/validate-contracts.mjs",
     "contracts:generate": "node scripts/generate-contracts.mjs",
