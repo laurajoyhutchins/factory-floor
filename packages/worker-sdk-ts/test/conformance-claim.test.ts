@@ -50,6 +50,17 @@ function responseBody(testCase: (typeof corpus.cases)[number]): unknown {
   return {};
 }
 
+function normalizeClaimSelectors(
+  request: (typeof corpus.cases)[number]['request'],
+): string[] {
+  const selectors = request.componentSelectors ?? ['verify@1'];
+  const sdkInput =
+    request.sdkInputAlias === 'capabilities'
+      ? { capabilities: selectors }
+      : { componentSelectors: selectors };
+  return sdkInput.componentSelectors ?? sdkInput.capabilities;
+}
+
 async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   let attempts = 0;
   let wireBody: unknown;
@@ -81,9 +92,7 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   });
 
   try {
-    const result = await client.claim(
-      testCase.request.componentSelectors ?? ['verify@1'],
-    );
+    const result = await client.claim(normalizeClaimSelectors(testCase.request));
     if (testCase.request.body) expect(wireBody).toEqual(testCase.request.body);
     if (testCase.request.expectedWireBody) {
       expect(testCase.request.sdkInputAlias).toBe('capabilities');
