@@ -83,6 +83,7 @@ export class ActivitySessionController {
     this.stopped = true;
     if (this.handle !== undefined) this.cancelCallback(this.handle);
     this.handle = undefined;
+    this.scrubToken();
     this.setState('stopped');
   }
 
@@ -176,8 +177,13 @@ export class ActivitySessionController {
     if (this.connectionState === 'expired') return;
     if (this.handle !== undefined) this.cancelCallback(this.handle);
     this.handle = undefined;
+    this.scrubToken();
     this.setState('expired');
     this.options.onExpired?.();
+  }
+
+  private scrubToken(): void {
+    this.session = { ...this.session, sessionToken: '' };
   }
 
   private setState(state: ActivityConnectionState): void {
