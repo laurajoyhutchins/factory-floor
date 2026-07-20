@@ -1,4 +1,4 @@
-import type { Database, Json } from '@factory-floor/db';
+import type { Database } from '@factory-floor/db';
 import type { Kysely } from 'kysely';
 import {
   OperatorAuthorizationError,
