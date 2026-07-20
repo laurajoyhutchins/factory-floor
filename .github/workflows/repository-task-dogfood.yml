@@ -75,11 +75,16 @@ jobs:
       - name: Bootstrap workspace
         run: bash scripts/bootstrap-workspace.sh
 
+      - name: Build workspace runtime
+        run: pnpm build:production
+
       - name: Start durable services
         run: pnpm verify:services
 
       - name: Run genuine repository-task dogfood
-        run: pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
+        run: |
+          set -o pipefail
+          pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
 
       - name: Upload repository-task proof bundle
         if: always()
@@ -90,6 +95,7 @@ jobs:
             .factory-floor/repository-task-dogfood/
             repository-task-dogfood.log
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 30
 
       - name: Stop durable services
