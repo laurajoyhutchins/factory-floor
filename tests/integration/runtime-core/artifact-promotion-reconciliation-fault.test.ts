@@ -293,9 +293,9 @@ describe('artifact promotion reconciliation fault injection', () => {
     });
     await expect(blobStore.committedExists(digest)).resolves.toBe(true);
     await expect(blobStore.stagedExists(staged.stagedRef)).resolves.toBe(false);
-    await expect(readAll(await blobStore.readCommitted(digest))).resolves.toEqual(
-      body,
-    );
+    await expect(
+      readAll(await blobStore.readCommitted(digest)),
+    ).resolves.toEqual(body);
     await expect(
       db
         .selectFrom('artifacts')
