@@ -164,12 +164,20 @@ describe('shared GitHub pull request state', () => {
   });
 
   it('maps authoritative workflow state to the stable verify status', () => {
-    expect(determineVerificationStatus(null)).toMatchObject({ state: 'pending' });
+    expect(determineVerificationStatus(null)).toMatchObject({
+      state: 'pending',
+    });
     expect(
-      determineVerificationStatus({ status: 'completed', conclusion: 'success' }),
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'success',
+      }),
     ).toMatchObject({ state: 'success' });
     expect(
-      determineVerificationStatus({ status: 'completed', conclusion: 'failure' }),
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'failure',
+      }),
     ).toMatchObject({ state: 'failure' });
   });
 
@@ -183,7 +191,11 @@ describe('shared GitHub pull request state', () => {
       'utf8',
     );
 
-    expect(existsSync(new URL('../.github/workflows/verification-gate.yml', import.meta.url))).toBe(false);
+    expect(
+      existsSync(
+        new URL('../.github/workflows/verification-gate.yml', import.meta.url),
+      ),
+    ).toBe(false);
     expect(clearanceWorkflow).toContain("context: 'verify'");
     expect(clearanceWorkflow).toContain("context: 'review / cleared'");
     expect(clearanceWorkflow).toContain('scripts/github-pr-state.mjs');
