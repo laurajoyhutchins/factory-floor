@@ -354,16 +354,11 @@ export class TemplateInstantiationInspectionService {
     if (!run.correlation_id) return [];
     const rows = await this.db
       .selectFrom('deliveries as delivery')
-      .innerJoin(
-        'executions as execution',
-        'execution.delivery_id',
-        'delivery.id',
-      )
-      .select('execution.topology_revision_id')
+      .select('delivery.topology_revision_id')
       .distinct()
       .where('delivery.region_id', '=', run.region_id)
       .where('delivery.correlation_id', '=', run.correlation_id)
-      .orderBy('execution.topology_revision_id')
+      .orderBy('delivery.topology_revision_id')
       .execute();
     return rows.map((row) => row.topology_revision_id);
   }
