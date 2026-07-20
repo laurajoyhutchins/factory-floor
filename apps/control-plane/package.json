@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc -p tsconfig.json --pretty false",
-    "test": "vitest run --root ../.. apps/control-plane/test/health.test.ts",
+    "test": "vitest run --root ../.. apps/control-plane",
     "artifacts:reconcile": "tsx src/maintenance/artifacts-reconcile.ts --dry-run"
   },
   "dependencies": {
