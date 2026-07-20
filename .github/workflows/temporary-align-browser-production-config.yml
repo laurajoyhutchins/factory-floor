@@ -1,0 +1,48 @@
+name: Temporary browser production config alignment
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  align-config:
+    if: github.head_ref == 'test/operator-browser-smoke'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: test/operator-browser-smoke
+          fetch-depth: 0
+
+      - name: Align production process environment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path('scripts/run-operator-browser-smoke.mjs')
+          text = runner.read_text()
+          old = '        CONTROL_PLANE_PUBLIC_URL: controlPlaneUrl,\n'
+          new = '        FACTORY_FLOOR_CONTROL_PLANE_URL: controlPlaneUrl,\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one legacy public URL assignment, found {text.count(old)}')
+          runner.write_text(text.replace(old, new, 1))
+
+          contract = Path('scripts/operator-browser-smoke-contract.test.mjs')
+          text = contract.read_text()
+          marker = "    expect(runner).toContain('databaseUrl');\n"
+          addition = "    expect(runner).toContain('FACTORY_FLOOR_CONTROL_PLANE_URL');\n"
+          if marker not in text:
+              raise SystemExit('contract marker not found')
+          contract.write_text(text.replace(marker, marker + addition, 1))
+          PY
+
+      - name: Commit production config alignment
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/run-operator-browser-smoke.mjs scripts/operator-browser-smoke-contract.test.mjs
+          git commit -m 'fix: align browser fixture with production config'
+          git push origin HEAD:test/operator-browser-smoke
