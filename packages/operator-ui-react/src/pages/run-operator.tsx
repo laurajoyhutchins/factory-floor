@@ -23,9 +23,9 @@ const record = (value: unknown): InspectionRecord =>
 const records = (value: unknown): InspectionRecord[] =>
   Array.isArray(value) ? value.map(record) : [];
 
-function pageItems<T extends InspectionRecord>(
-  query: { data?: { pages: Array<Page<T>> } },
-): T[] {
+function pageItems<T extends InspectionRecord>(query: {
+  data?: { pages: Array<Page<T>> };
+}): T[] {
   return query.data?.pages.flatMap((page) => page.items) ?? [];
 }
 
@@ -269,7 +269,9 @@ export function RunEventsPanel({ runId }: { runId: string }) {
               Ordered, resumable event pages with deduplication identity.
             </p>
           </div>
-          <StatusBadge value={latest?.complete ? 'caught-up' : 'more-available'} />
+          <StatusBadge
+            value={latest?.complete ? 'caught-up' : 'more-available'}
+          />
         </div>
         <DataTable
           rows={events}
@@ -303,7 +305,11 @@ export function RunArtifactsPanel({ runId }: { runId: string }) {
     enabled: runId.length > 0,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.runArtifacts(runId, { cursor: pageParam, limit: 25 }, signal),
+      operatorClient.runArtifacts(
+        runId,
+        { cursor: pageParam, limit: 25 },
+        signal,
+      ),
     getNextPageParam: (lastPage: Page<InspectionRecord>) =>
       lastPage.nextCursor ?? undefined,
   });
@@ -342,10 +348,7 @@ export function PendingApprovals() {
     queryKey: ['operator-pending-approvals'],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.pendingApprovals(
-        { cursor: pageParam, limit: 25 },
-        signal,
-      ),
+      operatorClient.pendingApprovals({ cursor: pageParam, limit: 25 }, signal),
     getNextPageParam: (lastPage: Page<InspectionRecord>) =>
       lastPage.nextCursor ?? undefined,
   });
