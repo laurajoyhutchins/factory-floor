@@ -29,11 +29,7 @@ const token =
   'local-repository-task-worker-token';
 const port = Number(process.env.FACTORY_FLOOR_REPOSITORY_TASK_PORT ?? 3111);
 const baseUrl = `http://127.0.0.1:${port}`;
-const outputRoot = join(
-  rootPath,
-  '.factory-floor',
-  'repository-task-dogfood',
-);
+const outputRoot = join(rootPath, '.factory-floor', 'repository-task-dogfood');
 const artifactRoot = join(outputRoot, 'artifacts');
 const outputPorts = [
   'authored-plan',
@@ -129,7 +125,9 @@ function git(...args: string[]): string {
   }).trim();
 }
 
-async function repositorySnapshot(): Promise<{ files: Record<string, string> }> {
+async function repositorySnapshot(): Promise<{
+  files: Record<string, string>;
+}> {
   const files = git(
     'ls-files',
     '--',
@@ -284,7 +282,11 @@ async function runState(
     .execute();
   const attempts = await db
     .selectFrom('execution_attempts as attempt')
-    .innerJoin('executions as execution', 'execution.id', 'attempt.execution_id')
+    .innerJoin(
+      'executions as execution',
+      'execution.id',
+      'attempt.execution_id',
+    )
     .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
     .select([
       'attempt.id',
