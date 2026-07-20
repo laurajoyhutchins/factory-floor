@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   FilesystemArtifactBlobStore,
   type ArtifactBlobStore,
-} from '../../../packages/artifact-store/src/index.js';
+} from '../../../packages/artifact-store/src/public.js';
+import { createMinioArtifactStoreFixture } from '../../../packages/artifact-store/test/minio-artifact-store-fixture.js';
 import {
   ArtifactRepository,
   createDatabase,
@@ -29,8 +30,35 @@ const admin = new pg.Pool({
   connectionString: base,
   connectionTimeoutMillis: 10_000,
 });
-const databaseName = `ff_artifact_fault_${randomUUID().replaceAll('-', '')}`;
-const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+
+interface ArtifactStoreFixture {
+  readonly blobStore: ArtifactBlobStore;
+  readonly expectedStagedLocatorPrefix: string;
+  cleanup(): Promise<void>;
+}
+
+interface AdapterScenario {
+  readonly name: string;
+  createStore(): Promise<ArtifactStoreFixture>;
+}
+
+const adapters: AdapterScenario[] = [
+  {
+    name: 'filesystem',
+    async createStore() {
+      const root = await mkdtemp(join(tmpdir(), 'ff-artifact-fault-'));
+      return {
+        blobStore: new FilesystemArtifactBlobStore(root),
+        expectedStagedLocatorPrefix: 'file:staging/',
+        cleanup: () => rm(root, { recursive: true, force: true }),
+      };
+    },
+  },
+  {
+    name: 'minio',
+    createStore: createMinioArtifactStoreFixture,
+  },
+];
 
 function failFirstPromotion(delegate: ArtifactBlobStore): ArtifactBlobStore {
   let shouldFail = true;
@@ -58,20 +86,27 @@ async function readAll(stream: Readable): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-async function seedRuntime(db: ReturnType<typeof createDatabase>) {
+async function seedRuntime(
+  db: ReturnType<typeof createDatabase>,
+  identity: string,
+) {
   const schemaId = createUuidV7();
   const definitionId = createUuidV7();
   const regionId = createUuidV7();
   const topologyId = createUuidV7();
   const instanceId = createUuidV7();
+  const regionName = `artifact-fault-${identity}`;
+  const definitionName = `producer-${identity}`;
 
   await db
     .insertInto('artifact_schemas')
     .values({
       id: schemaId,
-      name: 'fault-payload',
+      name: `fault-payload-${identity}`,
       version: '1',
-      content_digest: 'a'.repeat(64),
+      content_digest: createHash('sha256')
+        .update(`schema:${identity}`)
+        .digest('hex'),
       schema: {
         type: 'object',
         required: ['ok'],
@@ -84,9 +119,11 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     .insertInto('component_definitions')
     .values({
       id: definitionId,
-      name: 'producer',
+      name: definitionName,
       version: '1',
-      content_digest: 'b'.repeat(64),
+      content_digest: createHash('sha256')
+        .update(`definition:${identity}`)
+        .digest('hex'),
       definition: {},
     })
     .execute();
@@ -113,7 +150,7 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     .execute();
   await db
     .insertInto('regions')
-    .values({ id: regionId, name: 'artifact-fault' })
+    .values({ id: regionId, name: regionName })
     .execute();
   await db
     .insertInto('topology_revisions')
@@ -121,11 +158,13 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
       id: topologyId,
       region_id: regionId,
       revision_number: 1,
-      content_digest: 'c'.repeat(64),
+      content_digest: createHash('sha256')
+        .update(`topology:${identity}`)
+        .digest('hex'),
       topology: {
         ingress: {
           commands: {
-            start: { targets: [{ component: 'producer', port: 'in' }] },
+            start: { targets: [{ component: definitionName, port: 'in' }] },
           },
         },
       },
@@ -139,7 +178,7 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
       region_id: regionId,
       topology_revision_id: topologyId,
       component_definition_id: definitionId,
-      name: 'producer',
+      name: definitionName,
       configuration: {},
       lifecycle_status: 'ready',
     })
@@ -153,54 +192,46 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     .where('id', '=', regionId)
     .execute();
 
-  return { schemaId };
+  return {
+    schemaId,
+    regionName,
+    componentSelector: `${definitionName}@1`,
+  };
 }
 
-describe('artifact promotion reconciliation fault injection', () => {
-  const db = createDatabase(testUrl);
-  let artifactRoot = '';
+async function runScenario(scenario: AdapterScenario) {
+  const identity = randomUUID().replaceAll('-', '').slice(0, 12);
+  const databaseName = `ff_artifact_fault_${randomUUID().replaceAll('-', '')}`;
+  const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+  let databaseCreated = false;
+  let db: ReturnType<typeof createDatabase> | undefined;
+  let store: ArtifactStoreFixture | undefined;
 
-  beforeAll(async () => {
-    try {
-      await admin.query(`create database ${databaseName}`);
-      expect((await migrateToLatest(db)).error).toBeUndefined();
-    } catch (error) {
-      throw new Error(
-        `PostgreSQL integration database is required at TEST_DATABASE_URL=${base}. Cause: ${String(error)}`,
-      );
-    }
-    artifactRoot = await mkdtemp(join(tmpdir(), 'ff-artifact-fault-'));
-  });
+  try {
+    await admin.query(`create database ${databaseName}`);
+    databaseCreated = true;
+    db = createDatabase(testUrl);
+    expect((await migrateToLatest(db)).error).toBeUndefined();
+    store = await scenario.createStore();
 
-  afterAll(async () => {
-    await rm(artifactRoot, { recursive: true, force: true });
-    await db.destroy();
-    await admin
-      .query(`drop database if exists ${databaseName}`)
-      .catch(() => undefined);
-    await admin.end();
-  });
-
-  it('converges metadata committed before promotion exactly once', async () => {
-    const { schemaId } = await seedRuntime(db);
+    const runtime = await seedRuntime(db, identity);
     const repository = new ArtifactRepository();
-    const blobStore = new FilesystemArtifactBlobStore(artifactRoot);
-    const worker = new WorkerProtocolService(db, blobStore, {
+    const worker = new WorkerProtocolService(db, store.blobStore, {
       leaseDurationMs: 60_000,
       baseUrl: 'http://127.0.0.1:3000',
     });
 
     await new CommandService(db).submit({
-      region: '/artifact-fault',
+      region: `/${runtime.regionName}`,
       commandType: 'start',
-      source: { kind: 'fault-injection' },
+      source: { kind: `fault-injection-${scenario.name}` },
       payload: { ok: true },
       correlationId: randomUUID(),
       idempotencyKey: randomUUID(),
     });
     const claimed = await worker.claim({
-      workerId: 'artifact-fault-worker',
-      capabilities: ['producer@1'],
+      workerId: `artifact-fault-${scenario.name}-${identity}`,
+      capabilities: [runtime.componentSelector],
     });
     if (!claimed.claimed) throw new Error('expected a claimed attempt');
     const envelope = claimed.envelope;
@@ -236,16 +267,25 @@ describe('artifact promotion reconciliation fault injection', () => {
       throw new Error('worker upload did not create durable artifact staging');
     }
     const stagingRowId = upload.artifact_staging_id;
+    const stagedRow = await db
+      .selectFrom('artifact_staging')
+      .select('locator')
+      .where('id', '=', stagingRowId)
+      .executeTakeFirstOrThrow();
+    expect(stagedRow.locator).toBe(
+      `${store.expectedStagedLocatorPrefix}${staged.stagedRef}`,
+    );
 
     const provenance = {
       kind: 'fault-injection',
+      adapter: scenario.name,
       executionId: envelope.executionId,
       attemptId: envelope.attemptId,
     };
     const publication = await new ArtifactPublicationService({
       db,
       repository,
-      blobStore: failFirstPromotion(blobStore),
+      blobStore: failFirstPromotion(store.blobStore),
       maxJsonBytes: 1_000_000n,
     }).publish({
       stagingRowId,
@@ -257,22 +297,24 @@ describe('artifact promotion reconciliation fault injection', () => {
     );
     expect(publication.artifact).toMatchObject({
       digest,
-      schema_id: schemaId,
+      schema_id: runtime.schemaId,
       provenance,
       state: 'committed',
     });
-    await expect(blobStore.committedExists(digest)).resolves.toBe(false);
-    await expect(blobStore.stagedExists(staged.stagedRef)).resolves.toBe(true);
+    await expect(store.blobStore.committedExists(digest)).resolves.toBe(false);
+    await expect(
+      store.blobStore.stagedExists(staged.stagedRef),
+    ).resolves.toBe(true);
 
     const first = await new ArtifactReconciliationService({
       db,
       repository,
-      blobStore,
+      blobStore: store.blobStore,
     }).runBatch({ limit: 10, dryRun: false });
     const second = await new ArtifactReconciliationService({
       db,
       repository,
-      blobStore,
+      blobStore: store.blobStore,
     }).runBatch({ limit: 10, dryRun: false });
 
     expect(first).toMatchObject({
@@ -288,7 +330,11 @@ describe('artifact promotion reconciliation fault injection', () => {
       unresolved: [],
     });
     await expect(
-      db.selectFrom('artifacts').selectAll().execute(),
+      db
+        .selectFrom('artifacts')
+        .selectAll()
+        .where('digest', '=', digest)
+        .execute(),
     ).resolves.toHaveLength(1);
     await expect(
       db
@@ -300,10 +346,12 @@ describe('artifact promotion reconciliation fault injection', () => {
       status: 'promoted',
       artifact_id: publication.artifact.id,
     });
-    await expect(blobStore.committedExists(digest)).resolves.toBe(true);
-    await expect(blobStore.stagedExists(staged.stagedRef)).resolves.toBe(false);
+    await expect(store.blobStore.committedExists(digest)).resolves.toBe(true);
     await expect(
-      readAll(await blobStore.readCommitted(digest)),
+      store.blobStore.stagedExists(staged.stagedRef),
+    ).resolves.toBe(false);
+    await expect(
+      readAll(await store.blobStore.readCommitted(digest)),
     ).resolves.toEqual(body);
     await expect(
       db
@@ -312,5 +360,49 @@ describe('artifact promotion reconciliation fault injection', () => {
         .where('id', '=', publication.artifact.id)
         .executeTakeFirstOrThrow(),
     ).resolves.toEqual({ provenance });
-  });
+  } finally {
+    await cleanupScenario(store, db, databaseName, databaseCreated);
+  }
+}
+
+async function cleanupScenario(
+  store: ArtifactStoreFixture | undefined,
+  db: ReturnType<typeof createDatabase> | undefined,
+  databaseName: string,
+  databaseCreated: boolean,
+) {
+  const errors: unknown[] = [];
+  try {
+    await store?.cleanup();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await db?.destroy();
+  } catch (error) {
+    errors.push(error);
+  }
+  if (databaseCreated) {
+    try {
+      await admin.query(`drop database if exists ${databaseName}`);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, 'artifact fault scenario cleanup failed');
+  }
+}
+
+afterAll(async () => {
+  await admin.end();
 });
+
+describe.each(adapters)(
+  '$name artifact promotion reconciliation fault injection',
+  (scenario) => {
+    it('converges metadata committed before promotion exactly once', async () => {
+      await runScenario(scenario);
+    });
+  },
+);
