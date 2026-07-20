@@ -294,10 +294,12 @@ describe('operator query service', () => {
       firstEventId,
       secondEventId,
     ]);
-    expect(new Set(observed.map((event) => event.id)).size).toBe(observed.length);
-    expect(observed.every((event) => event.correlation_id === first.runId)).toBe(
-      true,
+    expect(new Set(observed.map((event) => event.id)).size).toBe(
+      observed.length,
     );
+    expect(
+      observed.every((event) => event.correlation_id === first.runId),
+    ).toBe(true);
     expect(secondPage.complete).toBe(true);
     expect(secondPage.nextCursor).toBeNull();
     expect(secondPage.resumeCursor).toEqual(expect.any(String));
