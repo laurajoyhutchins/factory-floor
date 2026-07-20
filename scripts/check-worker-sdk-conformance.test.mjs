@@ -54,9 +54,7 @@ test('rejects missing cases, fixtures, and canonical alias drift', () => {
       error.includes('missing required case: result.duplicate-conflict'),
     ),
   );
-  assert.ok(
-    result.errors.some((error) => error.includes('missing fixture')),
-  );
+  assert.ok(result.errors.some((error) => error.includes('missing fixture')));
   assert.ok(
     result.errors.some((error) =>
       error.includes('must not reach the canonical wire body'),
