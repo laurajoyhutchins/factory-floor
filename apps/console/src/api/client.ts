@@ -149,9 +149,8 @@ async function getPage(
   options?: PageOptions,
   signal?: AbortSignal,
 ): Promise<Page<InspectionRecord>> {
-  return assertPage(
-    await getJson(pageUrl(path, options).pathname + pageUrl(path, options).search, signal),
-  );
+  const url = pageUrl(path, options);
+  return assertPage(await getJson(url.pathname + url.search, signal));
 }
 
 export const consoleApi = {
