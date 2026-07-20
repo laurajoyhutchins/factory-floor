@@ -150,7 +150,8 @@ describe('Discord Activity shell', () => {
       ),
     );
     expect(await screen.findByText('Session expired')).toBeVisible();
-    const terminalClientConfig = mocks.createOperatorClient.mock.calls.at(-1)?.[0];
+    const terminalClientConfig =
+      mocks.createOperatorClient.mock.calls.at(-1)?.[0];
     expect(terminalClientConfig).toMatchObject({
       baseUrl: 'https://factory-floor.example',
       principalId: 'activity-session-ended',
