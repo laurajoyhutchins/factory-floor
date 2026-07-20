@@ -280,12 +280,13 @@ export function createRepositoryTaskComponent(
       : invalidInput(
           'The task input must include authoredPlanMarkdown, repositoryProfile, and a string-valued repositorySnapshot.files map.',
         );
-    const compileFailed =
+    if (
+      !task ||
       compiled.diagnostics.length > 0 ||
       !compiled.authoredPlan ||
       !compiled.normalizedPlan ||
-      !compiled.generationGraph;
-    if (compileFailed) {
+      !compiled.generationGraph
+    ) {
       const disposition = {
         status: 'failed',
         phase: 'compile',
@@ -381,7 +382,7 @@ export function factoryFloorVerificationProfiles(): RepositoryTaskVerificationPr
         {
           id: 'unit',
           executable: 'pnpm',
-          args: ['test:unit'],
+          args: ['verify:unit'],
           timeoutMs: 180_000,
         },
       ],
