@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { isAbsolute, resolve } from 'node:path';
 import process from 'node:process';
 
 try {
@@ -21,12 +22,24 @@ const inheritedNodeOptions = process.env.NODE_OPTIONS ?? '';
 const nodeOptions = inheritedNodeOptions.includes(authPreload)
   ? inheritedNodeOptions
   : [inheritedNodeOptions, `--import=${authPreload}`].filter(Boolean).join(' ');
+const artifactStoreRoot = process.env.ARTIFACT_STORE_ROOT?.trim();
+const childEnv = {
+  ...process.env,
+  NODE_OPTIONS: nodeOptions,
+  ...(artifactStoreRoot
+    ? {
+        ARTIFACT_STORE_ROOT: isAbsolute(artifactStoreRoot)
+          ? artifactStoreRoot
+          : resolve(artifactStoreRoot),
+      }
+    : {}),
+};
 const useProcessGroup = process.platform !== 'win32';
 const child = spawn(command, args, {
   stdio: 'inherit',
   shell: false,
   detached: useProcessGroup,
-  env: { ...process.env, NODE_OPTIONS: nodeOptions },
+  env: childEnv,
 });
 let forceTimer;
 

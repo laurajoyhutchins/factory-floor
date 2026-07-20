@@ -1,22 +1,13 @@
-import { buildApp } from './app.js';
-import { workerAuthorizationFromEnv } from './routes/worker.js';
-import { controlPlaneSecurityFromEnv } from './security.js';
-import { serviceAuthFromEnv } from './service-auth.js';
-
-const serviceAuthKeys = serviceAuthFromEnv(process.env);
-
-const app = await buildApp({
-  runStartupRecovery: true,
-  controlPlaneSecurity: controlPlaneSecurityFromEnv(process.env),
-  workerAuthorization: workerAuthorizationFromEnv(process.env),
-  ...(serviceAuthKeys ? { serviceAuthKeys } : {}),
-});
-const port = Number(process.env.PORT ?? '3000');
-const host = process.env.HOST ?? '127.0.0.1';
+import { startProductionControlPlane } from './production-process.js';
 
 try {
-  await app.listen({ port, host });
+  await startProductionControlPlane({
+    onShutdownError: (error) => {
+      console.error(error);
+      process.exitCode = 1;
+    },
+  });
 } catch (error) {
-  app.log.error(error);
-  process.exit(1);
+  console.error(error);
+  process.exitCode = 1;
 }
