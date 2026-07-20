@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   fix:
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'fix(operator-ui): preserve injected stream origin')
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'preserve injected stream origin')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
