@@ -27,6 +27,8 @@ All contracts use JSON Schema Draft 2020-12 and participate in the existing Type
 
 An authored plan names exactly one repository by `owner` and `name` and pins `baseRevision` to a full lowercase 40-character Git commit SHA. Branch names, tags, URLs, and abbreviated revisions are intentionally excluded because they are mutable or ambiguous.
 
+Normalization lowercases `owner` and `name`, so case variants of the same GitHub repository produce one canonical identity and digest. The immutable revision remains unchanged.
+
 ## Recipe boundary
 
 Version 1 supports `typescript-module@1`. Its input object is closed and requires:
@@ -62,7 +64,7 @@ Normalization rejects:
 
 - absolute paths;
 - Windows drive paths or backslashes;
-- `..` traversal segments;
+- empty, `.`, or `..` path segments, including doubled separators, `./` prefixes, and trailing slashes;
 - `.git` path segments;
 - NUL bytes;
 - intermediate or ambiguous glob syntax such as `packages/*/src/**`;
@@ -80,12 +82,13 @@ A safe path and accepted resource request are still only intent. Repository poli
 1. Validate the authored object as a closed schema.
 2. Emit stable sorted diagnostics for schema and semantic failures.
 3. Collapse repeated whitespace in the objective and completion criteria.
-4. Trim, deduplicate, and code-unit sort allowed paths, requested capabilities, and completion criteria.
-5. Canonically order recipe-input object keys.
-6. Normalize and code-unit sort declared outputs by name, kind, and path.
-7. Construct normalized state without `planDigest`.
-8. Recursively code-unit sort object keys, serialize compact JSON, and compute lowercase SHA-256.
-9. Attach the digest and validate the complete normalized-plan schema.
+4. Lowercase repository owner and name.
+5. Trim, deduplicate, and code-unit sort allowed paths, requested capabilities, and completion criteria.
+6. Canonically order recipe-input object keys.
+7. Normalize and code-unit sort declared outputs by name, kind, and path.
+8. Construct normalized state without `planDigest`.
+9. Recursively code-unit sort object keys, serialize compact JSON, and compute lowercase SHA-256.
+10. Attach the digest and validate the complete normalized-plan schema.
 
 Array ordering is normalized only where the contract declares order semantically irrelevant. The current recipe has scalar inputs only; future recipe schemas must explicitly define any order-sensitive arrays.
 
@@ -95,7 +98,7 @@ The canonical minimal fixtures are:
 - `contracts/fixtures/repository-task/equivalent-authored-plan.valid.json`
 - `contracts/fixtures/repository-task/minimal-normalized-plan.valid.json`
 
-The two authored fixtures normalize byte-for-byte to the same normalized fixture and digest.
+The two authored fixtures normalize byte-for-byte to the same normalized fixture and digest, including when owner and repository name use different casing.
 
 ## Stable diagnostics
 
@@ -104,8 +107,8 @@ The initial diagnostic codes are:
 | Code | Meaning |
 | --- | --- |
 | `schema.unknown-field` | A closed contract received an undeclared field, including arbitrary verification commands, recipe commands, or credential-shaped additions. |
-| `schema.invalid` | An authored value failed structural validation. |
-| `path.unsafe` | An allowed or output path is not a safe repository-relative path, or an output path contains a glob. |
+| `schema.invalid` | An authored value failed structural validation, including an unsupported schema version or an oversized absolute budget. |
+| `path.unsafe` | An allowed or output path is not a concrete, unambiguous repository-relative path, or an output path contains a glob. |
 | `path.unsupported-pattern` | An allowed path uses glob syntax other than a single terminal recursive `/**`. |
 | `output.outside-allowed-paths` | A declared output path is not covered by the authored allowed path set. |
 | `output.duplicate-name` | Two declared outputs use the same stable name. |
