@@ -64,3 +64,4 @@ export {
   runScopedCursorSemantics,
 } from './operator/run-scoped-operator-query-service.js';
 export { OperatorQueryService } from './inspection/template-instantiation-operator-query-service.js';
+export * from './repository-task-planner-component.js';

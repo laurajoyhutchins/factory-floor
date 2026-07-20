@@ -5,7 +5,37 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, constr
+
+
+class RecipeScalar(RootModel[str | float | bool | None]):
+    root: str | float | bool | None
+
+
+class RecipeLeaf(RootModel[RecipeScalar | list[RecipeScalar | None] | None]):
+    root: RecipeScalar | list[RecipeScalar | None] | None
+
+
+class RecipeValue(RootModel[RecipeLeaf | dict[str, RecipeLeaf]]):
+    root: RecipeLeaf | dict[str, RecipeLeaf]
+
+
+class Export(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: constr(pattern=r'^[A-Za-z_$][A-Za-z0-9_$]*$')
+    typeName: constr(pattern=r'^[A-Za-z_$][A-Za-z0-9_$]*$')
+    value: RecipeValue
+
+
+class TestCase(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: constr(min_length=1, max_length=256)
+    exportName: constr(pattern=r'^[A-Za-z_$][A-Za-z0-9_$]*$')
+    expected: RecipeValue
 
 
 class Inputs(BaseModel):
@@ -14,6 +44,9 @@ class Inputs(BaseModel):
     )
     package: constr(pattern=r'^@[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$')
     moduleName: constr(pattern=r'^[a-z][a-z0-9-]{0,63}$')
+    responsibility: constr(min_length=1, max_length=512) | None = None
+    exports: list[Export] | None = Field(None, max_length=32, min_length=1)
+    testCases: list[TestCase] | None = Field(None, max_length=64, min_length=1)
 
 
 class RepositoryTaskRecipeInvocation(BaseModel):

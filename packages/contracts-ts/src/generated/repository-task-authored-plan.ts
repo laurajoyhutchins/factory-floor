@@ -50,6 +50,87 @@ export interface RepositoryTaskRecipeInvocation {
   inputs: {
     package: string;
     moduleName: string;
+    responsibility?: string;
+    /**
+     * @minItems 1
+     * @maxItems 32
+     */
+    exports?: [
+      {
+        name: string;
+        typeName: string;
+        /**
+         * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+         * via the `definition` "recipeValue".
+         */
+        value:
+          | ((string | number | boolean | null) | (string | number | boolean | null)[])
+          | {
+              /**
+               * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+               * via the `definition` "recipeLeaf".
+               */
+              [k: string]: (string | number | boolean | null) | (string | number | boolean | null)[];
+            };
+      },
+      ...{
+        name: string;
+        typeName: string;
+        /**
+         * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+         * via the `definition` "recipeValue".
+         */
+        value:
+          | ((string | number | boolean | null) | (string | number | boolean | null)[])
+          | {
+              /**
+               * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+               * via the `definition` "recipeLeaf".
+               */
+              [k: string]: (string | number | boolean | null) | (string | number | boolean | null)[];
+            };
+      }[]
+    ];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    testCases?: [
+      {
+        name: string;
+        exportName: string;
+        /**
+         * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+         * via the `definition` "recipeValue".
+         */
+        expected:
+          | ((string | number | boolean | null) | (string | number | boolean | null)[])
+          | {
+              /**
+               * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+               * via the `definition` "recipeLeaf".
+               */
+              [k: string]: (string | number | boolean | null) | (string | number | boolean | null)[];
+            };
+      },
+      ...{
+        name: string;
+        exportName: string;
+        /**
+         * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+         * via the `definition` "recipeValue".
+         */
+        expected:
+          | ((string | number | boolean | null) | (string | number | boolean | null)[])
+          | {
+              /**
+               * This interface was referenced by `RepositoryTaskRecipeInvocation`'s JSON-Schema
+               * via the `definition` "recipeLeaf".
+               */
+              [k: string]: (string | number | boolean | null) | (string | number | boolean | null)[];
+            };
+      }[]
+    ];
   };
 }
 /**
