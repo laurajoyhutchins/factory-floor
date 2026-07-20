@@ -19,6 +19,7 @@ const corpus = JSON.parse(
     operation: string;
     request: {
       body?: Record<string, unknown>;
+      bodyMutations?: Partial<InvocationEnvelope>;
       fixture?: string;
       uploadBytesUtf8?: string;
     };
@@ -52,21 +53,25 @@ function responseBody(testCase: (typeof corpus.cases)[number]): unknown {
 }
 
 function errorClassification(error: WorkerSdkError): string {
-  if (
-    error.code === 'stale_lease_token' ||
-    error.code === 'stale_lifecycle_epoch'
-  )
-    return 'lease_error';
-  if (error.code === 'capability_denied') return 'capability_denied';
-  if (error.code === 'duplicate_conflicting_result') return 'conflict';
-  return error.kind;
+  return (
+    {
+      lease: 'lease_error',
+      capability_denied: 'capability_denied',
+      conflict: 'conflict',
+    }[error.kind] ?? error.kind
+  );
 }
 
 async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
-  const envelope = fixture<InvocationEnvelope>(
+  const sourceEnvelope = fixture<InvocationEnvelope>(
     'contracts/fixtures/worker/invocation-envelope.valid.json',
   );
+  const envelope = {
+    ...sourceEnvelope,
+    ...testCase.request.bodyMutations,
+  } as InvocationEnvelope;
   const uploaded: number[] = [];
+  let wireBody: Record<string, unknown> | undefined;
   const client = new WorkerProtocolClient({
     baseUrl: 'http://conformance.local',
     bearerToken: 'conformance-token',
@@ -91,6 +96,9 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
+      wireBody = init?.body
+        ? (JSON.parse(String(init.body)) as Record<string, unknown>)
+        : undefined;
       return new Response(JSON.stringify(responseBody(testCase)), {
         status: testCase.response.status ?? 200,
         headers: { 'content-type': 'application/json' },
@@ -140,6 +148,8 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
     throw new Error(`case ${testCase.id} unexpectedly succeeded`);
   } catch (error) {
     if (!(error instanceof WorkerSdkError)) throw error;
+    if (testCase.id === 'cancellation.stale-epoch')
+      expect(wireBody?.lifecycleEpoch).toBe(0);
     return {
       classification: errorClassification(error),
       retryable: error.retryable,
