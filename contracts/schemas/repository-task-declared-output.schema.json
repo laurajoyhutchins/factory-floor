@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/repository-task-declared-output.schema.json",
+  "title": "RepositoryTaskDeclaredOutput",
+  "description": "One immutable output promised by a normalized repository-task plan. Outputs describe required evidence or proposed repository content; they do not grant write authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "kind": {
+      "enum": ["file", "test", "export", "evidence"]
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "mediaType": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+    },
+    "required": {
+      "type": "boolean"
+    }
+  },
+  "required": ["name", "kind", "path", "mediaType", "required"]
+}

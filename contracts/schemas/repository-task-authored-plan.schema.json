@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/repository-task-authored-plan.schema.json",
+  "title": "RepositoryTaskAuthoredPlan",
+  "description": "Closed human-authored intent for one bounded repository task. This document selects a recipe and requests capabilities but grants no execution or external-write authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,100}$"
+        },
+        "baseRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      },
+      "required": ["owner", "name", "baseRevision"]
+    },
+    "resourceBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxFiles": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "maxPatchBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760
+        },
+        "maxVerificationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
+      },
+      "required": ["maxFiles", "maxPatchBytes", "maxVerificationSeconds"]
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "allowedPaths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "recipe": {
+      "$ref": "repository-task-recipe-invocation.schema.json"
+    },
+    "outputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "repository-task-declared-output.schema.json"
+          }
+        }
+      },
+      "required": ["outputs"]
+    },
+    "verificationProfile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "resourceBounds": {
+      "$ref": "#/$defs/resourceBounds"
+    },
+    "requestedCapabilities": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*)+$"
+      }
+    },
+    "completionCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "objective",
+    "repository",
+    "allowedPaths",
+    "recipe",
+    "outputContract",
+    "verificationProfile",
+    "resourceBounds",
+    "requestedCapabilities",
+    "completionCriteria"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/repository-task-diagnostic.schema.json",
+  "title": "RepositoryTaskDiagnostic",
+  "description": "A stable machine-readable diagnostic emitted while validating or normalizing repository-task intent.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "severity": {
+      "enum": ["error", "warning"]
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^(/([^/~]|~0|~1)*)*$"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  },
+  "required": ["code", "severity", "path", "message"]
+}

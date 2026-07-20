@@ -10,6 +10,11 @@ from .failure_descriptor_schema import *  # noqa: F401,F403
 from .invocation_envelope_schema import *  # noqa: F401,F403
 from .proposed_event_schema import *  # noqa: F401,F403
 from .proposed_result_schema import *  # noqa: F401,F403
+from .repository_task_authored_plan_schema import *  # noqa: F401,F403
+from .repository_task_declared_output_schema import *  # noqa: F401,F403
+from .repository_task_diagnostic_schema import *  # noqa: F401,F403
+from .repository_task_normalized_plan_schema import *  # noqa: F401,F403
+from .repository_task_recipe_invocation_schema import *  # noqa: F401,F403
 from .resource_usage_schema import *  # noqa: F401,F403
 from .source_identity_schema import *  # noqa: F401,F403
 from .staged_artifact_schema import *  # noqa: F401,F403
