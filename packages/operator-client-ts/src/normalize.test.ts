@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalize } from './adapters.js';
+import { normalize } from './index.js';
 
 describe('inspection response normalization', () => {
   it('normalizes transport fields without rewriting opaque runtime JSON', () => {

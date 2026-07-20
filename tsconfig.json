@@ -20,6 +20,12 @@
       "path": "packages/db"
     },
     {
+      "path": "packages/operator-client-ts"
+    },
+    {
+      "path": "packages/operator-ui-react"
+    },
+    {
       "path": "packages/runtime-core"
     },
     {

@@ -91,7 +91,7 @@ export function useLiveEvents(max = 50) {
         const url = new URL(consoleApi.streamPath, window.location.origin);
         url.searchParams.set('limit', '25');
         if (cursor.current) url.searchParams.set('cursor', cursor.current);
-        const response = await fetch(url.pathname + url.search, {
+        const response = await fetch(url.toString(), {
           method: 'GET',
           signal: controller.signal,
           headers: inspectionHeaders('text/event-stream'),
