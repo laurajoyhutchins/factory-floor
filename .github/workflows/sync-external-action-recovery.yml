@@ -1,0 +1,33 @@
+name: Sync external action recovery
+
+on:
+  push:
+    branches:
+      - agent/external-action-recovery
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-external-action-recovery
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: agent/external-action-recovery
+          fetch-depth: 0
+
+      - name: Merge current main
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git fetch origin main
+          git merge --no-edit origin/main
+          git push origin HEAD:agent/external-action-recovery
