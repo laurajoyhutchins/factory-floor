@@ -1,0 +1,42 @@
+name: Fix repository-task runner branch
+
+on:
+  push:
+    branches:
+      - feat/repository-task-worker
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-repository-task-runner
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/repository-task-worker
+      - name: Await committed blob before decoding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('examples/repository-task/run-dogfood.ts')
+          text = path.read_text()
+          old = 'JSON.parse(await streamText(blobStore.readCommitted(output.digest)))'
+          new = 'JSON.parse(\n          await streamText(await blobStore.readCommitted(output.digest)),\n        )'
+          if old not in text:
+              raise SystemExit('expected artifact reader expression not found')
+          path.write_text(text.replace(old, new))
+          PY
+          pnpm exec prettier --write examples/repository-task/run-dogfood.ts
+      - name: Commit runner fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add examples/repository-task/run-dogfood.ts
+          git commit -m "fix(repository-task): await committed artifact streams"
+          git push origin HEAD:feat/repository-task-worker
