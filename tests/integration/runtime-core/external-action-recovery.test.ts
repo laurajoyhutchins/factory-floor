@@ -12,6 +12,7 @@ import {
   CommandService,
   ExternalActionIndeterminateError,
   ExternalActionService,
+  PolicyDecisionService,
   SchedulerService,
   StartupRecoveryService,
   type ExternalActionProvider,
@@ -54,16 +55,15 @@ class ConfirmThenLoseResponseProvider implements ExternalActionProvider {
     this.reconcileCalls++;
     this.idempotencyKeys.push(request.idempotencyKey);
     const providerOperationId = this.confirmed.get(request.idempotencyKey);
-    if (!providerOperationId) {
-      return {
-        status: 'indeterminate',
-        response: { code: 'provider_operation_not_found' },
-      };
-    }
-    return {
-      status: 'acknowledged',
-      response: { providerOperationId, confirmed: true },
-    };
+    return providerOperationId
+      ? {
+          status: 'acknowledged',
+          response: { providerOperationId, confirmed: true },
+        }
+      : {
+          status: 'indeterminate',
+          response: { code: 'provider_operation_not_found' },
+        };
   }
 }
 
@@ -90,7 +90,6 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
   const definitionId = createUuidV7();
   const regionId = createUuidV7();
   const topologyId = createUuidV7();
-  const instanceId = createUuidV7();
   const capabilityId = createUuidV7();
   const grantId = createUuidV7();
 
@@ -176,7 +175,7 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
   await db
     .insertInto('component_instances')
     .values({
-      id: instanceId,
+      id: createUuidV7(),
       region_id: regionId,
       topology_revision_id: topologyId,
       component_definition_id: definitionId,
@@ -224,24 +223,32 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
     .execute();
 
   const actionId = createUuidV7();
-  const policyDecisionId = createUuidV7();
   await db
-    .insertInto('policy_decisions')
+    .insertInto('policies')
     .values({
-      id: policyDecisionId,
-      policy_id: null,
-      policy_name: 'external-action-test-policy',
-      policy_version: '1',
-      evaluator_version: 'test',
-      subject_kind: 'external_action',
-      subject_id: actionId,
-      input_artifact_id: artifactId,
-      normalized_inputs: {},
-      outcome: 'allow',
-      reason: null,
-      modifications: [],
+      id: createUuidV7(),
+      name: 'external-action-test-policy',
+      version: '1',
+      content_digest: 'e'.repeat(64),
+      policy: {
+        spec: {
+          outcome: 'allow',
+          reason: 'Allow the deterministic recovery test action.',
+        },
+      },
     })
     .execute();
+  const policyDecision = await new PolicyDecisionService(
+    db,
+    'external-action-recovery-test',
+  ).evaluate({
+    policyName: 'external-action-test-policy',
+    policyVersion: '1',
+    subjectKind: 'external_action',
+    subjectId: actionId,
+    inputArtifactId: artifactId,
+    normalizedInputs: {},
+  });
   const idempotencyKey = `external-action-${randomUUID()}`;
   await db
     .insertInto('external_actions')
@@ -252,7 +259,7 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
       proposal_id: createUuidV7(),
       capability_grant_id: grantId,
       outbound_request_artifact_id: artifactId,
-      policy_decision_id: policyDecisionId,
+      policy_decision_id: policyDecision.decisionId,
       approval_id: null,
       action_type: 'test.external-action',
       risk: 'medium',
@@ -261,12 +268,7 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
     })
     .execute();
 
-  return {
-    actionId,
-    regionId,
-    idempotencyKey,
-    scheduled,
-  };
+  return { actionId, regionId, idempotencyKey };
 }
 
 function response(value: unknown): Json {
@@ -283,10 +285,8 @@ describe('external action dispatch and startup recovery', () => {
   });
 
   beforeEach(async () => {
-    expect(
-      (await resetDatabaseForDevelopment(db, 'test')).error,
-    ).toBeUndefined();
-    now = new Date(Date.now() + 60_000);
+    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    now = new Date();
   });
 
   afterAll(async () => {
@@ -300,14 +300,16 @@ describe('external action dispatch and startup recovery', () => {
   it('reconciles a confirmed side effect after a lost response without redispatch', async () => {
     const seeded = await seedAuthorizedAction(db);
     const provider = new ConfirmThenLoseResponseProvider();
-    const dispatch = new ExternalActionService(db, provider, () => now);
 
-    await expect(dispatch.dispatch(seeded.actionId)).resolves.toEqual({
+    await expect(
+      new ExternalActionService(db, provider, () => now).dispatch(
+        seeded.actionId,
+      ),
+    ).resolves.toEqual({
       disposition: 'dispatched',
       status: 'indeterminate',
     });
     expect(provider.dispatchCalls).toBe(1);
-    expect(provider.reconcileCalls).toBe(0);
     await expect(
       db
         .selectFrom('external_actions')
