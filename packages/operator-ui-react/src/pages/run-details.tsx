@@ -87,7 +87,13 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
           <DetailTable
             title="Artifact derivations"
             empty="No artifact derivations are associated with this run."
-            headers={['Derivation', 'Source artifact', 'Result artifact', 'Type', 'Recorded']}
+            headers={[
+              'Derivation',
+              'Source artifact',
+              'Result artifact',
+              'Type',
+              'Recorded',
+            ]}
             rows={details.derivations.map((derivation) => [
               <CopyId key="id" value={derivation.id} />,
               <CopyId key="source" value={derivation.sourceArtifactId} />,
@@ -100,7 +106,13 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
           <DetailTable
             title="Projection freshness"
             empty="No projection checkpoints are available."
-            headers={['Projection', 'Checkpoint', 'Sequence', 'Freshness', 'Updated']}
+            headers={[
+              'Projection',
+              'Checkpoint',
+              'Sequence',
+              'Freshness',
+              'Updated',
+            ]}
             rows={details.projectionFreshness.items.map((projection) => [
               <span key="projection">{projection.projectionName}</span>,
               <CopyId key="checkpoint" value={projection.id} />,
