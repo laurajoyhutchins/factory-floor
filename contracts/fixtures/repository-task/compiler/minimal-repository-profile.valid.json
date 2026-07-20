@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "owner": "laurajoyhutchins",
+    "name": "factory-floor"
+  },
+  "pathBoundaries": ["packages/example/**"],
+  "recipes": {
+    "typescript-module": ["1"]
+  },
+  "verificationProfiles": ["package-unit"],
+  "packages": [
+    {
+      "name": "@factory-floor/example",
+      "path": "packages/example",
+      "sourceDirectory": "src",
+      "testDirectory": "test",
+      "publicExportPath": "src/index.ts"
+    }
+  ]
+}
