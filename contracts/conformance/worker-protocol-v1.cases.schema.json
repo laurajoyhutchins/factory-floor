@@ -50,14 +50,14 @@
               "expectedWireBody": { "type": "object" }
             },
             "additionalProperties": false,
-            "anyOf": [
+            "oneOf": [
               {
                 "required": ["path"],
-                "properties": { "path": true }
+                "not": { "required": ["endpointFromEnvelope"] }
               },
               {
                 "required": ["endpointFromEnvelope"],
-                "properties": { "endpointFromEnvelope": true }
+                "not": { "required": ["path"] }
               }
             ]
           },
