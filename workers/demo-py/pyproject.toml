@@ -9,7 +9,11 @@ dependencies = ["factory-floor-contracts", "factory-floor-worker-sdk"]
 factory-floor-demo-py = "factory_floor_demo_py.verifier:main"
 
 [dependency-groups]
-dev = ["pytest>=8.4,<9", "pytest-asyncio>=1.2,<2"]
+dev = [
+  "pytest>=8.4,<9",
+  "pytest-asyncio>=1.2,<2",
+  "pytest-cov>=7.0,<8",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "../../packages/worker-sdk-py/src"]

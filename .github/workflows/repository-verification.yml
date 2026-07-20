@@ -62,6 +62,13 @@ jobs:
         id: unit
         run: node scripts/run-ci-stage.mjs --stage unit --output .factory-floor/ci-metrics/unit.json -- bash -c 'set -o pipefail; pnpm verify:unit 2>&1 | tee unit-verification.log'
 
+      - name: Summarize coverage evidence
+        id: coverage-summary
+        if: always()
+        run: |
+          set -o pipefail
+          pnpm coverage:summarize 2>&1 | tee coverage-summary.log >> "$GITHUB_STEP_SUMMARY"
+
       - name: Summarize fast verification metrics
         id: metrics-summary
         if: always()
@@ -79,9 +86,11 @@ jobs:
           path: |
             .factory-floor/ci-metrics/
             .factory-floor/test-results/
+            .factory-floor/coverage/
             bootstrap.log
             fast-static.log
             unit-verification.log
+            coverage-summary.log
             metrics-summary.log
             format.log
             formatted-files.txt
@@ -95,9 +104,9 @@ jobs:
         env:
           AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status == 'success' && steps.evidence-upload.outcome == 'success' && 'success' || 'failure' }}
-          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
-          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
-          AGENT_CI_FAILURE_LOG: ${{ steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
+          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.static.outcome == 'failure' && 'static' || steps.unit.outcome == 'failure' && 'unit' || steps.coverage-summary.outcome == 'failure' && 'coverage-summary' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
+          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.static.outcome == 'failure' && 'pnpm verify:static' || steps.unit.outcome == 'failure' && 'pnpm verify:unit' || steps.coverage-summary.outcome == 'failure' && 'pnpm coverage:summarize' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
+          AGENT_CI_FAILURE_LOG: ${{ steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.static.outcome == 'failure' && 'fast-static.log' || steps.unit.outcome == 'failure' && 'unit-verification.log' || steps.coverage-summary.outcome == 'failure' && 'coverage-summary.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job fast-verification --artifact fast-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload fast agent handoff
