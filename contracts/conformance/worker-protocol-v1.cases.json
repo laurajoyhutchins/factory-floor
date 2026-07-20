@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "1.0",
+  "description": "Language-neutral HTTP cases for every supported Factory Floor worker SDK.",
+  "cases": [
+    {
+      "id": "claim.claimed",
+      "operation": "claim",
+      "request": {
+        "method": "POST",
+        "path": "/worker/v1/claim",
+        "body": {
+          "protocolVersion": "1.0",
+          "workerId": "conformance-worker",
+          "componentSelectors": ["verify@1"]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "protocolVersion": "1.0",
+          "claimed": true,
+          "envelopeFixture": "contracts/fixtures/worker/invocation-envelope.valid.json"
+        }
+      },
+      "expected": {
+        "classification": "claimed",
+        "retryable": false
+      }
+    },
+    {
+      "id": "claim.no-work",
+      "operation": "claim",
+      "request": {
+        "method": "POST",
+        "path": "/worker/v1/claim"
+      },
+      "response": {
+        "status": 200,
+        "fixture": "contracts/fixtures/worker/no-work-response.valid.json"
+      },
+      "expected": {
+        "classification": "no_work",
+        "retryable": false
+      }
+    },
+    {
+      "id": "invocation.deprecated-fields",
+      "operation": "claim",
+      "request": {
+        "method": "POST",
+        "path": "/worker/v1/claim"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "protocolVersion": "1.0",
+          "claimed": true,
+          "envelopeFixture": "contracts/fixtures/worker/invocation-envelope.valid.json",
+          "fixtureMutations": {
+            "component.definitionName": null,
+            "component.definitionVersion": null,
+            "component.name": "verify",
+            "component.version": "1"
+          }
+        }
+      },
+      "expected": {
+        "classification": "claimed",
+        "retryable": false
+      }
+    },
+    {
+      "id": "heartbeat.lease-error",
+      "operation": "heartbeat",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "heartbeatUrl"
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "protocolVersion": "1.0",
+          "code": "stale_lease_token",
+          "message": "The lease token is no longer active.",
+          "retryable": false,
+          "requestId": "conformance-heartbeat"
+        }
+      },
+      "expected": {
+        "classification": "lease_error",
+        "retryable": false
+      }
+    },
+    {
+      "id": "cancellation.stale-epoch",
+      "operation": "cancellation",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "cancellationUrl",
+        "bodyMutations": {
+          "lifecycleEpoch": 0
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "protocolVersion": "1.0",
+          "code": "stale_lifecycle_epoch",
+          "message": "The lifecycle epoch is stale.",
+          "retryable": false,
+          "requestId": "conformance-cancellation"
+        }
+      },
+      "expected": {
+        "classification": "lease_error",
+        "retryable": false
+      }
+    },
+    {
+      "id": "artifact.stage-upload",
+      "operation": "artifact",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "artifactStagingUrl",
+        "body": {
+          "portName": "verified-claims",
+          "mediaType": "application/json",
+          "expectedDigest": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+          "expectedSizeBytes": 13,
+          "metadata": {}
+        },
+        "uploadBytesUtf8": "{\"a\":1,\"b\":2}"
+      },
+      "response": {
+        "status": 200,
+        "fixture": "contracts/fixtures/worker/stage-response.valid.json"
+      },
+      "expected": {
+        "classification": "staged",
+        "retryable": false
+      }
+    },
+    {
+      "id": "capability.denied",
+      "operation": "capability",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "capabilityInvocationUrl",
+        "body": {
+          "handle": "denied-handle",
+          "input": {}
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "protocolVersion": "1.0",
+          "code": "capability_denied",
+          "message": "The capability is not granted.",
+          "retryable": false,
+          "requestId": "conformance-capability"
+        }
+      },
+      "expected": {
+        "classification": "capability_denied",
+        "retryable": false
+      }
+    },
+    {
+      "id": "result.accepted",
+      "operation": "result",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "resultSubmissionUrl",
+        "fixture": "contracts/fixtures/proposed-results/valid-completed.json"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "protocolVersion": "1.0",
+          "accepted": true,
+          "duplicate": false,
+          "handoff": "recorded_for_task_8_commit"
+        }
+      },
+      "expected": {
+        "classification": "accepted",
+        "retryable": false
+      }
+    },
+    {
+      "id": "result.duplicate-identical",
+      "operation": "result",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "resultSubmissionUrl",
+        "fixture": "contracts/fixtures/proposed-results/valid-completed.json"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "protocolVersion": "1.0",
+          "accepted": true,
+          "duplicate": true,
+          "handoff": "recorded_for_task_8_commit"
+        }
+      },
+      "expected": {
+        "classification": "duplicate",
+        "retryable": false
+      }
+    },
+    {
+      "id": "result.duplicate-conflict",
+      "operation": "result",
+      "request": {
+        "method": "POST",
+        "endpointFromEnvelope": "resultSubmissionUrl",
+        "fixture": "contracts/fixtures/proposed-results/valid-completed.json"
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "protocolVersion": "1.0",
+          "code": "duplicate_conflicting_result",
+          "message": "A different result is already recorded.",
+          "retryable": false,
+          "requestId": "conformance-result-conflict"
+        }
+      },
+      "expected": {
+        "classification": "conflict",
+        "retryable": false
+      }
+    },
+    {
+      "id": "response.malformed",
+      "operation": "claim",
+      "request": {
+        "method": "POST",
+        "path": "/worker/v1/claim"
+      },
+      "response": {
+        "status": 200,
+        "rawBody": "not-json"
+      },
+      "expected": {
+        "classification": "protocol_error",
+        "retryable": false
+      }
+    },
+    {
+      "id": "transport.retryable",
+      "operation": "claim",
+      "request": {
+        "method": "POST",
+        "path": "/worker/v1/claim"
+      },
+      "response": {
+        "transportError": "connection_reset",
+        "succeedAfterAttempts": 1,
+        "successFixture": "contracts/fixtures/worker/no-work-response.valid.json"
+      },
+      "expected": {
+        "classification": "no_work",
+        "retryable": true
+      }
+    }
+  ]
+}
