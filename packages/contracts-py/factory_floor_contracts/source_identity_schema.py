@@ -7,6 +7,7 @@ from ._internal import (
     SourceIdentity2,
     SourceIdentity3,
     SourceIdentity4,
+    SourceIdentity5,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "SourceIdentity2",
     "SourceIdentity3",
     "SourceIdentity4",
+    "SourceIdentity5",
 ]
