@@ -32,16 +32,6 @@ const corpus = JSON.parse(
   }>;
 };
 
-const operationCaseIds = new Set([
-  'heartbeat.lease-error',
-  'cancellation.stale-epoch',
-  'artifact.stage-upload',
-  'capability.denied',
-  'result.accepted',
-  'result.duplicate-identical',
-  'result.duplicate-conflict',
-]);
-
 function fixture<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, rootUrl), 'utf8')) as T;
 }
@@ -110,18 +100,18 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
   });
 
   try {
-    if (testCase.id === 'heartbeat.lease-error')
-      await client.heartbeat(envelope);
-    else if (testCase.id === 'cancellation.stale-epoch')
+    const operation = testCase.operation;
+    if (operation === 'heartbeat') await client.heartbeat(envelope);
+    else if (operation === 'cancellation')
       await client.observeCancellation(envelope);
-    else if (testCase.id === 'capability.denied') {
+    else if (operation === 'capability') {
       const request = testCase.request.body ?? {};
       await client.invokeCapability(
         envelope,
         String(request.handle),
         (request.input ?? {}) as Record<string, unknown>,
       );
-    } else if (testCase.id === 'artifact.stage-upload') {
+    } else if (operation === 'artifact') {
       const stage = await client.stageArtifact(
         envelope,
         testCase.request.body as Omit<
@@ -137,7 +127,7 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
       await client.uploadStagedContent(stage.uploadUrl, bytes);
       expect(uploaded).toEqual([...bytes]);
       return { classification: 'staged', retryable: false };
-    } else {
+    } else if (operation === 'result') {
       const result = fixture<ProposedResult>(testCase.request.fixture!);
       const response = await client.submitResult(
         result,
@@ -147,7 +137,7 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
         classification: response.duplicate ? 'duplicate' : 'accepted',
         retryable: false,
       };
-    }
+    } else throw new Error(`unsupported operation ${operation}`);
     throw new Error(`case ${testCase.id} unexpectedly succeeded`);
   } catch (error) {
     if (!(error instanceof WorkerSdkError)) throw error;
@@ -161,8 +151,8 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
 }
 
 describe('TypeScript worker operation conformance', () => {
-  for (const testCase of corpus.cases.filter((item) =>
-    operationCaseIds.has(item.id),
+  for (const testCase of corpus.cases.filter(
+    (item) => item.operation !== 'claim',
   ))
     it(testCase.id, async () => {
       await expect(runOperationCase(testCase)).resolves.toEqual(
