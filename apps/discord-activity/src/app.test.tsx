@@ -74,7 +74,7 @@ describe('Discord Activity shell', () => {
     expect(mocks.createActivityBroker).not.toHaveBeenCalled();
   });
 
-  it('renders only the verified bound run and revokes its in-memory session', async () => {
+  it('renders only the verified bound run and scrubs its in-memory client after revocation', async () => {
     const now = Date.now();
     const credentials = {
       sessionToken: 'session-token',
@@ -150,5 +150,12 @@ describe('Discord Activity shell', () => {
       ),
     );
     expect(await screen.findByText('Session expired')).toBeVisible();
+    const terminalClientConfig = mocks.createOperatorClient.mock.calls.at(-1)?.[0];
+    expect(terminalClientConfig).toMatchObject({
+      baseUrl: 'https://factory-floor.example',
+      principalId: 'activity-session-ended',
+      adapter: 'discord-activity',
+    });
+    expect(terminalClientConfig).not.toHaveProperty('token');
   });
 });
