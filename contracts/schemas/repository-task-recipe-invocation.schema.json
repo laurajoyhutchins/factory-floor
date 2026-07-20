@@ -3,6 +3,50 @@
   "$id": "https://factory-floor.local/contracts/repository-task-recipe-invocation.schema.json",
   "title": "RepositoryTaskRecipeInvocation",
   "description": "A versioned deterministic recipe selection and its bounded typed inputs. Recipe resolution remains repository-owned.",
+  "$defs": {
+    "recipeScalar": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recipeLeaf": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/recipeScalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipeScalar"
+          }
+        }
+      ]
+    },
+    "recipeValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/recipeLeaf"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/recipeLeaf"
+          }
+        }
+      ]
+    }
+  },
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -24,6 +68,58 @@
         "moduleName": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "exports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$"
+              },
+              "typeName": {
+                "type": "string",
+                "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$"
+              },
+              "value": {
+                "$ref": "#/$defs/recipeValue"
+              }
+            },
+            "required": ["name", "typeName", "value"]
+          }
+        },
+        "testCases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "exportName": {
+                "type": "string",
+                "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$"
+              },
+              "expected": {
+                "$ref": "#/$defs/recipeValue"
+              }
+            },
+            "required": ["name", "exportName", "expected"]
+          }
         }
       },
       "required": ["package", "moduleName"]
