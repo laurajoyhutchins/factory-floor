@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "planDigest": "e311be28e68d25157ed58b9a4f5f7fb0858fa80c5a0b91845e8c895ed0caeb3f",
+  "profileDigest": "ecad92aaa54d275c0479798b6b5601aff3b214b1a3a9a445426d0336b884cf37",
+  "repository": {
+    "owner": "laurajoyhutchins",
+    "name": "factory-floor",
+    "baseRevision": "62c91dc5a033eb2b74b09df3c196d052916ec062"
+  },
+  "recipe": {
+    "name": "typescript-module",
+    "version": "1"
+  },
+  "verificationProfile": "package-unit",
+  "nodes": [
+    {
+      "id": "input:normalized-plan",
+      "kind": "input",
+      "inputKind": "normalized-plan",
+      "digest": "e311be28e68d25157ed58b9a4f5f7fb0858fa80c5a0b91845e8c895ed0caeb3f",
+      "dependsOn": []
+    },
+    {
+      "id": "input:repository-profile",
+      "kind": "input",
+      "inputKind": "repository-profile",
+      "digest": "ecad92aaa54d275c0479798b6b5601aff3b214b1a3a9a445426d0336b884cf37",
+      "dependsOn": []
+    },
+    {
+      "id": "operation:implementation",
+      "kind": "file-operation",
+      "operation": "create",
+      "path": "packages/example/src/canonical-value.ts",
+      "outputName": "implementation",
+      "mediaType": "text/typescript",
+      "dependsOn": ["input:normalized-plan", "input:repository-profile"],
+      "attribution": [
+        {
+          "kind": "plan",
+          "reference": "/outputs/0"
+        },
+        {
+          "kind": "profile",
+          "reference": "/packages/0"
+        },
+        {
+          "kind": "recipe",
+          "reference": "typescript-module@1/implementation"
+        }
+      ]
+    },
+    {
+      "id": "operation:unit-test",
+      "kind": "file-operation",
+      "operation": "create",
+      "path": "packages/example/test/canonical-value.test.ts",
+      "outputName": "unit-test",
+      "mediaType": "text/typescript",
+      "dependsOn": [
+        "input:normalized-plan",
+        "input:repository-profile",
+        "operation:implementation"
+      ],
+      "attribution": [
+        {
+          "kind": "plan",
+          "reference": "/outputs/1"
+        },
+        {
+          "kind": "profile",
+          "reference": "/packages/0"
+        },
+        {
+          "kind": "recipe",
+          "reference": "typescript-module@1/unit-test"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "implementation",
+      "kind": "file",
+      "path": "packages/example/src/canonical-value.ts",
+      "nodeId": "operation:implementation"
+    },
+    {
+      "name": "unit-test",
+      "kind": "test",
+      "path": "packages/example/test/canonical-value.test.ts",
+      "nodeId": "operation:unit-test"
+    }
+  ],
+  "conflicts": [],
+  "graphDigest": "beb798d4150e6fddb349e2306929e5e75c8f8e14ca7d35c526acfd4c2574cef1"
+}
