@@ -41,6 +41,7 @@ export {
 } from './worker/worker-protocol-service.js';
 export { WorkerProtocolService } from './worker/state-aware-worker-protocol-service.js';
 export * from './commit/execution-commit-service.js';
+export * from './inspection/template-instantiation-inspection-service.js';
 export * from './observability/observability-service.js';
 export * from './observability/recovery-service.js';
 export * from './operator/types.js';
