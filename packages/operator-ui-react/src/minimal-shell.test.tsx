@@ -14,22 +14,24 @@ const json = (body: unknown) =>
 
 describe('minimal operator UI shell', () => {
   it('renders reusable views with injected authentication and transport', async () => {
-    const fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes('/projections')) {
-        return json({
-          items: [
-            {
-              projection_name: 'queue-depth',
-              updated_at: '2026-07-20T00:00:00Z',
-              staleness_ms: 0,
-              snapshot: { counts: { completed: 2 } },
-            },
-          ],
-        });
-      }
-      return json({ items: [], nextCursor: null });
-    });
+    const fetch = vi.fn(
+      async (input: RequestInfo | URL, _init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/projections')) {
+          return json({
+            items: [
+              {
+                projection_name: 'queue-depth',
+                updated_at: '2026-07-20T00:00:00Z',
+                staleness_ms: 0,
+                snapshot: { counts: { completed: 2 } },
+              },
+            ],
+          });
+        }
+        return json({ items: [], nextCursor: null });
+      },
+    );
     const client = createOperatorClient({
       fetch,
       headers: {
@@ -57,8 +59,8 @@ describe('minimal operator UI shell', () => {
 
     expect(await screen.findByText('completed: 2')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalled();
-    const request = fetch.mock.calls[0]?.[1] as RequestInit;
-    expect(request.headers).toMatchObject({
+    const request = fetch.mock.calls[0]?.[1];
+    expect(request?.headers).toMatchObject({
       authorization: 'Bearer injected-session',
       'x-factory-floor-principal-id': 'operator:test',
       'x-factory-floor-adapter': 'minimal-test-shell',
