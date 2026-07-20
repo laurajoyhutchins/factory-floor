@@ -13,12 +13,11 @@ import { TemplateInstantiationInspectionService } from './template-instantiation
 export class OperatorQueryService extends BaseOperatorQueryService {
   private readonly instantiations: TemplateInstantiationInspectionService;
 
-  constructor(
-    inspectionDb: Kysely<Database>,
-    blobs?: ArtifactBlobStore,
-  ) {
+  constructor(inspectionDb: Kysely<Database>, blobs?: ArtifactBlobStore) {
     super(inspectionDb, blobs);
-    this.instantiations = new TemplateInstantiationInspectionService(inspectionDb);
+    this.instantiations = new TemplateInstantiationInspectionService(
+      inspectionDb,
+    );
   }
 
   async listRunTemplateInstantiations(
