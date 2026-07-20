@@ -1,5 +1,6 @@
 name: Patch external action policy fixture
 
+# Temporary branch-only workflow; removed after the deterministic patch lands.
 on:
   push:
     branches:
@@ -38,54 +39,54 @@ jobs:
           text = text.replace(old_import, new_import)
 
           old_decision = """  const actionId = createUuidV7();
-  const policyDecisionId = createUuidV7();
-  await db
-    .insertInto('policy_decisions')
-    .values({
-      id: policyDecisionId,
-      policy_id: null,
-      policy_name: 'external-action-test-policy',
-      policy_version: '1',
-      evaluator_version: 'test',
-      subject_kind: 'external_action',
-      subject_id: actionId,
-      input_artifact_id: artifactId,
-      normalized_inputs: {},
-      outcome: 'allow',
-      reason: null,
-      modifications: [],
-    })
-    .execute();
-"""
+          const policyDecisionId = createUuidV7();
+          await db
+            .insertInto('policy_decisions')
+            .values({
+              id: policyDecisionId,
+              policy_id: null,
+              policy_name: 'external-action-test-policy',
+              policy_version: '1',
+              evaluator_version: 'test',
+              subject_kind: 'external_action',
+              subject_id: actionId,
+              input_artifact_id: artifactId,
+              normalized_inputs: {},
+              outcome: 'allow',
+              reason: null,
+              modifications: [],
+            })
+            .execute();
+          """
           new_decision = """  const actionId = createUuidV7();
-  await db
-    .insertInto('policies')
-    .values({
-      id: createUuidV7(),
-      name: 'external-action-test-policy',
-      version: '1',
-      content_digest: 'e'.repeat(64),
-      policy: {
-        spec: {
-          outcome: 'allow',
-          reason: 'Allow the deterministic recovery test action.',
-        },
-      },
-    })
-    .execute();
-  const policyDecision = await new PolicyDecisionService(
-    db,
-    'external-action-recovery-test',
-    () => new Date(),
-  ).evaluate({
-    policyName: 'external-action-test-policy',
-    policyVersion: '1',
-    subjectKind: 'external_action',
-    subjectId: actionId,
-    inputArtifactId: artifactId,
-    normalizedInputs: {},
-  });
-"""
+          await db
+            .insertInto('policies')
+            .values({
+              id: createUuidV7(),
+              name: 'external-action-test-policy',
+              version: '1',
+              content_digest: 'e'.repeat(64),
+              policy: {
+                spec: {
+                  outcome: 'allow',
+                  reason: 'Allow the deterministic recovery test action.',
+                },
+              },
+            })
+            .execute();
+          const policyDecision = await new PolicyDecisionService(
+            db,
+            'external-action-recovery-test',
+            () => new Date(),
+          ).evaluate({
+            policyName: 'external-action-test-policy',
+            policyVersion: '1',
+            subjectKind: 'external_action',
+            subjectId: actionId,
+            inputArtifactId: artifactId,
+            normalizedInputs: {},
+          });
+          """
           if text.count(old_decision) != 1:
               raise SystemExit('expected one policy decision patch match')
           text = text.replace(old_decision, new_decision)
