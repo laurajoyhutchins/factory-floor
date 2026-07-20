@@ -1,3 +1,4 @@
+# Temporary branch-only formatter.
 name: Format operator extraction
 
 on:
