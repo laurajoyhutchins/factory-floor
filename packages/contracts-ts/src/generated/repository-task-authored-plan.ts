@@ -42,13 +42,14 @@ export interface Repository {
   baseRevision: string;
 }
 /**
- * A versioned deterministic recipe selection and its bounded inputs. Recipe resolution remains repository-owned.
+ * A versioned deterministic recipe selection and its bounded typed inputs. Recipe resolution remains repository-owned.
  */
 export interface RepositoryTaskRecipeInvocation {
-  name: string;
+  name: 'typescript-module';
   version: string;
   inputs: {
-    [k: string]: unknown;
+    package: string;
+    moduleName: string;
   };
 }
 /**
