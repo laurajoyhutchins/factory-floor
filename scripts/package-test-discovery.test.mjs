@@ -24,11 +24,14 @@ function discoverTests(packagePath) {
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        if (!ignoredDirectories.has(entry.name)) visit(join(directory, entry.name));
+        if (!ignoredDirectories.has(entry.name))
+          visit(join(directory, entry.name));
         continue;
       }
       if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) {
-        tests.push(relative(root, join(directory, entry.name)).replaceAll('\\', '/'));
+        tests.push(
+          relative(root, join(directory, entry.name)).replaceAll('\\', '/'),
+        );
       }
     }
   };
@@ -51,7 +54,9 @@ describe('package-local test discovery', () => {
     expect(controlPlaneTests.length).toBeGreaterThan(1);
     expect(controlPlaneTests).toEqual(
       expect.arrayContaining([
-        expect.not.stringMatching(/apps\/control-plane\/test\/health\.test\.ts$/),
+        expect.not.stringMatching(
+          /apps\/control-plane\/test\/health\.test\.ts$/,
+        ),
       ]),
     );
     expect(cliTests).toEqual(
