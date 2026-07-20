@@ -154,7 +154,7 @@ describe('template-instantiation console views', () => {
     expect(screen.getByText('verifier.checkpoint')).toBeInTheDocument();
     expect(screen.getByText(/checkpoint@1/)).toBeInTheDocument();
     expect(screen.getByLabelText('Copy artifact-a')).toBeInTheDocument();
-    expect(screen.getByText(/completedSteps/)).toBeInTheDocument();
+    expect(screen.getAllByText(/completedSteps/)).toHaveLength(2);
     expect(screen.getAllByText(/templateInstantiation/).length).toBeGreaterThan(
       1,
     );
