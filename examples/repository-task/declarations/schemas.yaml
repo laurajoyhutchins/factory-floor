@@ -1,0 +1,98 @@
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-input, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: object
+    additionalProperties: false
+    required: [authoredPlanMarkdown, repositoryProfile, repositorySnapshot]
+    properties:
+      authoredPlanMarkdown: { type: string, minLength: 1 }
+      repositoryProfile: { type: object, additionalProperties: true }
+      repositorySnapshot:
+        type: object
+        additionalProperties: false
+        required: [files]
+        properties:
+          files:
+            type: object
+            additionalProperties: { type: string }
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-authored-plan, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: object
+    additionalProperties: true
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-normalized-plan, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: [object, 'null']
+    additionalProperties: true
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-generation-graph, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: [object, 'null']
+    additionalProperties: true
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-patch, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: object
+    additionalProperties: false
+    required: [patch, patchDigest]
+    properties:
+      patch: { type: string }
+      patchDigest: { type: [string, 'null'] }
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-evidence, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: [object, 'null']
+    additionalProperties: true
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-diagnostics, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+---
+apiVersion: factory-floor.dev/v1alpha1
+kind: ArtifactSchema
+metadata: { name: repository-task-disposition, version: v1 }
+spec:
+  schema:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: object
+    additionalProperties: true
+    required: [status, phase, diagnostics]
+    properties:
+      status: { enum: [succeeded, failed, dry-run] }
+      phase: { enum: [compile, verify, complete] }
+      diagnostics: { type: array }
