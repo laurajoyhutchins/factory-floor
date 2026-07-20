@@ -119,6 +119,7 @@ type SummaryRow = {
   template_version: string;
   template_digest: string;
   created_at: unknown;
+  created_at_cursor: string;
 };
 
 function dateValue(value: unknown): Date {
@@ -166,7 +167,7 @@ function decodeCursor(value: string | undefined, scopeDigest: string) {
     )
       throw new Error('invalid cursor');
     return {
-      afterCreatedAt: timestamp.toISOString(),
+      afterCreatedAt: parsed.afterCreatedAt!,
       afterId: parsed.afterId,
     };
   } catch {
@@ -179,7 +180,7 @@ function encodeCursor(scopeDigest: string, row: SummaryRow): string {
     JSON.stringify({
       v: 1,
       scopeDigest,
-      afterCreatedAt: dateValue(row.created_at).toISOString(),
+      afterCreatedAt: row.created_at_cursor,
       afterId: row.id,
     } satisfies Cursor),
     'utf8',
@@ -347,6 +348,7 @@ export class TemplateInstantiationInspectionService {
         'template.version as template_version',
         'template.content_digest as template_digest',
         'instantiation.created_at',
+        sql<string>`instantiation.created_at::text`.as('created_at_cursor'),
       ]);
   }
 
