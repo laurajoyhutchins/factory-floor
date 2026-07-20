@@ -86,7 +86,9 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
         ingress: {
           commands: {
             'durable-result.start': {
-              targets: [{ component: 'durable-result-worker', port: 'objective' }],
+              targets: [
+                { component: 'durable-result-worker', port: 'objective' },
+              ],
             },
           },
         },
@@ -288,7 +290,9 @@ describe('durable worker-result handoff recovery', () => {
     });
     releaseCommit();
 
-    await expect(submission).rejects.toMatchObject({ code: 'inactive_attempt' });
+    await expect(submission).rejects.toMatchObject({
+      code: 'inactive_attempt',
+    });
     await expect(
       db.selectFrom('worker_result_submissions').selectAll().execute(),
     ).resolves.toHaveLength(0);

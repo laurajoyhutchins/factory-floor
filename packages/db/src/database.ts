@@ -316,6 +316,7 @@ export interface Database {
     attempt_id: string;
     submission_digest: string;
     result: Jsonb;
+    committed_at: Timestamp | null;
   };
   projection_checkpoints: Row & {
     projection_name: string;
