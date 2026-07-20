@@ -45,28 +45,25 @@
       }
     },
     {
-      "id": "invocation.deprecated-fields",
+      "id": "claim.deprecated-capabilities",
       "operation": "claim",
       "request": {
         "method": "POST",
-        "path": "/worker/v1/claim"
+        "path": "/worker/v1/claim",
+        "sdkInputAlias": "capabilities",
+        "componentSelectors": ["verify@1"],
+        "expectedWireBody": {
+          "protocolVersion": "1.0",
+          "workerId": "conformance-worker",
+          "componentSelectors": ["verify@1"]
+        }
       },
       "response": {
         "status": 200,
-        "body": {
-          "protocolVersion": "1.0",
-          "claimed": true,
-          "envelopeFixture": "contracts/fixtures/worker/invocation-envelope.valid.json",
-          "fixtureMutations": {
-            "component.definitionName": null,
-            "component.definitionVersion": null,
-            "component.name": "verify",
-            "component.version": "1"
-          }
-        }
+        "fixture": "contracts/fixtures/worker/no-work-response.valid.json"
       },
       "expected": {
-        "classification": "claimed",
+        "classification": "no_work",
         "retryable": false
       }
     },
