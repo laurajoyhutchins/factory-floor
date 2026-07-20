@@ -82,7 +82,7 @@ describe('Activity session lifecycle', () => {
     expect(controller.current().sessionToken).toBe('rotated-token');
   });
 
-  it('fails closed when refresh returns an invalid or expired session', async () => {
+  it('fails closed and scrubs credentials when refresh returns an expired session', async () => {
     const onExpired = vi.fn();
     const controller = new ActivitySessionController(
       {
@@ -107,6 +107,29 @@ describe('Activity session lifecycle', () => {
     controller.start();
     await vi.waitFor(() => expect(onExpired).toHaveBeenCalledTimes(1));
     expect(controller.state()).toBe('expired');
+    expect(controller.current().sessionToken).toBe('');
+  });
+
+  it('scrubs credentials when stopped', () => {
+    const controller = new ActivitySessionController(
+      {
+        sessionToken: 'initial-token',
+        expiresAt: '2026-07-20T20:00:00.000Z',
+        idleExpiresAt: '2026-07-20T19:05:00.000Z',
+      },
+      {
+        now: () => Date.parse('2026-07-20T19:00:00.000Z'),
+        refresh: vi.fn(),
+        schedule: vi.fn(() => 1),
+        cancel: vi.fn(),
+      },
+    );
+
+    controller.start();
+    controller.stop();
+
+    expect(controller.state()).toBe('stopped');
+    expect(controller.current().sessionToken).toBe('');
   });
 
   it('keeps transient offline failures disconnected and retries without persisting credentials', async () => {
