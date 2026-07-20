@@ -116,7 +116,9 @@ describe('run details panel', () => {
     expect(actionCells).toHaveLength(2);
     for (const cell of actionCells) expect(cell).toBeVisible();
     expect(screen.getByText('42 token')).toBeVisible();
-    expect(screen.getByText('external-action-policy@1')).toBeVisible();
+    const policyLabels = screen.getAllByText('external-action-policy@1');
+    expect(policyLabels).toHaveLength(2);
+    for (const label of policyLabels) expect(label).toBeVisible();
     expect(screen.getByText('transform')).toBeVisible();
     expect(screen.getByText('run_status')).toBeVisible();
     expect(screen.getByText('stale')).toBeVisible();
