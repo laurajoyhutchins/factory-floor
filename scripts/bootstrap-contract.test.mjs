@@ -70,7 +70,9 @@ describe('canonical workspace bootstrap', () => {
     }
 
     expect(
-      workflow.match(/bash scripts\/bootstrap-workspace\.sh/g),
+      workflow.match(
+        /^\s+bash scripts\/bootstrap-workspace\.sh 2>&1 \| tee bootstrap\.log$/gm,
+      ),
     ).toHaveLength(2);
     expect(workflow).toContain('bash scripts/accept-m1.sh');
   });
