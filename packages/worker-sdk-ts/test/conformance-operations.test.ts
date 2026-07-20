@@ -75,11 +75,18 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
     jitter: () => 0,
     fetch: async (url, init) => {
       if (init?.method === 'PUT') {
+        const stage = fixture<{ stagedRef: string; uploadUrl: string }>(
+          'contracts/fixtures/worker/stage-response.valid.json',
+        );
+        expect(String(url)).toBe(
+          new URL(stage.uploadUrl, 'http://conformance.local').toString(),
+        );
+        const headers = new Headers(init.headers);
+        expect(headers.get('content-type')).toBe('application/octet-stream');
+        expect(headers.get('authorization')).toBe('Bearer conformance-token');
+        expect(headers.get('x-worker-id')).toBe('conformance-worker');
         uploaded.push(
           ...new Uint8Array(await new Response(init.body).arrayBuffer()),
-        );
-        const stage = fixture<{ stagedRef: string }>(
-          'contracts/fixtures/worker/stage-response.valid.json',
         );
         return new Response(
           JSON.stringify({
