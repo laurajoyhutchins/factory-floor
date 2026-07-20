@@ -14,10 +14,27 @@ This ledger records temporary public aliases retained by the supported worker pr
 
 ## Active aliases
 
-| ID | SDK surface | Legacy alias | Canonical replacement | Supported versions | Warning behavior | Automated evidence | Owner | Removal plan |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `WORKER-V1-PY-CLAIM-CAPABILITIES` | Python `WorkerClient.claim` | `capabilities=` | `component_selectors=` | Worker protocol v1; Python SDK 0.1.x | Silent normalization in v1 so long-running worker poll loops do not emit repeated warnings; documentation and the conformance case identify it as deprecated. | `contracts/conformance/worker-protocol-v1.cases.json` case `claim.deprecated-capabilities`; `packages/worker-sdk-py/tests/test_conformance_claim.py` | Worker SDK maintainers | Remove from the protocol v2 Python SDK under #107 after supported workers use `component_selectors=`. |
-| `WORKER-V1-TS-REGISTRY-CAPABILITIES` | TypeScript `ComponentRegistry` | `capabilities()` | `supportedComponentSelectors()` | Worker protocol v1; TypeScript SDK 0.1.x | TypeScript JSDoc `@deprecated`; no runtime warning so worker startup remains deterministic and quiet. | `packages/worker-sdk-ts/test/deprecation-compatibility.test.ts` | Worker SDK maintainers | Remove from the protocol v2 TypeScript SDK under #107 after supported workers use `supportedComponentSelectors()`. |
+### `WORKER-V1-PY-CLAIM-CAPABILITIES`
+
+- **SDK surface:** Python `WorkerClient.claim`
+- **Legacy alias:** `capabilities=`
+- **Canonical replacement:** `component_selectors=`
+- **Supported versions:** Worker protocol v1 and Python SDK 0.1.x
+- **Warning behavior:** Silent normalization in v1 so long-running worker poll loops do not emit repeated warnings. Documentation and the conformance case identify the alias as deprecated.
+- **Automated evidence:** `contracts/conformance/worker-protocol-v1.cases.json` case `claim.deprecated-capabilities` and `packages/worker-sdk-py/tests/test_conformance_claim.py`
+- **Owner:** Worker SDK maintainers
+- **Removal plan:** Remove from the protocol v2 Python SDK under #107 after supported workers use `component_selectors=`.
+
+### `WORKER-V1-TS-REGISTRY-CAPABILITIES`
+
+- **SDK surface:** TypeScript `ComponentRegistry`
+- **Legacy alias:** `capabilities()`
+- **Canonical replacement:** `supportedComponentSelectors()`
+- **Supported versions:** Worker protocol v1 and TypeScript SDK 0.1.x
+- **Warning behavior:** TypeScript JSDoc `@deprecated`; no runtime warning so worker startup remains deterministic and quiet.
+- **Automated evidence:** `packages/worker-sdk-ts/test/deprecation-compatibility.test.ts`
+- **Owner:** Worker SDK maintainers
+- **Removal plan:** Remove from the protocol v2 TypeScript SDK under #107 after supported workers use `supportedComponentSelectors()`.
 
 ## Protocol v2 cleanup gate
 
