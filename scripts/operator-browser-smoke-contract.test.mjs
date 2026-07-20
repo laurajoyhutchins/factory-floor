@@ -47,6 +47,7 @@ describe('production operator browser smoke', () => {
     expect(runner).toContain('CONTROL_PLANE_ADMIN_TOKEN');
     expect(runner).toContain('WORKER_API_BEARER_TOKEN');
     expect(runner).toContain('databaseUrl');
+    expect(runner).toContain('FACTORY_FLOOR_CONTROL_PLANE_URL');
     expect(runner).toContain(
       'privileged credential leaked into browser bundle',
     );

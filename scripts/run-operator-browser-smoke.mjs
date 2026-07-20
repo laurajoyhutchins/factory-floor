@@ -252,7 +252,7 @@ try {
         HOST: '127.0.0.1',
         PORT: String(controlPlanePort),
         DATABASE_URL: databaseUrl,
-        CONTROL_PLANE_PUBLIC_URL: controlPlaneUrl,
+        FACTORY_FLOOR_CONTROL_PLANE_URL: controlPlaneUrl,
         CONTROL_PLANE_OPERATOR_TOKEN: operatorToken,
         ARTIFACT_STORE_ROOT: artifactRoot,
       },
