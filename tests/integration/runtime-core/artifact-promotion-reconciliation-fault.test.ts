@@ -227,6 +227,15 @@ describe('artifact promotion reconciliation fault injection', () => {
       },
       Readable.from([body]),
     );
+    const upload = await db
+      .selectFrom('worker_artifact_uploads')
+      .select('artifact_staging_id')
+      .where('staged_ref', '=', staged.stagedRef)
+      .executeTakeFirstOrThrow();
+    if (!upload.artifact_staging_id) {
+      throw new Error('worker upload did not create durable artifact staging');
+    }
+    const stagingRowId = upload.artifact_staging_id;
 
     const provenance = {
       kind: 'fault-injection',
@@ -239,7 +248,7 @@ describe('artifact promotion reconciliation fault injection', () => {
       blobStore: failFirstPromotion(blobStore),
       maxJsonBytes: 1_000_000n,
     }).publish({
-      stagingRowId: staged.stagedRef,
+      stagingRowId,
       provenance,
     });
 
@@ -285,7 +294,7 @@ describe('artifact promotion reconciliation fault injection', () => {
       db
         .selectFrom('artifact_staging')
         .select(['status', 'artifact_id'])
-        .where('id', '=', staged.stagedRef)
+        .where('id', '=', stagingRowId)
         .executeTakeFirstOrThrow(),
     ).resolves.toEqual({
       status: 'promoted',
