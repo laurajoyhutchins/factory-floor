@@ -43,10 +43,9 @@ export class ObservabilityService extends BaseObservabilityService {
     if (!trace) return null;
     return {
       ...trace,
-      templateInstantiations:
-        await this.instantiations.listForTopologyRevision(
-          trace.execution.topology_revision_id,
-        ),
+      templateInstantiations: await this.instantiations.listForTopologyRevision(
+        trace.execution.topology_revision_id,
+      ),
     };
   }
 
