@@ -43,6 +43,18 @@ function errorCode(error: unknown): string {
     : 'activity_bootstrap_failed';
 }
 
+function clearOperatorState(controlPlaneUrl: string): void {
+  configureDefaultOperatorClient(
+    createOperatorClient({
+      baseUrl: controlPlaneUrl,
+      principalId: 'activity-session-ended',
+      adapter: 'discord-activity',
+      retry: { maxAttempts: 1, baseDelayMs: 250 },
+    }),
+  );
+  queryClient.clear();
+}
+
 export function DiscordActivityApp({
   config,
   createHost = createDiscordActivityHost,
@@ -60,6 +72,7 @@ export function DiscordActivityApp({
   useEffect(() => {
     if (!config.enabled) return;
     let cancelled = false;
+    clearOperatorState(config.controlPlaneUrl);
     const host = createHost(config.discordClientId);
     const broker = createActivityBroker(config.brokerUrl);
 
@@ -102,13 +115,19 @@ export function DiscordActivityApp({
             void queryClient.invalidateQueries();
           },
           onState: setConnection,
-          onExpired: () => setState({ kind: 'expired' }),
+          onExpired: () => {
+            clearOperatorState(config.controlPlaneUrl);
+            setState({ kind: 'expired' });
+          },
         });
         controller.current = sessionController;
         sessionController.start();
         setState({ kind: 'ready', context });
       } catch (error) {
-        if (!cancelled) setState({ kind: 'error', code: errorCode(error) });
+        if (!cancelled) {
+          clearOperatorState(config.controlPlaneUrl);
+          setState({ kind: 'error', code: errorCode(error) });
+        }
       }
     })();
 
@@ -119,6 +138,7 @@ export function DiscordActivityApp({
       window.removeEventListener('online', reconnect);
       controller.current?.stop();
       controller.current = undefined;
+      clearOperatorState(config.controlPlaneUrl);
     };
   }, [config, createHost]);
 
@@ -159,7 +179,9 @@ export function DiscordActivityApp({
   const leave = async () => {
     const session = controller.current?.current();
     controller.current?.stop();
-    if (session)
+    controller.current = undefined;
+    clearOperatorState(config.controlPlaneUrl);
+    if (session?.sessionToken)
       await revokeActivitySession(
         config.controlPlaneUrl,
         session.sessionToken,
