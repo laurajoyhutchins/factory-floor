@@ -12,6 +12,11 @@ const corpus = JSON.parse(
   cases: Array<{
     id: string;
     operation: string;
+    request?: {
+      sdkInputAlias?: string;
+      componentSelectors?: string[];
+      expectedWireBody?: Record<string, unknown>;
+    };
     response: {
       status?: number;
       fixture?: string;
@@ -28,6 +33,7 @@ const corpus = JSON.parse(
 const claimCaseIds = new Set([
   'claim.claimed',
   'claim.no-work',
+  'claim.deprecated-capabilities',
   'response.malformed',
   'transport.retryable',
 ]);
@@ -51,14 +57,16 @@ function responseBody(testCase: (typeof corpus.cases)[number]): unknown {
 
 async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   let attempts = 0;
+  let wireBody: unknown;
   const client = new WorkerProtocolClient({
     baseUrl: 'http://conformance.local',
     bearerToken: 'conformance-token',
     workerId: 'conformance-worker',
     sleep: async () => undefined,
     jitter: () => 0,
-    fetch: async () => {
+    fetch: async (_url, init) => {
       attempts += 1;
+      wireBody = init?.body ? JSON.parse(String(init.body)) : undefined;
       if (
         testCase.response.transportError &&
         attempts <= (testCase.response.succeedAfterAttempts ?? 0)
@@ -76,7 +84,14 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   });
 
   try {
-    const result = await client.claim(['verify@1']);
+    const result = await client.claim(
+      testCase.request?.componentSelectors ?? ['verify@1'],
+    );
+    if (testCase.request?.expectedWireBody) {
+      expect(testCase.request.sdkInputAlias).toBe('capabilities');
+      expect(wireBody).toEqual(testCase.request.expectedWireBody);
+      expect(wireBody).not.toHaveProperty('capabilities');
+    }
     return {
       classification: result.claimed ? 'claimed' : 'no_work',
       retryable: attempts > 1,
