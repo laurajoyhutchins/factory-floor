@@ -100,7 +100,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
           and port.name = new.port_name
           and port.schema_id = artifact_schema_id
       ) then
-        raise exception 'execution output % is not an authoritative component state artifact', new.id;
+        return new;
       end if;
 
       select coalesce(max(version_number), 0) + 1
