@@ -1,5 +1,8 @@
 import type { Kysely } from 'kysely';
-import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
+import {
+  ArtifactBlobStoreError,
+  type ArtifactBlobStore,
+} from '@factory-floor/artifact-store';
 import type { ArtifactRepository, Database } from '@factory-floor/db';
 import { ArtifactDomainError } from './errors.js';
 
@@ -20,6 +23,12 @@ export interface ArtifactReconciliationReport {
 
 interface ArtifactReconciliationCursor {
   blob?: string;
+}
+
+interface ReconciliationDiagnostic {
+  code: string;
+  id: string;
+  message: string;
 }
 
 export function encodeArtifactReconciliationCursor(value: unknown) {
@@ -47,6 +56,33 @@ export function decodeArtifactReconciliationCursor(
       'malformed reconciliation cursor',
     );
   }
+}
+
+function promotionDiagnostic(
+  error: unknown,
+  artifactId: string,
+  stagingRowId: string,
+): ReconciliationDiagnostic | undefined {
+  if (!(error instanceof ArtifactBlobStoreError)) return undefined;
+  if (error.code === 'not_found') {
+    return {
+      code: 'missing_staged_bytes',
+      id: artifactId,
+      message: `staged recovery bytes are missing for staging row ${stagingRowId}`,
+    };
+  }
+  if (
+    error.code === 'digest_mismatch' ||
+    error.code === 'size_mismatch' ||
+    error.code === 'staging_conflict'
+  ) {
+    return {
+      code: 'staged_bytes_mismatch',
+      id: artifactId,
+      message: `staged recovery bytes do not match committed artifact metadata for staging row ${stagingRowId}`,
+    };
+  }
+  return undefined;
 }
 
 export class ArtifactReconciliationService {
@@ -128,11 +164,18 @@ export class ArtifactReconciliationService {
         report.wouldPromote++;
         continue;
       }
-      await this.deps.blobStore.promote(
-        staging.staged_ref,
-        artifact.digest,
-        BigInt(artifact.size_bytes),
-      );
+      try {
+        await this.deps.blobStore.promote(
+          staging.staged_ref,
+          artifact.digest,
+          BigInt(artifact.size_bytes),
+        );
+      } catch (error) {
+        const diagnostic = promotionDiagnostic(error, artifact.id, staging.id);
+        if (!diagnostic) throw error;
+        report.unresolved.push(diagnostic);
+        continue;
+      }
       await this.deps.repository.markStagingPromoted(
         this.deps.db,
         staging.id,
@@ -147,6 +190,7 @@ export class ArtifactReconciliationService {
       { status: 'staged', before: cutoff, limit: input.limit },
     );
     for (const row of staged) {
+      if (row.artifact_id !== null) continue;
       if (await this.deps.blobStore.stagedExists(row.staged_ref)) continue;
       if (dryRun) report.wouldAbandonMetadataRows++;
       else {
