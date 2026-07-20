@@ -51,8 +51,14 @@
             },
             "additionalProperties": false,
             "anyOf": [
-              { "required": ["path"] },
-              { "required": ["endpointFromEnvelope"] }
+              {
+                "required": ["path"],
+                "properties": { "path": true }
+              },
+              {
+                "required": ["endpointFromEnvelope"],
+                "properties": { "endpointFromEnvelope": true }
+              }
             ]
           },
           "response": {
