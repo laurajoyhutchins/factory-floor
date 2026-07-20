@@ -363,7 +363,9 @@ async function outputArtifacts(
     await Promise.all(
       state.outputs.map(async (output) => [
         output.port_name,
-        JSON.parse(await streamText(blobStore.readCommitted(output.digest))),
+        JSON.parse(
+          await streamText(await blobStore.readCommitted(output.digest)),
+        ),
       ]),
     ),
   );
