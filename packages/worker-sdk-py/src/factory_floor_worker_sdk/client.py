@@ -78,6 +78,15 @@ class ProtocolValidationError(WorkerSdkError):
     pass
 
 
+def _response_json(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ProtocolValidationError(
+            "worker protocol returned non-json response"
+        ) from exc
+
+
 @dataclass(frozen=True)
 class WorkerClientConfig:
     base_url: str
@@ -152,7 +161,9 @@ class WorkerClient:
                 )
                 if response.status_code >= 400:
                     try:
-                        error = WorkerError.model_validate(response.json())
+                        error = WorkerError.model_validate(_response_json(response))
+                    except ProtocolValidationError:
+                        raise
                     except Exception as exc:
                         raise ProtocolValidationError(redact(response.text)) from exc
                     error_class = (
@@ -171,7 +182,7 @@ class WorkerClient:
                         continue
                     raise protocol_error
 
-                payload = response.json()
+                payload = _response_json(response)
                 if model is None:
                     if payload.get("protocolVersion") != PROTOCOL_VERSION:
                         raise ProtocolValidationError(
@@ -280,11 +291,13 @@ class WorkerClient:
             )
             if response.status_code >= 400:
                 try:
-                    error = WorkerError.model_validate(response.json())
+                    error = WorkerError.model_validate(_response_json(response))
+                except ProtocolValidationError:
+                    raise
                 except Exception as exc:
                     raise ProtocolValidationError(redact(response.text)) from exc
                 raise ProtocolError(error, response.status_code)
-            return WorkerUploadResponse.model_validate(response.json())
+            return WorkerUploadResponse.model_validate(_response_json(response))
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             raise TransportError(redact(exc)) from exc
         except ValidationError as exc:
