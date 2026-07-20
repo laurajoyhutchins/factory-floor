@@ -28,6 +28,9 @@ describe('operator client', () => {
 
     await client.operatorStatus();
 
+    expect(client.streamPath).toBe(
+      'https://factory.example/api/v1/inspect/stream',
+    );
     expect(fetch).toHaveBeenCalledWith(
       'https://factory.example/api/v1/operator/status',
       expect.objectContaining({

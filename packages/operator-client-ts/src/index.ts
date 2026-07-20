@@ -538,7 +538,7 @@ export function createOperatorClient(
         'a template instantiation',
         signal,
       ),
-    streamPath: paths.stream,
+    streamPath: targetUrl(baseUrl, paths.stream),
     operatorStatus: (signal) =>
       getRecord(`${paths.operator}/status`, 'operator status', signal),
     submitTask: (request, signal) =>
