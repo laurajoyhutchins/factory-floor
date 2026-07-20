@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repositoryVerificationRun": 565,
+    "pullRequest": 112,
+    "headSha": "6fb626fcfdc9461ab8035614b54e751c7fb9983a",
+    "recordedAt": "2026-07-20T14:46:21.145Z"
+  },
+  "seconds": {
+    "canonicalStatic": 24.858,
+    "canonicalUnit": 25.036,
+    "canonicalServices": 16.897,
+    "canonicalIntegration": 41.091,
+    "canonicalLiveRestart": 22.523,
+    "canonicalRepeatedTotal": 130.405,
+    "fullCleanAcceptance": 161.878,
+    "remainingCleanAndEvidenceWorkUpperBound": 31.473
+  },
+  "duplicateFractionLowerBound": 0.8056,
+  "duplicatePercentLowerBound": 80.56,
+  "repeatedTests": 348,
+  "notes": [
+    "The duplicate estimate counts only separately measured canonical stages repeated by accept-m1.sh.",
+    "Repeated bootstrap and investigation-demo execution are not included, so the measured duplicate percentage is a lower bound.",
+    "The remaining 31.473 seconds includes clean bootstrap, cancellation evidence, evidence-producing investigation and policy work, projection replay, artifact reconciliation, and evidence collection."
+  ],
+  "classification": [
+    {
+      "phase": "bootstrap",
+      "classification": "clean-environment-specific",
+      "pullRequestEquivalent": "canonical job bootstrap without a clean checkout attestation"
+    },
+    {
+      "phase": "static",
+      "classification": "duplicated",
+      "pullRequestEquivalent": "fast-verification static stage"
+    },
+    {
+      "phase": "unit",
+      "classification": "duplicated",
+      "pullRequestEquivalent": "fast-verification unit stage"
+    },
+    {
+      "phase": "services",
+      "classification": "duplicated",
+      "pullRequestEquivalent": "service-verification services stage"
+    },
+    {
+      "phase": "integration-and-investigation-demo",
+      "classification": "duplicated",
+      "pullRequestEquivalent": "service-verification integration stage"
+    },
+    {
+      "phase": "live-restart",
+      "classification": "duplicated",
+      "pullRequestEquivalent": "service-verification acceptance stage"
+    },
+    {
+      "phase": "cancellation-fencing",
+      "classification": "recovery-specific",
+      "pullRequestEquivalent": null
+    },
+    {
+      "phase": "investigation-evidence",
+      "classification": "evidence-producing",
+      "pullRequestEquivalent": "behavior covered by integration; durable evidence bundle remains clean-acceptance-only"
+    },
+    {
+      "phase": "policy-artifact-lineage-and-replay-evidence",
+      "classification": "evidence-producing",
+      "pullRequestEquivalent": null
+    },
+    {
+      "phase": "clean-checkout-attestation",
+      "classification": "clean-environment-specific",
+      "pullRequestEquivalent": null
+    },
+    {
+      "phase": "conformance-ledger-summary",
+      "classification": "duplicated-and-evidence-producing",
+      "pullRequestEquivalent": "static conformance check; summary retained in clean evidence"
+    }
+  ]
+}
