@@ -21,6 +21,7 @@ CORPUS = json.loads(
 CLAIM_CASE_IDS = {
     "claim.claimed",
     "claim.no-work",
+    "claim.deprecated-capabilities",
     "response.malformed",
     "transport.retryable",
 }
@@ -47,10 +48,12 @@ def response_body(case: dict[str, Any]) -> Any:
 
 async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
     attempts = 0
+    wire_body: dict[str, Any] | None = None
 
-    async def handler(_request: httpx.Request) -> httpx.Response:
-        nonlocal attempts
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts, wire_body
         attempts += 1
+        wire_body = json.loads(request.content)
         response = case["response"]
         if response.get("transportError") and attempts <= response.get(
             "succeedAfterAttempts", 0
@@ -75,7 +78,15 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
     )
 
     try:
-        result = await worker.claim(["verify@1"])
+        request = case.get("request", {})
+        selectors = request.get("componentSelectors", ["verify@1"])
+        if request.get("sdkInputAlias") == "capabilities":
+            result = await worker.claim(capabilities=selectors)
+        else:
+            result = await worker.claim(selectors)
+        if expected_wire_body := request.get("expectedWireBody"):
+            assert wire_body == expected_wire_body
+            assert "capabilities" not in wire_body
         return {
             "classification": "claimed" if result.root.claimed else "no_work",
             "retryable": attempts > 1,
