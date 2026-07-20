@@ -1,0 +1,180 @@
+name: Temporary browser smoke wiring
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  wire-browser-smoke:
+    if: github.head_ref == 'test/operator-browser-smoke'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: test/operator-browser-smoke
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Bootstrap workspace
+        run: bash scripts/bootstrap-workspace.sh
+
+      - name: Wire browser smoke into required verification
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected one match, found {text.count(old)}')
+              return text.replace(old, new, 1)
+
+          workflow_path = Path('.github/workflows/repository-verification.yml')
+          workflow = workflow_path.read_text()
+          prefix, service_and_after = workflow.split('  service-verification:\n', 1)
+          service, suffix = service_and_after.split('  m1-acceptance:\n', 1)
+          service = replace_once(
+              service,
+              '    timeout-minutes: 25',
+              '    timeout-minutes: 35',
+              'service timeout',
+          )
+          service = replace_once(
+              service,
+              '      - name: Start services and run migrations\n',
+              """      - name: Install Chromium for browser smoke
+                id: browser-install
+                run: pnpm exec playwright install --with-deps chromium
+
+              - name: Start services and run migrations
+          """,
+              'browser install step',
+          )
+          service = replace_once(
+              service,
+              '      - name: Stop development services\n',
+              """      - name: Run production operator browser smoke
+                id: browser-smoke
+                run: node scripts/run-ci-stage.mjs --stage browser-smoke --output .factory-floor/ci-metrics/browser-smoke.json -- bash -c 'set -o pipefail; pnpm test:browser:smoke 2>&1 | tee browser-smoke.log'
+
+              - name: Stop development services
+          """,
+              'browser smoke step',
+          )
+          service = replace_once(
+              service,
+              '            .factory-floor/test-results/\n            bootstrap.log\n',
+              '            .factory-floor/test-results/\n            .factory-floor/browser-smoke/\n            bootstrap.log\n',
+              'browser evidence directory',
+          )
+          service = replace_once(
+              service,
+              '            acceptance-verification.log\n            cleanup.log\n',
+              '            acceptance-verification.log\n            browser-smoke.log\n            cleanup.log\n',
+              'browser smoke log',
+          )
+          service = replace_once(
+              service,
+              "steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.cleanup.outcome",
+              "steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.browser-install.outcome == 'failure' && 'browser-install' || steps.browser-smoke.outcome == 'failure' && 'browser-smoke' || steps.cleanup.outcome",
+              'agent failure step',
+          )
+          service = replace_once(
+              service,
+              "steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.cleanup.outcome",
+              "steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.browser-install.outcome == 'failure' && 'pnpm exec playwright install --with-deps chromium' || steps.browser-smoke.outcome == 'failure' && 'pnpm test:browser:smoke' || steps.cleanup.outcome",
+              'agent failure command',
+          )
+          service = replace_once(
+              service,
+              "steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.cleanup.outcome",
+              "steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.browser-smoke.outcome == 'failure' && 'browser-smoke.log' || steps.cleanup.outcome",
+              'agent failure log',
+          )
+          workflow_path.write_text(prefix + '  service-verification:\n' + service + '  m1-acceptance:\n' + suffix)
+
+          summary_path = Path('scripts/summarize-ci-metrics.mjs')
+          summary = summary_path.read_text()
+          summary = replace_once(
+              summary,
+              "  ['vitest-acceptance.xml', 'acceptance'],\n",
+              "  ['vitest-acceptance.xml', 'acceptance'],\n  ['playwright-browser.xml', 'browser-smoke'],\n",
+              'browser JUnit layer',
+          )
+          summary = replace_once(
+              summary,
+              "  if (stageNames.has('acceptance')) requiredLayers.add('acceptance');\n",
+              "  if (stageNames.has('acceptance')) requiredLayers.add('acceptance');\n  if (stageNames.has('browser-smoke')) requiredLayers.add('browser-smoke');\n",
+              'browser required layer',
+          )
+          summary_path.write_text(summary)
+
+          accounting_path = Path('scripts/ci-test-accounting.test.mjs')
+          accounting = accounting_path.read_text()
+          marker = "  it('resets the database after integration failure and preserves the failure', () => {\n"
+          browser_test = """  it('requires nonzero browser evidence for a completed browser-smoke stage', () => {
+            const { result, summary } = runSummary(['browser-smoke'], {
+              'playwright-browser.xml': junit(
+                'operator-console.smoke.spec.ts',
+                'desktop production smoke',
+              ),
+            });
+            expect(result.status).toBe(0);
+            expect(summary.tests.layers).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({
+                  layer: 'browser-smoke',
+                  files: 1,
+                  tests: 1,
+                }),
+              ]),
+            );
+
+            const missing = runSummary(['browser-smoke'], {});
+            expect(missing.result.status).toBe(1);
+            expect(missing.summary.validation.missingLayers).toEqual([
+              'browser-smoke',
+            ]);
+          });
+
+          """
+          accounting = replace_once(
+              accounting,
+              marker,
+              browser_test + marker,
+              'browser accounting regression',
+          )
+          accounting_path.write_text(accounting)
+          PY
+
+      - name: Format modified files
+        run: |
+          pnpm exec prettier --write \
+            .github/workflows/repository-verification.yml \
+            scripts/summarize-ci-metrics.mjs \
+            scripts/ci-test-accounting.test.mjs \
+            playwright.config.ts \
+            tests/browser/operator-console.smoke.spec.ts \
+            scripts/run-operator-browser-smoke.mjs \
+            apps/console/vite.config.ts
+
+      - name: Commit required browser smoke wiring
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            .github/workflows/repository-verification.yml \
+            scripts/summarize-ci-metrics.mjs \
+            scripts/ci-test-accounting.test.mjs \
+            playwright.config.ts \
+            tests/browser/operator-console.smoke.spec.ts \
+            scripts/run-operator-browser-smoke.mjs \
+            apps/console/vite.config.ts
+          git commit -m 'test: require production operator browser smoke'
+          git push origin HEAD:test/operator-browser-smoke
