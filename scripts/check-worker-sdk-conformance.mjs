@@ -51,7 +51,10 @@ function isRepoPath(repoRoot, value) {
   if (isAbsolute(value)) return false;
   const absolute = resolve(repoRoot, value);
   const fromRoot = relative(repoRoot, absolute);
-  return fromRoot !== '..' && !fromRoot.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`);
+  return (
+    fromRoot !== '..' &&
+    !fromRoot.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+  );
 }
 
 export function validateWorkerSdkConformance({
@@ -69,9 +72,11 @@ export function validateWorkerSdkConformance({
 
   const caseIds = corpus.cases?.map((testCase) => testCase.id) ?? [];
   const uniqueCaseIds = new Set(caseIds);
-  if (uniqueCaseIds.size !== caseIds.length) errors.push('case ids must be unique');
+  if (uniqueCaseIds.size !== caseIds.length)
+    errors.push('case ids must be unique');
   for (const required of REQUIRED_CASE_IDS)
-    if (!uniqueCaseIds.has(required)) errors.push(`missing required case: ${required}`);
+    if (!uniqueCaseIds.has(required))
+      errors.push(`missing required case: ${required}`);
 
   const fixturePaths = new Set();
   for (const testCase of corpus.cases ?? [])
@@ -93,14 +98,20 @@ export function validateWorkerSdkConformance({
   );
   if (deprecated) {
     if (deprecated.request.sdkInputAlias !== 'capabilities')
-      errors.push('claim.deprecated-capabilities must name the deprecated alias');
+      errors.push(
+        'claim.deprecated-capabilities must name the deprecated alias',
+      );
     if (deprecated.request.expectedWireBody?.capabilities !== undefined)
-      errors.push('deprecated capabilities must not reach the canonical wire body');
+      errors.push(
+        'deprecated capabilities must not reach the canonical wire body',
+      );
     if (
       JSON.stringify(deprecated.request.componentSelectors) !==
       JSON.stringify(deprecated.request.expectedWireBody?.componentSelectors)
     )
-      errors.push('deprecated capabilities must normalize to componentSelectors');
+      errors.push(
+        'deprecated capabilities must normalize to componentSelectors',
+      );
   }
 
   const classificationCounts = {};
