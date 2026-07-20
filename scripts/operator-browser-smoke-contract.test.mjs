@@ -61,7 +61,7 @@ describe('production operator browser smoke', () => {
     expect(spec).toContain("searchParams.has('cursor')");
     expect(spec).toContain('toHaveCount(1)');
     expect(spec).toContain('keyboard.press');
-    expect(spec).toContain("page.goto(`/runs/${fixture.runId}`)");
+    expect(spec).toContain('page.goto(`/runs/${fixture.runId}`)');
   });
 
   it('makes the browser smoke required and retains actionable failure evidence', () => {
