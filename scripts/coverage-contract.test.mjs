@@ -28,7 +28,9 @@ describe('coverage evidence contract', () => {
     const qualityGates = JSON.parse(read('quality-gates.json'));
 
     expect(config).toContain("provider: 'v8'");
-    expect(config).toContain("reportsDirectory: '.factory-floor/coverage/typescript'");
+    expect(config).toContain(
+      "reportsDirectory: '.factory-floor/coverage/typescript'",
+    );
     expect(config).toContain("'**/generated/**'");
     expect(config).toContain("'apps/control-plane/src/server.ts'");
     expect(config).not.toContain('thresholds:');
