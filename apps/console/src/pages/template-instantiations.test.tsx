@@ -152,7 +152,7 @@ describe('template-instantiation console views', () => {
       await screen.findByRole('heading', { name: 'Template instantiation' }),
     ).toBeInTheDocument();
     expect(screen.getByText('verifier.checkpoint')).toBeInTheDocument();
-    expect(screen.getByText('checkpoint@1')).toBeInTheDocument();
+    expect(screen.getByText(/checkpoint@1/)).toBeInTheDocument();
     expect(screen.getByLabelText('Copy artifact-a')).toBeInTheDocument();
     expect(screen.getByText(/completedSteps/)).toBeInTheDocument();
     expect(screen.getAllByText(/templateInstantiation/).length).toBeGreaterThan(
