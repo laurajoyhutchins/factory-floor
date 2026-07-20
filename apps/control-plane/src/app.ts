@@ -40,7 +40,9 @@ import {
 } from './service-auth.js';
 import { createNonceRepository } from './nonce-repository.js';
 import { ActivitySessionService } from './activity-session-service.js';
+import { DatabaseActivitySessionAuthorizer } from './activity-session-read-authorizer.js';
 import { registerActivityRoutes } from './routes/activity.js';
+import { registerActivityBrowserRoutes } from './routes/activity-browser.js';
 
 export interface StartupRecoveryBounds {
   expiredAttempts: number;
@@ -260,8 +262,6 @@ export async function buildApp(
       }
     },
   );
-  if (deps.controlPlaneSecurity)
-    registerControlPlaneSecurity(app, deps.controlPlaneSecurity);
   app.get('/health', async () => ({
     status: 'ok',
     service: 'control-plane',
@@ -272,6 +272,18 @@ export async function buildApp(
     (process.env.DATABASE_URL
       ? createDatabase(process.env.DATABASE_URL)
       : undefined);
+  const activitySessionService = db
+    ? new ActivitySessionService(db)
+    : undefined;
+  const activitySessionAuthorizer = db
+    ? new DatabaseActivitySessionAuthorizer(db)
+    : undefined;
+  if (deps.controlPlaneSecurity)
+    registerControlPlaneSecurity(
+      app,
+      deps.controlPlaneSecurity,
+      activitySessionAuthorizer,
+    );
   const artifactBlobStore =
     deps.artifactBlobStore ??
     (db
@@ -367,13 +379,23 @@ export async function buildApp(
     });
   }
 
-  if (deps.serviceAuthKeys && db) {
+  if (
+    deps.serviceAuthKeys &&
+    db &&
+    activitySessionService &&
+    activitySessionAuthorizer
+  ) {
     const serviceAuthConfig: ServiceAuthConfig = {
       keys: deps.serviceAuthKeys,
       db: createNonceRepository(db),
     };
     registerServiceAuth(app, serviceAuthConfig);
-    await registerActivityRoutes(app, new ActivitySessionService(db));
+    await registerActivityRoutes(app, activitySessionService);
+    await registerActivityBrowserRoutes(
+      app,
+      activitySessionService,
+      activitySessionAuthorizer,
+    );
   }
 
   if (db)

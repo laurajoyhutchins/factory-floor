@@ -50,6 +50,7 @@ verify_unit() {
     pnpm test:python
   fi
   pnpm --filter @factory-floor/console build
+  pnpm --filter @factory-floor/discord-activity build
 }
 
 verify_fast() {
