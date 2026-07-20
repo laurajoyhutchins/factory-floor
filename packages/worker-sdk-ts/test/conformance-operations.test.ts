@@ -53,13 +53,16 @@ function responseBody(testCase: (typeof corpus.cases)[number]): unknown {
 }
 
 function errorClassification(error: WorkerSdkError): string {
-  return (
-    {
-      lease: 'lease_error',
-      capability_denied: 'capability_denied',
-      conflict: 'conflict',
-    }[error.kind] ?? error.kind
-  );
+  switch (error.kind) {
+    case 'lease':
+      return 'lease_error';
+    case 'capability_denied':
+      return 'capability_denied';
+    case 'conflict':
+      return 'conflict';
+    default:
+      return error.kind;
+  }
 }
 
 async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
