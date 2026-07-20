@@ -89,7 +89,8 @@ describe('operator client', () => {
     await expect(
       client.runEvents('run-1', { cursor: 'opaque==', limit: 1 }),
     ).resolves.toMatchObject({ resumeCursor: 'opaque==', complete: true });
-    expect(String(fetch.mock.calls[0]?.[0])).toContain('cursor=opaque%3D%3D');
+    const calls = fetch.mock.calls as unknown as [string, RequestInit][];
+    expect(String(calls[0]?.[0])).toContain('cursor=opaque%3D%3D');
   });
 
   it('maps canonical HTTP errors and rejects malformed responses', async () => {
