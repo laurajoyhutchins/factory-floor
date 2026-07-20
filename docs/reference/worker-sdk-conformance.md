@@ -26,6 +26,12 @@ Both adapters consume every applicable case from the same corpus. They may trans
 
 The suite covers claim/no-work behavior, invocation-envelope decoding, deprecated claim normalization, lease and stale-epoch errors, cancellation observation, artifact staging and exact upload bytes, capability denial, accepted and duplicate results, malformed responses, and retry-safe transport behavior.
 
+## Compatibility aliases
+
+Temporary SDK aliases are normative only when they appear in the [worker protocol compatibility and deprecation ledger](worker-protocol-compatibility.md). Each entry identifies the canonical replacement, supported versions, warning behavior, automated evidence, owner, and removal milestone.
+
+Protocol v1 aliases must normalize to canonical wire requests and remain tested. New code uses only canonical APIs. Their protocol v2 removal is tracked by [issue #107](https://github.com/laurajoyhutchins/factory-floor/issues/107).
+
 ## Stable normalized outcomes
 
 Adapters report the corpus classifications rather than language-specific exception class names:
