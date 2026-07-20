@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "protocol": "discord-agent-activity-revalidation",
+  "endpoint": {
+    "method": "POST",
+    "path": "/api/v1/discord/activity/revalidate",
+    "authenticationDirection": "ff-to-agent"
+  },
+  "allow": {
+    "request": {
+      "applicationId": "application-1",
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "installationId": "guild-1",
+      "guildId": "guild-1",
+      "channelId": "agent-1",
+      "threadId": "thread-1",
+      "principalId": "user-1",
+      "adapter": "discord-agent",
+      "projectId": "ff-project-1",
+      "runId": "run-1",
+      "action": "approve"
+    },
+    "response": {
+      "schemaVersion": 1,
+      "allowed": true,
+      "reasonCode": "authorized",
+      "action": "approve",
+      "principalId": "user-1",
+      "runId": "run-1",
+      "revalidatedAt": 2000
+    }
+  },
+  "deny": {
+    "request": {
+      "applicationId": "application-1",
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "installationId": "guild-1",
+      "guildId": "guild-1",
+      "channelId": "agent-1",
+      "threadId": "thread-1",
+      "principalId": "user-1",
+      "adapter": "discord-agent",
+      "projectId": "ff-project-1",
+      "runId": "run-1",
+      "action": "cancel"
+    },
+    "response": {
+      "schemaVersion": 1,
+      "allowed": false,
+      "reasonCode": "not_authorized",
+      "action": "cancel",
+      "revalidatedAt": 2000
+    }
+  },
+  "reasonCodes": [
+    "authorized",
+    "invalid_request",
+    "unsupported_action",
+    "rate_limited",
+    "activity_instance_not_found",
+    "activity_instance_unavailable",
+    "activity_application_mismatch",
+    "activity_location_mismatch",
+    "activity_principal_not_present",
+    "installation_mismatch",
+    "guild_mismatch",
+    "member_not_found",
+    "member_unavailable",
+    "principal_mismatch",
+    "not_authorized",
+    "project_binding_not_found",
+    "surface_binding_not_found",
+    "run_binding_not_found",
+    "binding_mismatch",
+    "adapter_mismatch"
+  ]
+}
