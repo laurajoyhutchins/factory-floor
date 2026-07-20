@@ -1,3 +1,19 @@
+import { createOperatorClient } from '@factory-floor/operator-client';
+import {
+  ArtifactDetail,
+  Artifacts,
+  ExecutionDetail,
+  Executions,
+  NotFound,
+  Operations,
+  OperatorClientProvider,
+  Overview,
+  Shell,
+  TemplateInstantiationDetail,
+  TemplateInstantiations,
+  Topology,
+  useLiveEvents,
+} from '@factory-floor/operator-ui-react';
 import {
   QueryClient,
   QueryClientProvider,
@@ -6,24 +22,18 @@ import {
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
-import { consoleApi } from './api/client.js';
-import { Shell } from './components/ui.js';
-import { useLiveEvents } from './hooks/liveEvents.js';
-import {
-  ArtifactDetail,
-  Artifacts,
-  ExecutionDetail,
-  Executions,
-  NotFound,
-  Operations,
-  Overview,
-  Topology,
-} from './pages/pages.js';
-import {
-  TemplateInstantiationDetail,
-  TemplateInstantiations,
-} from './pages/template-instantiations.js';
 import './styles.css';
+
+const operatorToken = import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim();
+const operatorClient = createOperatorClient({
+  headers: {
+    ...(operatorToken ? { authorization: `Bearer ${operatorToken}` } : {}),
+    'x-factory-floor-principal-id':
+      import.meta.env.VITE_FACTORY_FLOOR_PRINCIPAL_ID?.trim() ||
+      'operator:standalone-console',
+    'x-factory-floor-adapter': 'standalone-console',
+  },
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,7 +58,7 @@ function App() {
   const location = useLocation();
   const health = useQuery({
     queryKey: ['health'],
-    queryFn: ({ signal }) => consoleApi.health(signal),
+    queryFn: ({ signal }) => operatorClient.health(signal),
   });
   const segment = location.pathname.split('/').filter(Boolean)[0];
   const title = segment ? (titles[segment] ?? 'Not found') : 'Overview';
@@ -94,7 +104,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <OperatorClientProvider client={operatorClient}>
+          <App />
+        </OperatorClientProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

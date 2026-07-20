@@ -1,24 +1,25 @@
 {
-  "name": "@factory-floor/console",
+  "name": "@factory-floor/operator-ui-react",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b --pretty false && vite build",
     "typecheck": "tsc -p tsconfig.json --pretty false",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@factory-floor/operator-client": "workspace:*",
-    "@factory-floor/operator-ui-react": "workspace:*",
     "@tanstack/react-query": "^5.83.0",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@xyflow/react": "^12.8.2",
+    "react-router": "^7.6.3"
+  },
+  "peerDependencies": {
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router": "^7.6.3",
-    "vite": "^7.0.4"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -26,6 +27,9 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "jsdom": "^26.1.0"
+    "@vitejs/plugin-react": "^4.6.0",
+    "jsdom": "^26.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   }
 }
