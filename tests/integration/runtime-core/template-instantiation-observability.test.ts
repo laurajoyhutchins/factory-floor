@@ -166,15 +166,18 @@ describe('template-instantiation observability in PostgreSQL', () => {
     });
 
     const rebuild = await service.rebuildProjections(50);
-    expect(rebuild.checkpointed).toBeGreaterThan(10);
+    expect(rebuild.checkpointed).toBe(10);
     const after = await new ObservabilityService(db).projectionStatus();
-    expect(
-      after.find(
-        (projection) =>
-          String(projection.projectionName) ===
-          'template-instantiation-history',
-      )?.snapshot,
-    ).toEqual(snapshotBefore?.snapshot);
+    const snapshotAfter = after.find(
+      (projection) =>
+        String(projection.projectionName) ===
+        'template-instantiation-history',
+    );
+    expect(snapshotAfter).toMatchObject({
+      checkpointId: expect.any(String),
+      updatedAt: expect.any(Date),
+    });
+    expect(snapshotAfter?.snapshot).toEqual(snapshotBefore?.snapshot);
 
     const trace = await service.executionTrace(executionId);
     expect(trace?.templateInstantiations.map((item) => item.id)).toEqual([
