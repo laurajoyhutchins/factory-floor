@@ -1,0 +1,60 @@
+name: Update coverage locks
+
+on:
+  push:
+    branches:
+      - agent/coverage-evidence
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-coverage-locks
+  cancel-in-progress: true
+
+jobs:
+  update-locks:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: agent/coverage-evidence
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Install package managers
+        run: |
+          corepack prepare pnpm@10.12.1 --activate
+          corepack enable
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate locked dependencies
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          pnpm install --lockfile-only
+          uv lock --project packages/worker-sdk-py
+          uv lock --project workers/demo-py
+
+      - name: Commit lockfiles
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add pnpm-lock.yaml packages/worker-sdk-py/uv.lock workers/demo-py/uv.lock
+          if git diff --cached --quiet; then
+            echo 'Lockfiles already current.'
+            exit 0
+          fi
+          git commit -m 'chore: lock coverage dependencies'
+          git push origin HEAD:agent/coverage-evidence
