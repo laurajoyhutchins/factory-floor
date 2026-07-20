@@ -47,7 +47,7 @@ describe('run details client', () => {
     });
     expect(result.projectionFreshness.staleAfterMs).toBe(60000);
     expect(fetch).toHaveBeenCalledWith(
-      new URL('https://factory.example/api/v1/operator/runs/run-1/details?limit=25'),
+      'https://factory.example/api/v1/operator/runs/run-1/details?limit=25',
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',
