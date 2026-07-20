@@ -33,7 +33,7 @@
     },
     {
       "name": "m1-clean-acceptance",
-      "command": "pnpm accept:m1",
+      "command": "bash scripts/accept-m1.sh",
       "metric": ".factory-floor/ci-metrics/m1-clean-acceptance.json",
       "logs": ["m1-acceptance.log"]
     }

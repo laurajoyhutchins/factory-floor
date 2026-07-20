@@ -68,26 +68,42 @@ install_package_managers() {
   corepack enable --install-directory "$LOCAL_BIN" pnpm
 }
 
+discover_python_projects() {
+  find "$ROOT_DIR" \
+    -type d \( \
+      -name .git -o \
+      -name .venv -o \
+      -name node_modules -o \
+      -name dist -o \
+      -name build -o \
+      -name coverage -o \
+      -name generated \
+    \) -prune -o \
+    -type f -name pyproject.toml -print0
+}
+
 install_dependencies() {
   cd "$ROOT_DIR"
 
   if [[ -f package.json ]]; then
-    if [[ -f pnpm-lock.yaml ]]; then
-      log "Installing JavaScript dependencies from pnpm-lock.yaml"
-      pnpm install --frozen-lockfile
-    else
-      log "Installing JavaScript dependencies; no lockfile exists yet"
-      pnpm install --no-frozen-lockfile
-    fi
+    [[ -f pnpm-lock.yaml ]] || fail "pnpm-lock.yaml is required for the JavaScript workspace."
+    log "Installing JavaScript dependencies from pnpm-lock.yaml"
+    pnpm install --frozen-lockfile
   fi
 
-  local project
-  for project in "$ROOT_DIR" "$ROOT_DIR/packages/worker-sdk-py"; do
-    if [[ -f "$project/pyproject.toml" ]]; then
-      log "Synchronizing Python project ${project#$ROOT_DIR/}"
-      uv sync --project "$project"
-    fi
-  done
+  local manifest project relative_project project_count=0
+  while IFS= read -r -d '' manifest; do
+    project="${manifest%/pyproject.toml}"
+    [[ -f "$project/uv.lock" ]] || fail "Python project ${project#$ROOT_DIR/} is missing uv.lock."
+    relative_project="${project#$ROOT_DIR/}"
+    [[ "$project" == "$ROOT_DIR" ]] && relative_project="."
+    log "Synchronizing locked Python project ${relative_project}"
+    uv sync --project "$project" --locked
+    project_count=$((project_count + 1))
+  done < <(discover_python_projects | sort -z)
+
+  ((project_count > 0)) || fail "No Python projects were discovered."
+  log "Synchronized ${project_count} locked Python projects"
 }
 
 print_summary() {

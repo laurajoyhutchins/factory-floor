@@ -40,31 +40,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Activate pnpm
-        id: activate-pnpm
-        run: |
-          set -o pipefail
-          { corepack enable && corepack prepare pnpm@10.12.1 --activate && pnpm --version; } 2>&1 | tee activate-pnpm.log
-
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        id: install-uv
-        run: |
-          set -o pipefail
-          python -m pip install --disable-pip-version-check uv 2>&1 | tee install-uv.log
-
-      - name: Install locked dependencies
-        id: install-dependencies
-        run: |
-          set -o pipefail
-          { pnpm install --frozen-lockfile && uv sync --project packages/contracts-py --locked && uv sync --project packages/worker-sdk-py --locked; } 2>&1 | tee install-dependencies.log
-
-      - name: Verify workspace bootstrap
+      - name: Bootstrap workspace
         id: bootstrap
         run: |
           set -o pipefail
@@ -97,9 +79,6 @@ jobs:
           path: |
             .factory-floor/ci-metrics/
             .factory-floor/test-results/
-            activate-pnpm.log
-            install-uv.log
-            install-dependencies.log
             bootstrap.log
             fast-static.log
             unit-verification.log
@@ -116,9 +95,9 @@ jobs:
         env:
           AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status == 'success' && steps.evidence-upload.outcome == 'success' && 'success' || 'failure' }}
-          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.install-uv.outcome == 'failure' && 'install-uv' || steps.install-dependencies.outcome == 'failure' && 'install-dependencies' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
-          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.activate-pnpm.outcome == 'failure' && 'corepack prepare pnpm@10.12.1 --activate' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.install-uv.outcome == 'failure' && 'python -m pip install --disable-pip-version-check uv' || steps.install-dependencies.outcome == 'failure' && 'pnpm install --frozen-lockfile' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
-          AGENT_CI_FAILURE_LOG: ${{ steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm.log' || steps.install-uv.outcome == 'failure' && 'install-uv.log' || steps.install-dependencies.outcome == 'failure' && 'install-dependencies.log' || steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
+          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
+          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
+          AGENT_CI_FAILURE_LOG: ${{ steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job fast-verification --artifact fast-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload fast agent handoff
@@ -154,31 +133,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Activate pnpm
-        id: activate-pnpm
-        run: |
-          set -o pipefail
-          { corepack enable && corepack prepare pnpm@10.12.1 --activate && pnpm --version; } 2>&1 | tee activate-pnpm.log
-
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        id: install-uv
-        run: |
-          set -o pipefail
-          python -m pip install --disable-pip-version-check uv 2>&1 | tee install-uv.log
-
-      - name: Install locked dependencies
-        id: install-dependencies
-        run: |
-          set -o pipefail
-          { pnpm install --frozen-lockfile && uv sync --project packages/contracts-py --locked && uv sync --project packages/worker-sdk-py --locked; } 2>&1 | tee install-dependencies.log
-
-      - name: Verify workspace bootstrap
+      - name: Bootstrap workspace
         id: bootstrap
         run: |
           set -o pipefail
@@ -220,9 +181,6 @@ jobs:
           path: |
             .factory-floor/ci-metrics/
             .factory-floor/test-results/
-            activate-pnpm.log
-            install-uv.log
-            install-dependencies.log
             bootstrap.log
             services-verification.log
             integration-verification.log
@@ -238,9 +196,9 @@ jobs:
         env:
           AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status == 'success' && steps.evidence-upload.outcome == 'success' && 'success' || 'failure' }}
-          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.install-uv.outcome == 'failure' && 'install-uv' || steps.install-dependencies.outcome == 'failure' && 'install-dependencies' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.cleanup.outcome == 'failure' && 'cleanup' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
-          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.activate-pnpm.outcome == 'failure' && 'corepack prepare pnpm@10.12.1 --activate' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.install-uv.outcome == 'failure' && 'python -m pip install --disable-pip-version-check uv' || steps.install-dependencies.outcome == 'failure' && 'pnpm install --frozen-lockfile' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
-          AGENT_CI_FAILURE_LOG: ${{ steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm.log' || steps.install-uv.outcome == 'failure' && 'install-uv.log' || steps.install-dependencies.outcome == 'failure' && 'install-dependencies.log' || steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.cleanup.outcome == 'failure' && 'cleanup.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
+          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.cleanup.outcome == 'failure' && 'cleanup' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
+          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
+          AGENT_CI_FAILURE_LOG: ${{ steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.cleanup.outcome == 'failure' && 'cleanup.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job service-verification --artifact service-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload service agent handoff
@@ -273,12 +231,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Activate pnpm
-        id: activate-pnpm
-        run: |
-          set -o pipefail
-          { corepack enable && corepack prepare pnpm@10.12.1 --activate && pnpm --version; } 2>&1 | tee activate-pnpm.log
-
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -292,14 +244,18 @@ jobs:
           DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
           ARTIFACT_STORE_ROOT: .factory-floor/demo-artifacts
           FACTORY_FLOOR_CLEAN_CHECKOUT: '1'
-        run: node scripts/run-ci-stage.mjs --stage m1-clean-acceptance --output .factory-floor/ci-metrics/m1-clean-acceptance.json -- bash -c 'set -o pipefail; pnpm accept:m1 2>&1 | tee m1-acceptance.log'
+        run: node scripts/run-ci-stage.mjs --stage m1-clean-acceptance --output .factory-floor/ci-metrics/m1-clean-acceptance.json -- bash -c 'set -o pipefail; bash scripts/accept-m1.sh 2>&1 | tee m1-acceptance.log'
 
       - name: Stop development services
         id: cleanup
         if: always()
         run: |
           set -o pipefail
-          pnpm services:clean 2>&1 | tee cleanup.log
+          if command -v pnpm >/dev/null 2>&1; then
+            pnpm services:clean 2>&1 | tee cleanup.log
+          else
+            printf 'pnpm was not installed; no services were started by bootstrap.\n' | tee cleanup.log
+          fi
 
       - name: Summarize clean acceptance metrics
         id: metrics-summary
@@ -319,7 +275,6 @@ jobs:
             .factory-floor/ci-metrics/
             .factory-floor/test-results/
             .factory-floor/evidence/m1/
-            activate-pnpm.log
             m1-acceptance.log
             cleanup.log
             metrics-summary.log
@@ -332,9 +287,9 @@ jobs:
         env:
           AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status == 'success' && steps.evidence-upload.outcome == 'success' && 'success' || 'failure' }}
-          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.cleanup.outcome == 'failure' && 'cleanup' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
-          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.activate-pnpm.outcome == 'failure' && 'corepack prepare pnpm@10.12.1 --activate' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
-          AGENT_CI_FAILURE_LOG: ${{ steps.activate-pnpm.outcome == 'failure' && 'activate-pnpm.log' || steps.cleanup.outcome == 'failure' && 'cleanup.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
+          AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.m1-clean-acceptance.outcome == 'failure' && 'm1-clean-acceptance' || steps.cleanup.outcome == 'failure' && 'cleanup' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
+          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.m1-clean-acceptance.outcome == 'failure' && 'bash scripts/accept-m1.sh' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
+          AGENT_CI_FAILURE_LOG: ${{ steps.m1-clean-acceptance.outcome == 'failure' && 'm1-acceptance.log' || steps.cleanup.outcome == 'failure' && 'cleanup.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job m1-acceptance --artifact m1-acceptance-evidence-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload M1 agent handoff
