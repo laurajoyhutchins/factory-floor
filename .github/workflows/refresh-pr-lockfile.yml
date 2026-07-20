@@ -1,0 +1,97 @@
+name: Refresh pull request lockfile
+
+on:
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: write
+  pull-requests: read
+  issues: write
+
+jobs:
+  refresh:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/refresh-lockfile' &&
+      github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve same-repository pull request
+        id: pull
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pullNumber = context.issue.number;
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullNumber,
+            });
+            if (pull.state !== 'open') {
+              core.setFailed(`Pull request #${pullNumber} is not open.`);
+              return;
+            }
+            if (pull.head.repo?.full_name !== `${owner}/${repo}`) {
+              core.setFailed('Lockfile refresh is restricted to same-repository pull requests.');
+              return;
+            }
+            core.setOutput('head-ref', pull.head.ref);
+            core.setOutput('head-sha', pull.head.sha);
+
+      - name: Check out exact pull request head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ steps.pull.outputs.head-sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Regenerate the lockfile without lifecycle scripts
+        run: |
+          corepack prepare pnpm@10.12.1 --activate
+          corepack enable
+          pnpm install --lockfile-only --ignore-scripts
+
+      - name: Commit a lockfile-only update
+        id: commit
+        env:
+          HEAD_REF: ${{ steps.pull.outputs.head-ref }}
+        run: |
+          unexpected="$(git status --short | grep -v '^ M pnpm-lock.yaml$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            printf 'Unexpected files changed during lockfile refresh:\n%s\n' "$unexpected" >&2
+            exit 1
+          fi
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add pnpm-lock.yaml
+          git commit -m 'chore: refresh pnpm lockfile'
+          git push origin "HEAD:${HEAD_REF}"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Record the result
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          HEAD_REF: ${{ steps.pull.outputs.head-ref }}
+        with:
+          script: |
+            const changed = process.env.CHANGED === 'true';
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: changed
+                ? `Lockfile refreshed on \`${process.env.HEAD_REF}\` with pnpm 10.12.1; lifecycle scripts were disabled.`
+                : `Lockfile already current on \`${process.env.HEAD_REF}\`.`,
+            });
