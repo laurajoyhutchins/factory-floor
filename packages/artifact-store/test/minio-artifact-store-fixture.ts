@@ -55,11 +55,12 @@ export async function createMinioArtifactStoreFixture(): Promise<MinioArtifactSt
     async cleanup() {
       if (cleaned) return;
       cleaned = true;
-      await emptyBucket(client, bucket);
-      await client
-        .send(new DeleteBucketCommand({ Bucket: bucket }))
-        .catch(() => undefined);
-      client.destroy();
+      try {
+        await emptyBucket(client, bucket);
+        await client.send(new DeleteBucketCommand({ Bucket: bucket }));
+      } finally {
+        client.destroy();
+      }
     },
   };
 }
