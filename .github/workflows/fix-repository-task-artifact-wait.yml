@@ -1,4 +1,4 @@
-name: Fix repository-task artifact wait
+name: Fix repository-task artifact promotion wait
 
 on:
   pull_request:
