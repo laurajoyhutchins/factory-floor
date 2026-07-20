@@ -1,6 +1,7 @@
 import {
   OperatorClientError,
-  type OperatorClientOptions,
+  normalize,
+  type OperatorClientConfig,
 } from './index.js';
 
 export interface RunApprovalDetail {
@@ -93,117 +94,175 @@ export interface RunDetailsRequest {
 }
 
 export interface RunDetailsClient {
-  getRunDetails(runId: string, request?: RunDetailsRequest): Promise<RunDetailsPage>;
+  getRunDetails(
+    runId: string,
+    request?: RunDetailsRequest,
+  ): Promise<RunDetailsPage>;
 }
 
-function normalizeBaseUrl(value: string): URL {
-  const url = new URL(value);
-  if (url.username || url.password || url.search || url.hash)
-    throw new Error('operator_client_base_url_invalid');
-  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1')
-    throw new Error('operator_client_https_required');
-  url.pathname = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
-  return url;
+function normalizeBaseUrl(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
 }
 
-function normalizeJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(normalizeJson);
-  if (value === null || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-      key.replace(/_([a-z])/g, (_, character: string) => character.toUpperCase()),
-      normalizeJson(item),
-    ]),
-  );
+function targetUrl(baseUrl: string | undefined, path: string): string {
+  return baseUrl ? new URL(path.replace(/^\//, ''), baseUrl).toString() : path;
 }
 
-function retryable(status: number): boolean {
+function positiveInteger(value: number | undefined, fallback: number): number {
+  return Number.isInteger(value) && Number(value) > 0
+    ? Number(value)
+    : fallback;
+}
+
+function transientStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-function wait(delayMs: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, delayMs));
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function createRunDetailsClient(options: OperatorClientOptions): RunDetailsClient {
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
-  const fetchImplementation = options.fetch ?? globalThis.fetch;
-  const maximumAttempts = options.retry?.maxAttempts ?? 3;
-  const baseDelayMs = options.retry?.baseDelayMs ?? 250;
-  const maximumDelayMs = options.retry?.maxDelayMs ?? 5_000;
-  if (!Number.isInteger(maximumAttempts) || maximumAttempts < 1)
-    throw new Error('operator_client_retry_attempts_invalid');
+function errorDetails(body: unknown): { code?: string; message?: string } {
+  if (!isRecord(body) || !isRecord(body.error)) return {};
+  return {
+    code: typeof body.error.code === 'string' ? body.error.code : undefined,
+    message:
+      typeof body.error.message === 'string' ? body.error.message : undefined,
+  };
+}
+
+function assertRunDetails(value: unknown): RunDetailsPage {
+  if (!isRecord(value))
+    throw new OperatorClientError(
+      'malformed-response',
+      'Expected run details to be an object.',
+    );
+  if (
+    typeof value.runId !== 'string' ||
+    !isRecord(value.limits) ||
+    typeof value.limits.records !== 'number' ||
+    !Array.isArray(value.approvals) ||
+    !Array.isArray(value.policyDecisions) ||
+    !Array.isArray(value.resources) ||
+    !Array.isArray(value.derivations) ||
+    !isRecord(value.projectionFreshness) ||
+    !Array.isArray(value.projectionFreshness.items)
+  )
+    throw new OperatorClientError(
+      'malformed-response',
+      'The run details response is incomplete.',
+    );
+  return value as unknown as RunDetailsPage;
+}
+
+export function createRunDetailsClient(
+  config: OperatorClientConfig,
+): RunDetailsClient {
+  const principalId = config.principalId.trim();
+  const adapter = config.adapter.trim();
+  if (!principalId)
+    throw new OperatorClientError(
+      'malformed-response',
+      'principalId is required.',
+    );
+  if (!adapter)
+    throw new OperatorClientError('malformed-response', 'adapter is required.');
+
+  const baseUrl = normalizeBaseUrl(config.baseUrl);
+  const token = config.token?.trim();
+  const fetchImplementation = config.fetch ?? globalThis.fetch;
+  const maxAttempts = positiveInteger(config.retry?.maxAttempts, 3);
+  const baseDelayMs = positiveInteger(config.retry?.baseDelayMs, 100);
+  const sleep =
+    config.retry?.sleep ??
+    ((milliseconds: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
 
   return {
     async getRunDetails(runId, request = {}) {
       const normalizedRunId = runId.trim();
-      if (!normalizedRunId) throw new Error('run_id_required');
+      if (!normalizedRunId)
+        throw new OperatorClientError(
+          'malformed-response',
+          'runId is required.',
+        );
       const url = new URL(
-        `api/v1/operator/runs/${encodeURIComponent(normalizedRunId)}/details`,
-        baseUrl,
+        `/api/v1/operator/runs/${encodeURIComponent(normalizedRunId)}/details`,
+        'http://factory-floor.local',
       );
       if (request.limit !== undefined)
         url.searchParams.set('limit', String(request.limit));
+      const path = `${url.pathname}${url.search}`;
 
-      let lastError: unknown;
-      for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        let response: Response;
         try {
-          const response = await fetchImplementation(url, {
+          response = await fetchImplementation(targetUrl(baseUrl, path), {
             method: 'GET',
             headers: {
               accept: 'application/json',
-              'x-factory-floor-principal-id': options.principalId,
-              'x-factory-floor-adapter': options.adapter,
-              ...(options.token
-                ? { authorization: `Bearer ${options.token}` }
-                : {}),
+              ...(token ? { authorization: `Bearer ${token}` } : {}),
+              'x-factory-floor-principal-id': principalId,
+              'x-factory-floor-adapter': adapter,
             },
             cache: 'no-store',
           });
-          const payload = (await response.json().catch(() => null)) as unknown;
-          if (response.ok) return normalizeJson(payload) as RunDetailsPage;
-
-          const record =
-            payload !== null && typeof payload === 'object' && !Array.isArray(payload)
-              ? (payload as Record<string, unknown>)
-              : {};
-          const error =
-            record.error !== null &&
-            typeof record.error === 'object' &&
-            !Array.isArray(record.error)
-              ? (record.error as Record<string, unknown>)
-              : {};
-          const code =
-            typeof error.code === 'string' ? error.code : `http_${response.status}`;
-          const message =
-            typeof error.message === 'string' ? error.message : code;
-          const clientError = new OperatorClientError(
-            code,
-            message,
-            response.status,
-            retryable(response.status),
-          );
-          if (!clientError.retryable || attempt === maximumAttempts)
-            throw clientError;
-          lastError = clientError;
         } catch (error) {
-          if (error instanceof OperatorClientError) {
-            if (!error.retryable || attempt === maximumAttempts) throw error;
-            lastError = error;
-          } else {
-            lastError = error;
-            if (attempt === maximumAttempts)
-              throw new OperatorClientError(
-                'network_error',
-                'Factory Floor could not be reached.',
-                0,
-                true,
-              );
+          if ((error as Error).name === 'AbortError')
+            throw new OperatorClientError('aborted', 'Request was cancelled.');
+          if (attempt < maxAttempts) {
+            await sleep(baseDelayMs * 2 ** (attempt - 1));
+            continue;
           }
+          throw new OperatorClientError(
+            'transport',
+            'Unable to reach the control plane.',
+          );
         }
-        await wait(Math.min(maximumDelayMs, baseDelayMs * 2 ** (attempt - 1)));
+
+        if (transientStatus(response.status) && attempt < maxAttempts) {
+          await sleep(baseDelayMs * 2 ** (attempt - 1));
+          continue;
+        }
+
+        const text = await response.text();
+        let parsed: unknown = null;
+        if (text)
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            if (!response.ok)
+              throw new OperatorClientError(
+                'http',
+                `The control plane returned HTTP ${response.status}.`,
+                response.status,
+              );
+            throw new OperatorClientError(
+              'malformed-response',
+              'The control plane returned malformed JSON.',
+              response.status,
+            );
+          }
+
+        if (!response.ok) {
+          const details = errorDetails(parsed);
+          throw new OperatorClientError(
+            response.status === 404 ? 'not-found' : 'http',
+            details.message ??
+              `The control plane returned HTTP ${response.status}.`,
+            response.status,
+            details.code,
+          );
+        }
+        return assertRunDetails(normalize(parsed));
       }
-      throw lastError;
+
+      throw new OperatorClientError(
+        'transport',
+        'Unable to reach the control plane.',
+      );
     },
   };
 }
