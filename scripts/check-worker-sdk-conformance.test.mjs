@@ -33,7 +33,7 @@ test('accepts the repository worker SDK conformance corpus', () => {
 });
 
 test('rejects missing cases, fixtures, and canonical alias drift', () => {
-  const invalid = structuredClone(corpus);
+  const invalid = JSON.parse(JSON.stringify(corpus));
   invalid.cases = invalid.cases.filter(
     (testCase) => testCase.id !== 'result.duplicate-conflict',
   );
