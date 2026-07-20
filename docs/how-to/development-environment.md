@@ -26,7 +26,13 @@ pnpm services:wait
 pnpm db:migrate
 ```
 
-The bootstrap validates Node.js 22 and Python 3.12, activates the pinned pnpm version, installs or validates uv, and synchronizes dependencies from lockfiles when available. Keep `.env` local and never commit credentials, worker tokens, signed URLs, or production endpoints.
+The bootstrap validates Node.js 22 and Python 3.12, activates the pinned pnpm version, installs or validates uv, installs the JavaScript workspace from `pnpm-lock.yaml`, discovers every non-generated `pyproject.toml`, requires a colocated `uv.lock`, and runs `uv sync --locked` for each Python project. Keep `.env` local and never commit credentials, worker tokens, signed URLs, or production endpoints.
+
+### Bootstrap contract
+
+`bash scripts/bootstrap-workspace.sh` is the only supported dependency-installation entrypoint for local development, Codespaces, Codex Cloud, and CI. Repository Verification provisions the required Node and Python runtimes, then delegates package-manager activation and all dependency synchronization to this script instead of maintaining workflow-specific `pnpm install` or `uv sync` commands.
+
+The bootstrap is safe to run repeatedly. Frozen pnpm installation and locked uv synchronization converge on the declared dependency state without rewriting manifests or lockfiles. Adding a supported Python project requires committing both `pyproject.toml` and `uv.lock`; automatic discovery includes it in the next local or CI bootstrap without another workflow edit.
 
 ## Maintain the workspace
 
@@ -64,7 +70,7 @@ pnpm verify:acceptance
 pnpm services:clean
 ```
 
-`verify:services` validates Compose, starts PostgreSQL and MinIO, waits for health, and runs migrations. `verify:integration` prepares workspace build output, runs Docker-backed integration and investigation-demo checks, runs conformance-focused tests, and resets the development database through the guarded command. `verify:acceptance` runs live-restart acceptance against the prepared services.
+`verify:services` validates Compose, starts PostgreSQL and MinIO, waits for health, and runs migrations. `verify:integration` prepares workspace build output, runs Docker-backed integration and investigation-demo checks, and resets the development database through the guarded command. `verify:acceptance` runs live-restart acceptance against the prepared services.
 
 To run the complete sequence with automatic service cleanup, use:
 
@@ -84,7 +90,7 @@ pnpm ci:quality:check
 
 The policy in `quality-gates.json` records required jobs and measured stages, fast and complete verification duration targets, the maximum flaky-rerun target, change-size review thresholds, immutable GitHub Action requirements, and the future changed-line and changed-branch coverage ratchet. Coverage targets are recorded but remain non-blocking until enough successful runs establish a trustworthy baseline.
 
-GitHub Actions wraps each canonical verification stage with `scripts/run-ci-stage.mjs`. Every job retains `.factory-floor/ci-metrics/`, including command outcome, timestamps, duration, and reviewed commit identity. CI unit verification also writes Vitest and pytest JUnit XML to `.factory-floor/test-results/`. `scripts/summarize-ci-metrics.mjs` publishes the same evidence as a job-summary table and aggregate JSON.
+GitHub Actions runs the shared bootstrap after runtime provisioning, then wraps each canonical verification stage with `scripts/run-ci-stage.mjs`. Every job retains `.factory-floor/ci-metrics/`, including command outcome, timestamps, duration, and reviewed commit identity. CI unit verification also writes Vitest and pytest JUnit XML to `.factory-floor/test-results/`. `scripts/summarize-ci-metrics.mjs` publishes the same evidence as a job-summary table and aggregate JSON.
 
 Local `pnpm test` and `pnpm test:python` output is unchanged. The JUnit-producing `test:ci` and `test:python:ci` commands are selected automatically only when `CI=true`.
 
@@ -92,11 +98,12 @@ Local `pnpm test` and `pnpm test:python` output is unchanged. The JUnit-producin
 
 Docker Compose binds PostgreSQL, the MinIO API, and the MinIO console to loopback by default. Override bind addresses and ports only on a trusted development host. A reachable Docker daemon is required for PostgreSQL and MinIO integration tests.
 
-When frozen installation fails, update the relevant manifest and lockfile together in one reviewed change. Do not work around reproducibility failures by copying setup commands into an agent prompt or environment UI.
+When frozen installation fails, update the relevant manifest and lockfile together in one reviewed change. Do not work around reproducibility failures by copying setup commands into an agent prompt, workflow, or environment UI.
 
 ## Troubleshooting
 
 - If `pnpm install --frozen-lockfile` fails, inspect manifest and lockfile drift.
+- If bootstrap reports a Python project without `uv.lock`, generate and commit its lockfile before retrying.
 - If `uv sync --locked` fails, update the affected Python lockfile with its manifest change.
 - If `pnpm services:wait` times out, run `pnpm services:status` and `pnpm services:logs`.
 - If Docker works in Codespaces or CI but not Codex Cloud, use Codespaces or CI for service-backed verification.
