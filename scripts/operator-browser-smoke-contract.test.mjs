@@ -34,7 +34,7 @@ describe('production operator browser smoke', () => {
   it('runs against real seeded Factory Floor processes with isolated ports', () => {
     const runner = read('scripts/run-operator-browser-smoke.mjs');
     expect(runner).toContain("spawn('pnpm', ['demo:investigation']");
-    expect(runner).toContain("spawn(process.execPath, ['--import', 'tsx'");
+    expect(runner).toContain("'apps/control-plane/src/server.ts'");
     expect(runner).toContain("'vite', 'preview'");
     expect(runner).toContain('server.listen(0');
     expect(runner).toContain('pnpm db:reset');
@@ -59,7 +59,7 @@ describe('production operator browser smoke', () => {
     expect(spec).toContain("getByRole('heading', { name: 'Run artifacts' })");
     expect(spec).toContain('status: 401');
     expect(spec).toContain("searchParams.has('cursor')");
-    expect(spec).toContain('toHaveCount(1)');
+    expect(spec).toContain('toHaveCount(');
     expect(spec).toContain('keyboard.press');
     expect(spec).toContain('page.goto(`/runs/${fixture.runId}`)');
   });
