@@ -22,11 +22,13 @@
 ### Task 1: Canonical inspection read model
 
 **Files:**
+
 - Create: `packages/runtime-core/src/inspection/template-instantiation-inspection-service.ts`
 - Modify: `packages/runtime-core/src/index.ts`
 - Test: `tests/integration/runtime-core/template-instantiation-inspection.test.ts`
 
 **Interfaces:**
+
 - Produces `TemplateInstantiationInspectionService`.
 - Produces `list({ regionId } | { runId }, page)` returning `{ items, nextCursor }`.
 - Produces `get(instantiationId)` returning an operator-safe detail or `null`.
@@ -69,6 +71,7 @@ Commit message: `feat(runtime): add template instantiation inspection model`
 ### Task 2: Supported API, projection, trace, lineage, and CLI boundaries
 
 **Files:**
+
 - Modify: `packages/runtime-core/src/observability/observability-service.ts`
 - Modify: `packages/runtime-core/src/operator/operator-query-service.ts`
 - Modify: `apps/control-plane/src/inspection-routes.ts`
@@ -79,6 +82,7 @@ Commit message: `feat(runtime): add template instantiation inspection model`
 - Test: `apps/cli/test/cli.test.ts` or a new focused CLI test
 
 **Interfaces:**
+
 - `GET /api/v1/inspect/instantiations?regionId=<uuid>&cursor=<cursor>&limit=<n>`
 - `GET /api/v1/inspect/instantiations?runId=<uuid>&cursor=<cursor>&limit=<n>`
 - `GET /api/v1/inspect/instantiations/:id`
@@ -108,6 +112,7 @@ Commit message: `feat(operator): expose template instantiation inspection`
 ### Task 3: Read-only console and recovery acceptance
 
 **Files:**
+
 - Modify: `apps/console/src/api/client.ts`
 - Modify: `apps/console/src/main.tsx`
 - Modify: `apps/console/src/components/ui.tsx`
@@ -118,6 +123,7 @@ Commit message: `feat(operator): expose template instantiation inspection`
 - Modify: `docs/reference/template-instantiation-protocol-v1.md`
 
 **Interfaces:**
+
 - Console route `/instantiations` lists region-scoped history and links to `/instantiations/:instantiationId`.
 - The detail page renders textual provenance and initial-state ownership/schema/artifact/value identity.
 
