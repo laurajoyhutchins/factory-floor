@@ -3,19 +3,27 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, constr
 
 
+class Inputs(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    package: constr(pattern=r'^@[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$')
+    moduleName: constr(pattern=r'^[a-z][a-z0-9-]{0,63}$')
+
+
 class RepositoryTaskRecipeInvocation(BaseModel):
     """
-    A versioned deterministic recipe selection and its bounded inputs. Recipe resolution remains repository-owned.
+    A versioned deterministic recipe selection and its bounded typed inputs. Recipe resolution remains repository-owned.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
-    name: constr(pattern=r'^[a-z][a-z0-9-]{0,63}$')
+    name: Literal['typescript-module']
     version: constr(pattern=r'^[1-9][0-9]*$')
-    inputs: dict[str, Any]
+    inputs: Inputs
