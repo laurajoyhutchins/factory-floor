@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: feat/repository-task-worker
-      - name: Use the canonical workspace bootstrap
+      - name: Use canonical bootstrap in isolated verification
         run: |
           python - <<'PY'
           from pathlib import Path
