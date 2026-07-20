@@ -47,7 +47,11 @@ export class RunDetailsQueryService {
       .orderBy('execution.id')
       .limit(limit + 1)
       .execute();
-    assertWithinBound(executions, limit, 'run_details_execution_bound_exceeded');
+    assertWithinBound(
+      executions,
+      limit,
+      'run_details_execution_bound_exceeded',
+    );
     const executionIds = executions.map((execution) => execution.id);
 
     const attempts = executionIds.length
