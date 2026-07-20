@@ -58,7 +58,7 @@ export function DiscordActivityApp({
   );
   const [connection, setConnection] =
     useState<ActivityConnectionState>('active');
-  const controller = useRef<ActivitySessionController>();
+  const controller = useRef<ActivitySessionController | undefined>(undefined);
 
   useEffect(() => {
     if (!config.enabled) return;
