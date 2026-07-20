@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+from typing import Any
+
+import httpx
+import pytest
+from factory_floor_contracts.invocation_envelope_schema import InvocationEnvelope
+from factory_floor_contracts.proposed_result_schema import ProposedResult
+from factory_floor_contracts.worker.capability_request_schema import WorkerCapabilityRequest
+from factory_floor_contracts.worker.stage_request_schema import WorkerStageRequest
+from factory_floor_worker_sdk import (
+    ProtocolError,
+    WorkerClient,
+    WorkerClientConfig,
+    WorkerSdkError,
+)
+from factory_floor_worker_sdk.client import PROTOCOL_VERSION
+
+ROOT = Path(__file__).resolve().parents[3]
+CORPUS = json.loads(
+    (ROOT / "contracts/conformance/worker-protocol-v1.cases.json").read_text()
+)
+OPERATION_CASE_IDS = {
+    "heartbeat.lease-error",
+    "cancellation.stale-epoch",
+    "artifact.stage-upload",
+    "capability.denied",
+    "result.accepted",
+    "result.duplicate-identical",
+    "result.duplicate-conflict",
+}
+
+
+def fixture(path: str) -> Any:
+    return json.loads((ROOT / path).read_text())
+
+
+def response_body(case: dict[str, Any]) -> Any:
+    response = case["response"]
+    if fixture_path := response.get("fixture"):
+        return fixture(fixture_path)
+    return response.get("body", {})
+
+
+def classification(error: WorkerSdkError) -> str:
+    if isinstance(error, ProtocolError):
+        code = error.error.code
+        if code in {"stale_lease_token", "stale_lifecycle_epoch"}:
+            return "lease_error"
+        if code == "capability_denied":
+            return "capability_denied"
+        if code == "duplicate_conflicting_result":
+            return "conflict"
+    return type(error).__name__
+
+
+async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
+    envelope = InvocationEnvelope.model_validate(
+        fixture("contracts/fixtures/worker/invocation-envelope.valid.json")
+    )
+    uploaded = bytearray()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "PUT":
+            uploaded.extend(await request.aread())
+            stage = fixture("contracts/fixtures/worker/stage-response.valid.json")
+            return httpx.Response(
+                200,
+                json={
+                    "protocolVersion": "1.0",
+                    "stagedRef": stage["stagedRef"],
+                    "digest": case["request"].get("body", {}).get(
+                        "expectedDigest", "a" * 64
+                    ),
+                    "sizeBytes": len(uploaded),
+                },
+            )
+        return httpx.Response(
+            case["response"].get("status", 200), json=response_body(case)
+        )
+
+    worker = WorkerClient(
+        WorkerClientConfig(
+            "http://conformance.local", "conformance-token", "conformance-worker"
+        ),
+        http_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="http://conformance.local",
+        ),
+        sleep=lambda _delay: asyncio.sleep(0),
+        rand=lambda: 0,
+    )
+
+    try:
+        if case["id"] == "heartbeat.lease-error":
+            await worker.heartbeat(envelope)
+        elif case["id"] == "cancellation.stale-epoch":
+            await worker.cancellation(envelope)
+        elif case["id"] == "capability.denied":
+            values = case["request"]["body"]
+            await worker.invoke_capability(
+                envelope,
+                WorkerCapabilityRequest(
+                    protocolVersion=PROTOCOL_VERSION,
+                    executionId=envelope.executionId,
+                    attemptId=envelope.attemptId,
+                    leaseToken=envelope.leaseToken,
+                    lifecycleEpoch=envelope.lifecycleEpoch,
+                    handle=values["handle"],
+                    input=values["input"],
+                ),
+            )
+        elif case["id"] == "artifact.stage-upload":
+            values = case["request"]["body"]
+            stage = await worker.stage_artifact(
+                envelope,
+                WorkerStageRequest(
+                    protocolVersion=PROTOCOL_VERSION,
+                    executionId=envelope.executionId,
+                    attemptId=envelope.attemptId,
+                    leaseToken=envelope.leaseToken,
+                    lifecycleEpoch=envelope.lifecycleEpoch,
+                    portName=values["portName"],
+                    mediaType=values["mediaType"],
+                    expectedDigest=values["expectedDigest"],
+                    expectedSizeBytes=values["expectedSizeBytes"],
+                    metadata=values["metadata"],
+                ),
+            )
+            content = case["request"]["uploadBytesUtf8"].encode()
+            await worker.upload(str(stage.uploadUrl), content)
+            assert uploaded == content
+            return {"classification": "staged", "retryable": False}
+        else:
+            result = ProposedResult.model_validate(fixture(case["request"]["fixture"]))
+            response = await worker.submit_result(envelope, result)
+            return {
+                "classification": "duplicate"
+                if response["duplicate"]
+                else "accepted",
+                "retryable": False,
+            }
+        raise AssertionError(f"case {case['id']} unexpectedly succeeded")
+    except WorkerSdkError as error:
+        return {
+            "classification": classification(error),
+            "retryable": error.retryable,
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case",
+    [case for case in CORPUS["cases"] if case["id"] in OPERATION_CASE_IDS],
+    ids=lambda case: case["id"],
+)
+async def test_python_worker_operation_conformance(case: dict[str, Any]) -> None:
+    assert await run_operation_case(case) == case["expected"]
