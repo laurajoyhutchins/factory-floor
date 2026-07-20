@@ -16,6 +16,10 @@ import {
   type ExternalActionService,
 } from '../external-actions/external-action-service.js';
 import {
+  ExecutionCommitError,
+  ExecutionCommitService,
+} from '../commit/execution-commit-service.js';
+import {
   ObservabilityService,
   PROJECTION_NAMES,
 } from './observability-service.js';
@@ -33,6 +37,9 @@ const CANCELLATION_FAILURE = {
 } satisfies Json;
 
 export interface StartupRecoverySummary {
+  submittedResultsScanned: number;
+  submittedResultsCommitted: number;
+  submittedResultsRejected: number;
   expiredAttemptsAbandoned: number;
   replacementAttemptsCreated: number;
   retryableDeliveriesExposed: number;
@@ -73,11 +80,44 @@ export class StartupRecoveryService {
       projectionBatchSize?: number;
       reconciliationBatchSize?: number;
       externalActionReconciliationBatchSize?: number;
+      resultCommitBatchSize?: number;
       removeOrphanArtifacts?: boolean;
       orphanGraceSeconds?: number;
     } = {},
   ): Promise<StartupRecoverySummary> {
     const now = options.now ?? this.clock();
+    const pendingSubmissions = await this.db
+      .selectFrom('worker_result_submissions')
+      .select('attempt_id')
+      .where('committed_at', 'is', null)
+      .orderBy('created_at')
+      .orderBy('id')
+      .limit(options.resultCommitBatchSize ?? 100)
+      .execute();
+    const resultCommit = new ExecutionCommitService(
+      this.db,
+      this.deps.blobStore,
+      this.clock,
+    );
+    let submittedResultsScanned = 0;
+    let submittedResultsCommitted = 0;
+    let submittedResultsRejected = 0;
+    for (const submission of pendingSubmissions) {
+      submittedResultsScanned++;
+      try {
+        await resultCommit.commitSubmittedResult(submission.attempt_id, {
+          allowExpiredLease: true,
+        });
+        submittedResultsCommitted++;
+      } catch (error) {
+        if (error instanceof ExecutionCommitError && error.statusCode < 500) {
+          submittedResultsRejected++;
+          continue;
+        }
+        throw error;
+      }
+    }
+
     const expiredAttemptIds = await this.db
       .selectFrom('execution_attempts')
       .select('id')
@@ -359,6 +399,9 @@ export class StartupRecoveryService {
       .orderBy('id')
       .executeTakeFirst();
     const recoveryPayload: Json = {
+      submittedResultsScanned,
+      submittedResultsCommitted,
+      submittedResultsRejected,
       expiredAttemptsAbandoned,
       replacementAttemptsCreated,
       retryableDeliveriesExposed,
@@ -392,6 +435,9 @@ export class StartupRecoveryService {
       options.projectionBatchSize ?? 500,
     );
     return {
+      submittedResultsScanned,
+      submittedResultsCommitted,
+      submittedResultsRejected,
       expiredAttemptsAbandoned,
       replacementAttemptsCreated,
       retryableDeliveriesExposed,

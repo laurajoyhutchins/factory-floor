@@ -74,6 +74,9 @@ export type ProposedExecutionResult = {
   resourceUsage: Record<ResourceType, number>;
   failure?: Json;
 };
+interface CommitOptions {
+  allowExpiredLease?: boolean;
+}
 type Promotion = {
   rowId: string;
   stagedRef: string;
@@ -110,6 +113,24 @@ function isExecutionSource(
   );
 }
 
+function normalizeSubmittedResult(value: Json): ProposedExecutionResult {
+  const raw = value as any;
+  const normalizeStaged = (staged: any): Staged => ({
+    ...staged,
+    stagingId: staged.stagingId ?? staged.stagingRef,
+  });
+  return {
+    ...raw,
+    lifecycleEpoch: raw.lifecycleEpoch ?? raw.regionFencingEpoch,
+    stagedArtifacts: Array.isArray(raw.stagedArtifacts)
+      ? raw.stagedArtifacts.map(normalizeStaged)
+      : [],
+    ...(raw.proposedState
+      ? { proposedState: normalizeStaged(raw.proposedState) }
+      : {}),
+  } as ProposedExecutionResult;
+}
+
 export class ExecutionCommitService {
   private readonly artifacts = new ArtifactRepository();
   private readonly events: EventService;
@@ -124,21 +145,22 @@ export class ExecutionCommitService {
     this.routing = new RoutingService(db);
   }
 
-  async commitSubmittedResult(attemptId: string) {
+  async commitSubmittedResult(attemptId: string, options: CommitOptions = {}) {
     const submission = await this.db
       .selectFrom('worker_result_submissions')
       .selectAll()
       .where('attempt_id', '=', attemptId)
       .executeTakeFirstOrThrow();
     return this.commit(
-      submission.result as unknown as ProposedExecutionResult,
+      normalizeSubmittedResult(submission.result),
       submission.submission_digest,
+      options,
     );
   }
-
   async commit(
     input: ProposedExecutionResult,
     submissionDigest = canonicalJsonDigest(input),
+    options: CommitOptions = {},
   ) {
     const promotions: Promotion[] = [];
     let result;
@@ -174,15 +196,15 @@ export class ExecutionCommitService {
             'duplicate_conflicting_result',
             'attempt already has a different proposed result',
           );
+        if (submission?.committed_at)
+          return { disposition: 'duplicate' as const };
         if (!['leased', 'running'].includes(attempt.status)) {
-          if (submission) return { disposition: 'duplicate' as const };
           throw new ExecutionCommitError(
             'inactive_attempt',
             'attempt is already terminal',
           );
         }
         if (execution.status !== 'running') {
-          if (submission) return { disposition: 'duplicate' as const };
           throw new ExecutionCommitError(
             'inactive_attempt',
             'execution is already terminal',
@@ -230,7 +252,14 @@ export class ExecutionCommitService {
             'execution has no inputs',
           );
 
-        this.assertAuthority(input, attempt, execution, region, deliveries);
+        this.assertAuthority(
+          input,
+          attempt,
+          execution,
+          region,
+          deliveries,
+          options.allowExpiredLease === true,
+        );
         this.validateResourceUsage(input.resourceUsage);
         await this.validateProposedEvents(trx, input);
         if (
@@ -332,16 +361,31 @@ export class ExecutionCommitService {
             promotions,
           );
         await this.writeResourceUsage(trx, region.id, input);
-        if (input.status === 'completed')
-          return this.complete(
-            trx,
-            input,
-            execution,
-            component,
-            deliveries,
-            artifactIds,
-          );
-        return this.failOrRetry(trx, input, execution, attempt, deliveries);
+        const disposition =
+          input.status === 'completed'
+            ? await this.complete(
+                trx,
+                input,
+                execution,
+                component,
+                deliveries,
+                artifactIds,
+              )
+            : await this.failOrRetry(
+                trx,
+                input,
+                execution,
+                attempt,
+                deliveries,
+              );
+        await trx
+          .updateTable('worker_result_submissions')
+          .set({ committed_at: this.clock() })
+          .where('attempt_id', '=', input.attemptId)
+          .where('submission_digest', '=', submissionDigest)
+          .where('committed_at', 'is', null)
+          .executeTakeFirstOrThrow();
+        return disposition;
       });
     } catch (error) {
       if (error instanceof ExecutionCommitError && error.statusCode < 500)
@@ -349,6 +393,7 @@ export class ExecutionCommitService {
           .deleteFrom('worker_result_submissions')
           .where('attempt_id', '=', input.attemptId)
           .where('submission_digest', '=', submissionDigest)
+          .where('committed_at', 'is', null)
           .execute();
       throw error;
     }
@@ -380,13 +425,17 @@ export class ExecutionCommitService {
     execution: any,
     region: any,
     deliveries: any[],
+    allowExpiredLease: boolean,
   ) {
     if (attempt.lease_token !== input.leaseToken)
       throw new ExecutionCommitError(
         'stale_lease_token',
         'lease token is not current',
       );
-    if (!attempt.lease_expires_at || attempt.lease_expires_at <= this.clock())
+    if (
+      !allowExpiredLease &&
+      (!attempt.lease_expires_at || attempt.lease_expires_at <= this.clock())
+    )
       throw new ExecutionCommitError('lease_expired', 'lease has expired');
     if (
       execution.lifecycle_epoch !== input.lifecycleEpoch ||
