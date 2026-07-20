@@ -9,7 +9,7 @@ import {
 } from '../../../packages/db/src/index.js';
 import {
   OperatorCommandService,
-  RunDetailsQueryService,
+  OperatorQueryService,
   WorkerProtocolService,
 } from '../../../packages/runtime-core/src/index.js';
 
@@ -123,12 +123,14 @@ type ClaimedRun = {
   runId: string;
   executionId: string;
   attemptId: string;
+  deliveryId: string;
 };
 
 async function seedRunDetails(
   db: ReturnType<typeof createDatabase>,
   run: ClaimedRun,
   schemaId: string,
+  regionId: string,
   capabilityGrantId: string,
   ordinal: number,
 ) {
@@ -201,6 +203,17 @@ async function seedRunDetails(
     ])
     .execute();
   await db
+    .insertInto('execution_inputs')
+    .values({
+      id: createUuidV7(),
+      execution_id: run.executionId,
+      port_name: 'objective',
+      artifact_id: sourceArtifactId,
+      delivery_id: run.deliveryId,
+      payload: null,
+    })
+    .execute();
+  await db
     .insertInto('execution_outputs')
     .values({
       id: createUuidV7(),
@@ -243,7 +256,7 @@ async function seedRunDetails(
     .insertInto('resource_ledger')
     .values({
       id: resourceId,
-      region_id: null,
+      region_id: regionId,
       execution_id: run.executionId,
       attempt_id: run.attemptId,
       external_action_id: actionId,
@@ -268,7 +281,7 @@ async function seedRunDetails(
 describe('run details query service', () => {
   const db = createDatabase(testUrl);
   const commands = new OperatorCommandService(db);
-  const queries = new RunDetailsQueryService(db);
+  const queries = new OperatorQueryService(db);
   const workers = new WorkerProtocolService(db, undefined, {
     leaseDurationMs: 60_000,
     baseUrl: 'http://127.0.0.1:3000',
@@ -292,7 +305,7 @@ describe('run details query service', () => {
   });
 
   it('returns bounded details for one run without leaking a concurrent run', async () => {
-    const { schemaId, definitionId } = await seedRuntime(db);
+    const { schemaId, definitionId, regionId } = await seedRuntime(db);
     const capabilityId = createUuidV7();
     const capabilityGrantId = createUuidV7();
     await db
@@ -328,10 +341,13 @@ describe('run details query service', () => {
       capabilities: ['retrieve@1'],
     });
     if (!firstClaim.claimed) throw new Error('expected first claim');
+    const firstDeliveryId = firstClaim.envelope.inputs[0]?.deliveryId;
+    if (!firstDeliveryId) throw new Error('expected first delivery');
     const firstRun = {
       runId: firstReceipt.runId,
       executionId: firstClaim.envelope.executionId,
       attemptId: firstClaim.envelope.attemptId,
+      deliveryId: firstDeliveryId,
     };
 
     const secondReceipt = await commands.submitDevelopmentTask(
@@ -343,16 +359,20 @@ describe('run details query service', () => {
       capabilities: ['retrieve@1'],
     });
     if (!secondClaim.claimed) throw new Error('expected second claim');
+    const secondDeliveryId = secondClaim.envelope.inputs[0]?.deliveryId;
+    if (!secondDeliveryId) throw new Error('expected second delivery');
     const secondRun = {
       runId: secondReceipt.runId,
       executionId: secondClaim.envelope.executionId,
       attemptId: secondClaim.envelope.attemptId,
+      deliveryId: secondDeliveryId,
     };
 
     const first = await seedRunDetails(
       db,
       firstRun,
       schemaId,
+      regionId,
       capabilityGrantId,
       1,
     );
@@ -360,6 +380,7 @@ describe('run details query service', () => {
       db,
       secondRun,
       schemaId,
+      regionId,
       capabilityGrantId,
       2,
     );
