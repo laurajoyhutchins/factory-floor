@@ -22,7 +22,9 @@ export class ObservabilityService extends BaseObservabilityService {
 
   constructor(private readonly inspectionDb: Kysely<Database>) {
     super(inspectionDb);
-    this.instantiations = new TemplateInstantiationInspectionService(inspectionDb);
+    this.instantiations = new TemplateInstantiationInspectionService(
+      inspectionDb,
+    );
   }
 
   listTemplateInstantiations(
@@ -105,7 +107,7 @@ export class ObservabilityService extends BaseObservabilityService {
         }),
       )
       .execute();
-    return { ...result, checkpointed: result.checkpointed + 1 };
+    return result;
   }
 
   private async templateInstantiationSnapshot() {
