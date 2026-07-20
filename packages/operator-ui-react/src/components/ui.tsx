@@ -121,6 +121,7 @@ export function Shell({
           <NavLink to="/artifacts">Artifacts</NavLink>
           <NavLink to="/instantiations">Instantiations</NavLink>
           <NavLink to="/operations">Operations</NavLink>
+          <NavLink to="/approvals">Approvals</NavLink>
         </nav>
         <dl className="connection-status">
           <div>

@@ -3,12 +3,7 @@ import {
   QueryClientProvider,
   useQuery,
 } from '@tanstack/react-query';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
-import { consoleApi } from './api/client.js';
-import { Shell } from './components/ui.js';
-import { useLiveEvents } from './hooks/liveEvents.js';
+import { consoleApi } from '@factory-floor/operator-client-ts';
 import {
   ArtifactDetail,
   Artifacts,
@@ -17,13 +12,25 @@ import {
   NotFound,
   Operations,
   Overview,
-  Topology,
-} from './pages/pages.js';
-import {
+  PendingApprovals,
+  RunOperatorWorkspace,
+  Shell,
   TemplateInstantiationDetail,
   TemplateInstantiations,
-} from './pages/template-instantiations.js';
-import './styles.css';
+  Topology,
+  useLiveEvents,
+} from '@factory-floor/operator-ui-react';
+import '@factory-floor/operator-ui-react/styles.css';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router';
+import './api/client.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,7 +48,14 @@ const titles: Record<string, string> = {
   artifacts: 'Artifacts',
   instantiations: 'Template instantiations',
   operations: 'Operations',
+  approvals: 'Pending approvals',
+  runs: 'Run inspection',
 };
+
+function RunRoute() {
+  const { runId = '' } = useParams();
+  return <RunOperatorWorkspace runId={runId} />;
+}
 
 function App() {
   const live = useLiveEvents(50);
@@ -84,6 +98,8 @@ function App() {
           element={<TemplateInstantiationDetail />}
         />
         <Route path="/operations" element={<Operations />} />
+        <Route path="/approvals" element={<PendingApprovals />} />
+        <Route path="/runs/:runId" element={<RunRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Shell>

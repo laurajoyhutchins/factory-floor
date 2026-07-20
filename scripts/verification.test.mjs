@@ -10,14 +10,17 @@ const read = (relativePath) =>
   readFileSync(new URL(relativePath, root), 'utf8');
 
 describe('repository verification wiring', () => {
-  it('discovers unit tests and preserves the console test project', () => {
+  it('discovers unit tests and preserves browser test projects', () => {
     const projects = rootVitestConfig.test.projects;
     const rootProject = projects.find(
       (project) => typeof project === 'object' && project !== null,
     );
 
     expect(projects).toEqual(
-      expect.arrayContaining(['apps/console/vitest.config.ts']),
+      expect.arrayContaining([
+        'apps/console/vitest.config.ts',
+        'packages/operator-ui-react/vitest.config.ts',
+      ]),
     );
     expect(rootProject.test.include).toEqual(
       expect.arrayContaining([
@@ -46,6 +49,7 @@ describe('repository verification wiring', () => {
         '**/coverage/**',
         '**/generated/**',
         'apps/console/**',
+        'packages/operator-ui-react/**',
       ]),
     );
     const consoleVitestConfig = read('apps/console/vitest.config.ts');
@@ -53,9 +57,19 @@ describe('repository verification wiring', () => {
     expect(consoleVitestConfig).toContain(
       "setupFiles: ['./src/test/setup.ts']",
     );
+    const operatorUiVitestConfig = read(
+      'packages/operator-ui-react/vitest.config.ts',
+    );
+    expect(operatorUiVitestConfig).toContain("environment: 'jsdom'");
+    expect(operatorUiVitestConfig).toContain(
+      "setupFiles: ['./src/test/setup.ts']",
+    );
     expect(
       existsSync(
-        new URL('../apps/console/src/pages/pages.test.tsx', import.meta.url),
+        new URL(
+          '../packages/operator-ui-react/src/pages/pages.test.tsx',
+          import.meta.url,
+        ),
       ),
     ).toBe(true);
   });
@@ -191,6 +205,12 @@ describe('repository verification wiring', () => {
     );
     expect(verificationScript).not.toContain('@factory-floor/console test');
     expect(read('tsconfig.json')).toContain('"path": "apps/console"');
+    expect(read('tsconfig.json')).toContain(
+      '"path": "packages/operator-client-ts"',
+    );
+    expect(read('tsconfig.json')).toContain(
+      '"path": "packages/operator-ui-react"',
+    );
   });
 
   it('contains no references to the obsolete workflow filename', () => {
