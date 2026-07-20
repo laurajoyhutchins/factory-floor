@@ -1,3 +1,4 @@
+# Temporary branch-only review helper.
 name: Apply operator extraction review fixes
 
 on:
