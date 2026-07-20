@@ -43,6 +43,10 @@ def classification(error: WorkerSdkError) -> str:
     }.get(error.kind, error.kind)
 
 
+def json_value(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))
+
+
 async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
     envelope = InvocationEnvelope.model_validate(
         fixture("contracts/fixtures/worker/invocation-envelope.valid.json")
@@ -85,7 +89,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                 "lifecycleEpoch": envelope.lifecycleEpoch,
                 **expected_request.get("body", {}),
             }
-        assert wire_body == expected_body
+        assert wire_body == json_value(expected_body)
         return httpx.Response(
             case["response"].get("status", 200), json=response_body(case)
         )
