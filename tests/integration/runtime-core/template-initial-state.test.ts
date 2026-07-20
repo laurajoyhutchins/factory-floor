@@ -11,6 +11,8 @@ import {
   TopologyRepository,
 } from '../../../packages/db/src/index.js';
 import {
+  canonicalizeJson,
+  canonicalJsonDigest,
   RegistrationService,
   TemplateInstantiationService,
   WorkerProtocolService,
@@ -239,6 +241,85 @@ describe('template-provided initial state in PostgreSQL', () => {
         instantiationId: first.instantiationId,
       },
     });
+  });
+
+  it('rolls back topology, history, and state when seed publication conflicts', async () => {
+    const schema = await db
+      .selectFrom('artifact_schemas')
+      .selectAll()
+      .where('name', '=', 'checkpoint')
+      .where('version', '=', '1')
+      .executeTakeFirstOrThrow();
+    const value = { completedSteps: [] };
+    const canonical = canonicalizeJson(value);
+    const digest = canonicalJsonDigest(value);
+    await db
+      .insertInto('artifacts')
+      .values({
+        id: createUuidV7(),
+        digest_algorithm: 'sha256',
+        digest,
+        size_bytes: Buffer.byteLength(canonical, 'utf8').toString(),
+        schema_id: schema.id,
+        state: 'committed',
+        media_type: 'text/plain',
+        committed_locator: 'test://conflicting-seed',
+        provenance: { kind: 'test' },
+        tombstoned_at: null,
+      })
+      .execute();
+    const rollbackRegionId = (
+      await topology.createRegion(db, 'rollback-seed-region', null)
+    ).id;
+
+    await expect(
+      new TemplateInstantiationService(db).instantiate({
+        requestId: requestA,
+        targetRegionId: rollbackRegionId,
+        template: 'seeded@1',
+      }),
+    ).rejects.toMatchObject({ code: 'template_instantiation_conflict' });
+
+    expect(
+      await db
+        .selectFrom('topology_revisions')
+        .selectAll()
+        .where('region_id', '=', rollbackRegionId)
+        .execute(),
+    ).toEqual([]);
+    expect(
+      await db
+        .selectFrom('template_instantiations')
+        .selectAll()
+        .where('target_region_id', '=', rollbackRegionId)
+        .execute(),
+    ).toEqual([]);
+    expect(
+      await db
+        .selectFrom('component_instances')
+        .selectAll()
+        .where('region_id', '=', rollbackRegionId)
+        .execute(),
+    ).toEqual([]);
+    expect(
+      await db.selectFrom('component_state_versions').selectAll().execute(),
+    ).toEqual([]);
+    expect(
+      await db.selectFrom('artifact_inline_payloads').selectAll().execute(),
+    ).toEqual([]);
+    expect(
+      await db
+        .selectFrom('regions')
+        .select('active_topology_revision_id')
+        .where('id', '=', rollbackRegionId)
+        .executeTakeFirstOrThrow(),
+    ).toEqual({ active_topology_revision_id: null });
+    expect(
+      await db
+        .selectFrom('artifacts')
+        .select(({ fn }) => fn.countAll<string>().as('count'))
+        .executeTakeFirstOrThrow(),
+    ).toEqual({ count: '1' });
   });
 
   it('rejects invalid seed content without publishing topology or history', async () => {
