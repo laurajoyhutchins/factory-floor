@@ -1,0 +1,44 @@
+name: Temporary browser runner globals fix
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-runner:
+    if: github.head_ref == 'test/operator-browser-smoke'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: test/operator-browser-smoke
+          fetch-depth: 0
+
+      - name: Make Node globals explicit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/run-operator-browser-smoke.mjs')
+          text = path.read_text()
+          text = text.replace(
+              "import { execFileSync, spawn } from 'node:child_process';\n",
+              "import { execFileSync, spawn } from 'node:child_process';\nimport console from 'node:console';\n",
+              1,
+          )
+          text = text.replace('setTimeout(resolveDelay, 5_000)', 'globalThis.setTimeout(resolveDelay, 5_000)')
+          text = text.replace('setTimeout(resolveDelay, 200)', 'globalThis.setTimeout(resolveDelay, 200)')
+          text = text.replace('await fetch(url, { headers })', 'await globalThis.fetch(url, { headers })')
+          text = text.replace('const response = await fetch(\n', 'const response = await globalThis.fetch(\n')
+          path.write_text(text)
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/run-operator-browser-smoke.mjs
+          git commit -m 'fix: make browser runner Node globals explicit'
+          git push origin HEAD:test/operator-browser-smoke
