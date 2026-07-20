@@ -42,8 +42,20 @@ function services() {
       getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
       getRunStatus: vi.fn(async () => ({ runId: 'run-1', status: 'running' })),
       inspectRunTrace: vi.fn(async () => ({ run: { id: 'run-1' } })),
+      getRunTopology: vi.fn(async () => ({ run: { id: 'run-1' } })),
+      listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listRunEvents: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+        resumeCursor: null,
+        complete: true,
+      })),
+      listRunTemplateInstantiations: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+      })),
       listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
-      readArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+      readRunArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
       listPendingApprovals: vi.fn(async () => ({
         items: [],
         nextCursor: null,
@@ -148,12 +160,13 @@ describe('operator routes', () => {
 
     const artifact = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/artifacts/artifact-1?maxBytes=4096',
+      url: '/api/v1/operator/runs/run-1/artifacts/artifact-1?maxBytes=4096',
       headers,
     });
     expect(artifact.statusCode).toBe(200);
-    expect(context.queries.readArtifact).toHaveBeenCalledWith(
+    expect(context.queries.readRunArtifact).toHaveBeenCalledWith(
       expect.any(Object),
+      'run-1',
       'artifact-1',
       4096,
     );
