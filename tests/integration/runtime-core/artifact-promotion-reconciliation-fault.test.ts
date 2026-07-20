@@ -302,9 +302,9 @@ async function runScenario(scenario: AdapterScenario) {
       state: 'committed',
     });
     await expect(store.blobStore.committedExists(digest)).resolves.toBe(false);
-    await expect(
-      store.blobStore.stagedExists(staged.stagedRef),
-    ).resolves.toBe(true);
+    await expect(store.blobStore.stagedExists(staged.stagedRef)).resolves.toBe(
+      true,
+    );
 
     const first = await new ArtifactReconciliationService({
       db,
@@ -347,9 +347,9 @@ async function runScenario(scenario: AdapterScenario) {
       artifact_id: publication.artifact.id,
     });
     await expect(store.blobStore.committedExists(digest)).resolves.toBe(true);
-    await expect(
-      store.blobStore.stagedExists(staged.stagedRef),
-    ).resolves.toBe(false);
+    await expect(store.blobStore.stagedExists(staged.stagedRef)).resolves.toBe(
+      false,
+    );
     await expect(
       readAll(await store.blobStore.readCommitted(digest)),
     ).resolves.toEqual(body);
