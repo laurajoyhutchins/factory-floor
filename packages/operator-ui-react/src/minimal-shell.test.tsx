@@ -15,7 +15,8 @@ const json = (body: unknown) =>
 describe('minimal operator UI shell', () => {
   it('renders reusable views with injected authentication and transport', async () => {
     const fetch = vi.fn(
-      async (input: RequestInfo | URL, _init?: RequestInit) => {
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        void init;
         const url = String(input);
         if (url.includes('/projections')) {
           return json({
