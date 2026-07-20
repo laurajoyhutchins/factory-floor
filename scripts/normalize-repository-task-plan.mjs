@@ -286,10 +286,7 @@ function normalizePlan(plan) {
       maxVerificationSeconds: plan.resourceBounds.maxVerificationSeconds,
     },
     requestedCapabilities: sortUnique(plan.requestedCapabilities),
-    completionCriteria: sortUnique(
-      plan.completionCriteria,
-      collapseWhitespace,
-    ),
+    completionCriteria: sortUnique(plan.completionCriteria, collapseWhitespace),
   };
   return {
     ...planWithoutDigest,
@@ -309,7 +306,9 @@ export function normalizeRepositoryTaskPlan(authoredPlan, options = {}) {
   if (!validateAuthoredPlan(authoredPlan))
     return {
       normalizedPlan: null,
-      diagnostics: sortDiagnostics(schemaDiagnostics(validateAuthoredPlan.errors)),
+      diagnostics: sortDiagnostics(
+        schemaDiagnostics(validateAuthoredPlan.errors),
+      ),
     };
 
   const diagnostics = semanticDiagnostics(authoredPlan, resolvedOptions);
