@@ -22,6 +22,7 @@ export const rootUnitTestExclude = [
 export const rootNodeUnitTestExclude = [
   ...rootUnitTestExclude,
   'apps/console/**',
+  'apps/discord-activity/**',
   'packages/operator-ui-react/**',
 ];
 
@@ -40,6 +41,7 @@ export const rootCoverageExclude = [
   '**/*.test.mjs',
   'apps/control-plane/src/server.ts',
   'apps/console/src/main.tsx',
+  'apps/discord-activity/src/main.tsx',
   'workers/demo-ts/src/index.ts',
 ];
 
@@ -69,6 +71,7 @@ export default defineConfig({
         },
       },
       'apps/console/vitest.config.ts',
+      'apps/discord-activity/vitest.config.ts',
       'packages/operator-ui-react/vitest.config.ts',
     ],
   },
