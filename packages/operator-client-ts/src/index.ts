@@ -475,10 +475,14 @@ export function createOperatorClient(
         );
       return { status: value.status, service: value.service };
     },
-    regions: (options, signal) => getPage(inspectionPaths.regions, options, signal),
-    events: (options, signal) => getPage(inspectionPaths.events, options, signal),
-    deliveries: (options, signal) => getPage(inspectionPaths.deliveries, options, signal),
-    executions: (options, signal) => getPage(inspectionPaths.executions, options, signal),
+    regions: (options, signal) =>
+      getPage(inspectionPaths.regions, options, signal),
+    events: (options, signal) =>
+      getPage(inspectionPaths.events, options, signal),
+    deliveries: (options, signal) =>
+      getPage(inspectionPaths.deliveries, options, signal),
+    executions: (options, signal) =>
+      getPage(inspectionPaths.executions, options, signal),
     execution: (id, signal) =>
       getRecord(
         `${inspectionPaths.executions}/${encodeURIComponent(id)}`,
@@ -491,15 +495,18 @@ export function createOperatorClient(
         options,
         signal,
       ),
-    attempts: (options, signal) => getPage(inspectionPaths.attempts, options, signal),
-    artifacts: (options, signal) => getPage(inspectionPaths.artifacts, options, signal),
+    attempts: (options, signal) =>
+      getPage(inspectionPaths.attempts, options, signal),
+    artifacts: (options, signal) =>
+      getPage(inspectionPaths.artifacts, options, signal),
     artifactLineage: (id, signal) =>
       getRecord(
         `${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`,
         'artifact lineage',
         signal,
       ),
-    resources: (options, signal) => getPage(inspectionPaths.resources, options, signal),
+    resources: (options, signal) =>
+      getPage(inspectionPaths.resources, options, signal),
     policyDecisions: (options, signal) =>
       getPage(inspectionPaths.policies, options, signal),
     projections: async (signal) => {
@@ -515,7 +522,8 @@ export function createOperatorClient(
         );
       return { items: value.items };
     },
-    topology: (signal) => getRecord(inspectionPaths.topology, 'active topology', signal),
+    topology: (signal) =>
+      getRecord(inspectionPaths.topology, 'active topology', signal),
     templateInstantiations: async (scope, options = {}, signal) => {
       const url = new URL(
         pagePath(inspectionPaths.instantiations, options),
