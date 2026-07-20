@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "protocol": "discord-agent-activity-bootstrap",
+  "oauthStart": {
+    "request": {
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "codeChallenge": "dYSqskoTcWrpu8GYY0XpWlzOc0c5rd9YO3uAgh_zmV4"
+    },
+    "response": {
+      "state": "fixture-launch-state",
+      "clientId": "application-1",
+      "scopes": ["identify"],
+      "codeChallengeMethod": "S256",
+      "expiresAt": 62000
+    }
+  },
+  "bootstrap": {
+    "request": {
+      "state": "fixture-launch-state",
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "code": "fixture-code",
+      "codeVerifier": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abc",
+      "redirectUri": "https://123.discordsays.com/.proxy/oauth/callback"
+    },
+    "validatedInstance": {
+      "applicationId": "application-1",
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "launchId": "launch-1",
+      "location": {
+        "id": "gc-guild-1-thread-1",
+        "kind": "gc",
+        "guildId": "guild-1",
+        "channelId": "thread-1"
+      },
+      "users": ["user-1"]
+    },
+    "factoryFloorRequest": {
+      "applicationId": "application-1",
+      "instanceId": "i-launch-1-gc-guild-1-thread-1",
+      "installationId": "guild-1",
+      "guildId": "guild-1",
+      "channelId": "agent-1",
+      "threadId": "thread-1",
+      "launchId": "launch-1",
+      "principalId": "user-1",
+      "adapter": "discord-agent",
+      "boundRunId": "run-1"
+    },
+    "response": {
+      "discord": {
+        "accessToken": "fixture-value",
+        "tokenType": "Bearer",
+        "expiresIn": 3600,
+        "scope": "identify"
+      },
+      "factoryFloor": {
+        "instanceBindingId": "binding-1",
+        "sessionToken": "fixture-value",
+        "expiresAt": "2026-07-20T01:00:00.000Z",
+        "idleExpiresAt": "2026-07-20T00:40:00.000Z"
+      },
+      "context": {
+        "kind": "run",
+        "projectId": "ff-project-1",
+        "runId": "run-1"
+      }
+    }
+  },
+  "errors": [
+    "origin_not_allowed",
+    "activity_instance_response_invalid",
+    "activity_location_mismatch",
+    "activity_principal_not_present",
+    "activity_not_authorized",
+    "oauth_state_invalid",
+    "oauth_principal_mismatch",
+    "launch_state_invalid",
+    "factory_floor_session_unavailable"
+  ]
+}
