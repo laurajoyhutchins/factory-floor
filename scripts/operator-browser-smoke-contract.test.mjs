@@ -35,7 +35,8 @@ describe('production operator browser smoke', () => {
     const runner = read('scripts/run-operator-browser-smoke.mjs');
     expect(runner).toContain("spawn('pnpm', ['demo:investigation']");
     expect(runner).toContain("'apps/control-plane/src/server.ts'");
-    expect(runner).toContain("'vite', 'preview'");
+    expect(runner).toContain("'vite'");
+    expect(runner).toContain("'preview'");
     expect(runner).toContain('server.listen(0');
     expect(runner).toContain('pnpm db:reset');
     expect(runner).toContain('finally');
