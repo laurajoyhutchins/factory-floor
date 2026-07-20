@@ -111,7 +111,7 @@ describe('run details panel', () => {
       screen.getByText((_, element) =>
         Boolean(
           element?.tagName === 'TD' &&
-            element.textContent?.includes('github.pull_request'),
+          element.textContent?.includes('github.pull_request'),
         ),
       ),
     ).toBeVisible();
