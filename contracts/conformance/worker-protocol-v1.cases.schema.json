@@ -53,11 +53,17 @@
             "oneOf": [
               {
                 "required": ["path"],
-                "not": { "required": ["endpointFromEnvelope"] }
+                "properties": {
+                  "path": true,
+                  "endpointFromEnvelope": false
+                }
               },
               {
                 "required": ["endpointFromEnvelope"],
-                "not": { "required": ["path"] }
+                "properties": {
+                  "path": false,
+                  "endpointFromEnvelope": true
+                }
               }
             ]
           },
