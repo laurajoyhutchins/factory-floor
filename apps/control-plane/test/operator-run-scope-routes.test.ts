@@ -27,7 +27,10 @@ function services() {
       })),
       listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
       readArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
-      listPendingApprovals: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listPendingApprovals: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+      })),
       getRunTopology: vi.fn(async () => ({
         run: { id: 'run-1' },
         regions: [],
