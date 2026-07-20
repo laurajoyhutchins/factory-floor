@@ -58,4 +58,19 @@ describe('worker SDK conformance corpus validation', () => {
       ]),
     );
   });
+
+  it('rejects ambiguous request targets', () => {
+    const invalid = JSON.parse(JSON.stringify(corpus));
+    invalid.cases[0].request.endpointFromEnvelope = 'heartbeatUrl';
+
+    const result = validateWorkerSdkConformance({
+      corpus: invalid,
+      schema,
+      repoRoot,
+    });
+
+    expect(result.errors).toEqual(
+      expect.arrayContaining([expect.stringContaining('oneOf')]),
+    );
+  });
 });
