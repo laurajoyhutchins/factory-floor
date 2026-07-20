@@ -1,0 +1,184 @@
+name: Apply Discord Activity composition
+
+on:
+  push:
+    branches:
+      - feat/discord-activity-readonly-shell
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, 'compose read-only Discord Activity shell')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/discord-activity-readonly-shell
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Apply composition changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          app_path = Path('apps/control-plane/src/app.ts')
+          app = app_path.read_text()
+          app = app.replace(
+              "import { ActivitySessionService } from './activity-session-service.js';\nimport { registerActivityRoutes } from './routes/activity.js';",
+              "import { ActivitySessionService } from './activity-session-service.js';\nimport { DatabaseActivitySessionAuthorizer } from './activity-session-read-authorizer.js';\nimport { registerActivityRoutes } from './routes/activity.js';\nimport { registerActivityBrowserRoutes } from './routes/activity-browser.js';",
+              1,
+          )
+          app = app.replace(
+              "  if (deps.controlPlaneSecurity)\n    registerControlPlaneSecurity(app, deps.controlPlaneSecurity);\n  app.get('/health'",
+              "  app.get('/health'",
+              1,
+          )
+          database_block = """  const db =
+    deps.database ??
+    (process.env.DATABASE_URL
+      ? createDatabase(process.env.DATABASE_URL)
+      : undefined);
+"""
+          replacement = database_block + """  const activitySessionService = db
+    ? new ActivitySessionService(db)
+    : undefined;
+  const activitySessionAuthorizer = db
+    ? new DatabaseActivitySessionAuthorizer(db)
+    : undefined;
+  if (deps.controlPlaneSecurity)
+    registerControlPlaneSecurity(
+      app,
+      deps.controlPlaneSecurity,
+      activitySessionAuthorizer,
+    );
+"""
+          if database_block not in app:
+              raise SystemExit('database composition block not found')
+          app = app.replace(database_block, replacement, 1)
+          old_activity = """  if (deps.serviceAuthKeys && db) {
+    const serviceAuthConfig: ServiceAuthConfig = {
+      keys: deps.serviceAuthKeys,
+      db: createNonceRepository(db),
+    };
+    registerServiceAuth(app, serviceAuthConfig);
+    await registerActivityRoutes(app, new ActivitySessionService(db));
+  }
+"""
+          new_activity = """  if (
+    deps.serviceAuthKeys &&
+    db &&
+    activitySessionService &&
+    activitySessionAuthorizer
+  ) {
+    const serviceAuthConfig: ServiceAuthConfig = {
+      keys: deps.serviceAuthKeys,
+      db: createNonceRepository(db),
+    };
+    registerServiceAuth(app, serviceAuthConfig);
+    await registerActivityRoutes(app, activitySessionService);
+    await registerActivityBrowserRoutes(
+      app,
+      activitySessionService,
+      activitySessionAuthorizer,
+    );
+  }
+"""
+          if old_activity not in app:
+              raise SystemExit('activity composition block not found')
+          app_path.write_text(app.replace(old_activity, new_activity, 1))
+
+          tsconfig_path = Path('tsconfig.json')
+          tsconfig = json.loads(tsconfig_path.read_text())
+          refs = tsconfig['references']
+          if not any(item['path'] == 'apps/discord-activity' for item in refs):
+              index = next(i for i, item in enumerate(refs) if item['path'] == 'apps/console') + 1
+              refs.insert(index, {'path': 'apps/discord-activity'})
+          tsconfig_path.write_text(json.dumps(tsconfig, indent=2) + '\n')
+
+          vitest_path = Path('vitest.config.ts')
+          vitest = vitest_path.read_text()
+          vitest = vitest.replace(
+              "  'apps/console/**',\n  'packages/operator-ui-react/**',",
+              "  'apps/console/**',\n  'apps/discord-activity/**',\n  'packages/operator-ui-react/**',",
+              1,
+          )
+          vitest = vitest.replace(
+              "      'apps/console/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
+              "      'apps/console/vitest.config.ts',\n      'apps/discord-activity/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
+              1,
+          )
+          vitest_path.write_text(vitest)
+
+          package_path = Path('package.json')
+          package = json.loads(package_path.read_text())
+          scripts = package['scripts']
+          scripts['dev:discord-activity'] = 'pnpm --filter @factory-floor/discord-activity dev'
+          scripts['build:discord-activity'] = 'pnpm --filter @factory-floor/discord-activity build'
+          scripts['test:discord-activity'] = 'pnpm --filter @factory-floor/discord-activity test'
+          package_path.write_text(json.dumps(package, indent=2) + '\n')
+
+          verify_path = Path('scripts/verify.sh')
+          verify = verify_path.read_text()
+          verify = verify.replace(
+              '  pnpm --filter @factory-floor/console build\n',
+              '  pnpm --filter @factory-floor/console build\n  pnpm --filter @factory-floor/discord-activity build\n',
+              1,
+          )
+          verify_path.write_text(verify)
+
+          env_path = Path('.env.example')
+          env = env_path.read_text()
+          marker = '# Discord Activity browser host (disabled by default)'
+          if marker not in env:
+              env += """
+
+# Discord Activity browser host (disabled by default)
+VITE_FACTORY_FLOOR_DISCORD_ACTIVITY_ENABLED=false
+VITE_DISCORD_CLIENT_ID=
+VITE_FACTORY_FLOOR_BROKER_URL=https://broker.example
+VITE_FACTORY_FLOOR_CONTROL_PLANE_URL=https://factory-floor.example
+VITE_DISCORD_OAUTH_REDIRECT_URI=https://your-application-id.discordsays.com/.proxy/oauth/callback
+"""
+          env_path.write_text(env)
+          PY
+      - name: Update lockfile and format
+        run: |
+          corepack enable
+          pnpm install --lockfile-only
+          pnpm exec prettier --write \
+            .env.example \
+            package.json \
+            pnpm-lock.yaml \
+            tsconfig.json \
+            vitest.config.ts \
+            scripts/verify.sh \
+            apps/control-plane/src/app.ts \
+            apps/control-plane/src/security.ts \
+            apps/control-plane/src/activity-session-read-authorizer.ts \
+            apps/control-plane/src/routes/activity-browser.ts \
+            apps/control-plane/test/security.test.ts \
+            apps/control-plane/test/activity-browser-routes.test.ts \
+            apps/discord-activity
+      - name: Focused verification
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @factory-floor/control-plane typecheck
+          pnpm --filter @factory-floor/control-plane test -- activity-browser-routes security
+          pnpm --filter @factory-floor/discord-activity typecheck
+          pnpm --filter @factory-floor/discord-activity test
+          pnpm --filter @factory-floor/discord-activity build
+          pnpm --filter @factory-floor/console build
+      - name: Commit composition
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .
+          git diff --cached --quiet || git commit -m 'feat(discord-activity): compose read-only Discord Activity shell'
+          git push origin HEAD:feat/discord-activity-readonly-shell
