@@ -59,7 +59,10 @@ type DispatchPreparation =
       request: ExternalActionProviderRequest;
       attemptId: string;
     }
-  | { disposition: 'reconcile' }
+  | {
+      disposition: 'uncertain';
+      status: 'dispatching' | 'indeterminate' | 'acknowledged';
+    }
   | { disposition: 'cancelled' | 'terminal' };
 
 export class ExternalActionService {
@@ -71,7 +74,6 @@ export class ExternalActionService {
 
   async dispatch(actionId: string) {
     const prepared = await this.prepareDispatch(actionId);
-    if (prepared.disposition === 'reconcile') return this.reconcile(actionId);
     if (prepared.disposition !== 'dispatch') return prepared;
 
     try {
@@ -99,12 +101,10 @@ export class ExternalActionService {
           'external_action_not_found',
           'external action was not found',
         );
-      if (action.status === 'reconciled')
-        return { disposition: 'terminal' as const, status: action.status };
       if (
-        !['dispatching', 'indeterminate', 'acknowledged'].includes(
-          action.status,
-        )
+        action.status !== 'dispatching' &&
+        action.status !== 'indeterminate' &&
+        action.status !== 'acknowledged'
       )
         return { disposition: 'terminal' as const, status: action.status };
 
@@ -199,9 +199,11 @@ export class ExternalActionService {
           'external action was not found',
         );
       if (
-        ['dispatching', 'indeterminate', 'acknowledged'].includes(action.status)
+        action.status === 'dispatching' ||
+        action.status === 'indeterminate' ||
+        action.status === 'acknowledged'
       )
-        return { disposition: 'reconcile' };
+        return { disposition: 'uncertain', status: action.status };
       if (action.status !== 'authorized') return { disposition: 'terminal' };
       if (
         action.lifecycle_status !== 'running' ||
@@ -302,18 +304,18 @@ export class ExternalActionService {
         .executeTakeFirstOrThrow();
       if (action.status === 'reconciled') return;
       if (
-        !['dispatching', 'indeterminate', 'acknowledged'].includes(
-          action.status,
-        )
+        action.status !== 'dispatching' &&
+        action.status !== 'indeterminate' &&
+        action.status !== 'acknowledged'
       )
         throw new ExternalActionError(
           'external_action_state_conflict',
           `external action cannot complete from ${action.status}`,
         );
       if (
-        !['dispatching', 'indeterminate', 'acknowledged'].includes(
-          attempt.status,
-        )
+        attempt.status !== 'dispatching' &&
+        attempt.status !== 'indeterminate' &&
+        attempt.status !== 'acknowledged'
       )
         throw new ExternalActionError(
           'external_action_attempt_state_conflict',
