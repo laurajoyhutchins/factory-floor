@@ -61,9 +61,9 @@ describe('repository-task plan normalization', () => {
       });
 
       expect(result.normalizedPlan).toBeNull();
-      expect(
-        result.diagnostics.map((diagnostic) => diagnostic.code),
-      ).toContain(expectedCode);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+        expectedCode,
+      );
     },
   );
 });
