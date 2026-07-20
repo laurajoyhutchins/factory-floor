@@ -132,7 +132,9 @@ describe('control-plane HTTP security', () => {
       adminToken: 'admin-secret',
     });
     app.post('/worker/v1/claim', async () => ({ claimed: false }));
-    app.get('/api/v1/discord/activity/session', async () => ({ session: true }));
+    app.get('/api/v1/discord/activity/session', async () => ({
+      session: true,
+    }));
 
     await expect(
       app.inject({ method: 'POST', url: '/worker/v1/claim' }),

@@ -17,7 +17,8 @@ function value(
 export function discordActivityConfig(
   env: Record<string, string | boolean | undefined>,
 ): DiscordActivityConfig {
-  const enabled = value(env, 'VITE_FACTORY_FLOOR_DISCORD_ACTIVITY_ENABLED') === 'true';
+  const enabled =
+    value(env, 'VITE_FACTORY_FLOOR_DISCORD_ACTIVITY_ENABLED') === 'true';
   const config = {
     enabled,
     discordClientId: value(env, 'VITE_DISCORD_CLIENT_ID'),
@@ -29,7 +30,11 @@ export function discordActivityConfig(
   for (const [name, item] of Object.entries(config))
     if (name !== 'enabled' && !item)
       throw new Error(`discord_activity_${name}_required`);
-  for (const endpoint of [config.brokerUrl, config.controlPlaneUrl, config.redirectUri]) {
+  for (const endpoint of [
+    config.brokerUrl,
+    config.controlPlaneUrl,
+    config.redirectUri,
+  ]) {
     const url = new URL(endpoint);
     if (url.protocol !== 'https:' && url.hostname !== 'localhost')
       throw new Error('discord_activity_https_required');

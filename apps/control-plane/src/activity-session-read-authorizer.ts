@@ -25,9 +25,7 @@ export interface ActivitySessionAuthorizer {
   ): Promise<ActivityReadSession | null>;
 }
 
-export class DatabaseActivitySessionAuthorizer
-  implements ActivitySessionAuthorizer
-{
+export class DatabaseActivitySessionAuthorizer implements ActivitySessionAuthorizer {
   constructor(private readonly db: Kysely<Database>) {}
 
   async resolveSession(

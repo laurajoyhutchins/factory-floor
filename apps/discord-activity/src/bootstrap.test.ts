@@ -59,7 +59,11 @@ describe('Discord Activity bootstrap', () => {
             expiresAt: '2026-07-20T20:00:00.000Z',
             idleExpiresAt: '2026-07-20T19:05:00.000Z',
           },
-          context: { kind: 'run' as const, projectId: 'project-1', runId: 'run-1' },
+          context: {
+            kind: 'run' as const,
+            projectId: 'project-1',
+            runId: 'run-1',
+          },
         };
       }),
     };
@@ -123,7 +127,10 @@ describe('Discord Activity bootstrap', () => {
           }),
         },
         redirectUri: 'https://123.discordsays.com/.proxy/oauth/callback',
-        createPkce: async () => ({ verifier: 'verifier', challenge: 'challenge' }),
+        createPkce: async () => ({
+          verifier: 'verifier',
+          challenge: 'challenge',
+        }),
       }),
     ).rejects.toThrow('activity_run_binding_required');
   });

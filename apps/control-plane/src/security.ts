@@ -99,8 +99,7 @@ export function registerControlPlaneSecurity(
       (request.method === 'GET' || request.method === 'HEAD');
     if (activityRead) {
       const session = await activitySessions.resolveSession(supplied);
-      if (!session)
-        return reply.code(403).send(securityError('forbidden'));
+      if (!session) return reply.code(403).send(securityError('forbidden'));
       if (!session.boundRunId || session.boundRunId !== runId)
         return reply
           .code(403)

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ActivitySessionCredentials } from './contracts.js';
 import { ActivitySessionController } from './session.js';
 
 describe('Activity session lifecycle', () => {
@@ -33,12 +34,52 @@ describe('Activity session lifecycle', () => {
     expect(scheduled).toHaveLength(1);
     now = Date.parse('2026-07-20T19:04:00.000Z');
     scheduled.shift()?.();
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith('initial-token'));
+    await vi.waitFor(() =>
+      expect(refresh).toHaveBeenCalledWith('initial-token'),
+    );
     expect(controller.current().sessionToken).toBe('rotated-token');
     expect(controller.current().expiresAt).toBe('2026-07-20T20:00:00.000Z');
     expect(onSession).toHaveBeenLastCalledWith(
       expect.objectContaining({ sessionToken: 'rotated-token' }),
     );
+  });
+
+  it('coalesces overlapping scheduled and reconnect refresh triggers', async () => {
+    let resolveRefresh!: (session: ActivitySessionCredentials) => void;
+    const refresh = vi.fn(
+      () =>
+        new Promise<ActivitySessionCredentials>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const controller = new ActivitySessionController(
+      {
+        sessionToken: 'initial-token',
+        expiresAt: '2026-07-20T20:00:00.000Z',
+        idleExpiresAt: '2026-07-20T19:05:00.000Z',
+      },
+      {
+        now: () => Date.parse('2026-07-20T19:04:00.000Z'),
+        refresh,
+        schedule: vi.fn(() => 1),
+        cancel: vi.fn(),
+      },
+    );
+
+    const scheduledRefresh = controller.refreshNow();
+    const reconnectRefresh = controller.refreshNow();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith('initial-token');
+
+    resolveRefresh({
+      sessionToken: 'rotated-token',
+      expiresAt: '2026-07-20T20:00:00.000Z',
+      idleExpiresAt: '2026-07-20T19:10:00.000Z',
+    });
+    await Promise.all([scheduledRefresh, reconnectRefresh]);
+
+    expect(controller.state()).toBe('active');
+    expect(controller.current().sessionToken).toBe('rotated-token');
   });
 
   it('fails closed when refresh returns an invalid or expired session', async () => {
@@ -99,7 +140,9 @@ describe('Activity session lifecycle', () => {
 
     controller.start();
     scheduled.shift()?.();
-    await vi.waitFor(() => expect(onState).toHaveBeenCalledWith('disconnected'));
+    await vi.waitFor(() =>
+      expect(onState).toHaveBeenCalledWith('disconnected'),
+    );
     expect(scheduled.length).toBeGreaterThan(0);
     scheduled.shift()?.();
     await vi.waitFor(() => expect(controller.state()).toBe('active'));

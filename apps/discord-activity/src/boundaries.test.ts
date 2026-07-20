@@ -13,9 +13,13 @@ const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 describe('Discord Activity architecture boundaries', () => {
   it('keeps the Discord SDK in the host adapter only', () => {
-    const sourceFiles = files(resolve(repositoryRoot, 'apps/discord-activity/src'))
+    const sourceFiles = files(
+      resolve(repositoryRoot, 'apps/discord-activity/src'),
+    )
       .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
-      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'));
+      .filter(
+        (path) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'),
+      );
     const sdkImports = sourceFiles.filter((path) =>
       readFileSync(path, 'utf8').includes('@discord/embedded-app-sdk'),
     );
@@ -36,7 +40,9 @@ describe('Discord Activity architecture boundaries', () => {
 
   it('keeps reusable operator packages Discord-free', () => {
     for (const packageName of ['operator-client-ts', 'operator-ui-react']) {
-      const source = files(resolve(repositoryRoot, `packages/${packageName}/src`))
+      const source = files(
+        resolve(repositoryRoot, `packages/${packageName}/src`),
+      )
         .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
         .map((path) => readFileSync(path, 'utf8'))
         .join('\n');

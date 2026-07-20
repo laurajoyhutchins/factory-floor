@@ -13,7 +13,8 @@ export async function beginActivityBootstrap(options: {
 }): Promise<BootstrappedActivity> {
   const redirectUri = options.redirectUri.trim();
   if (!redirectUri) throw new Error('activity_redirect_uri_required');
-  if (!options.host.instanceId) throw new Error('activity_instance_id_required');
+  if (!options.host.instanceId)
+    throw new Error('activity_instance_id_required');
 
   await options.host.ready();
   const pkce = await (options.createPkce ?? createPkce)();

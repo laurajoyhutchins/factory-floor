@@ -39,6 +39,7 @@ export class ActivitySessionController {
   ) => unknown;
   private readonly cancelCallback: (handle: unknown) => void;
   private handle: unknown;
+  private refreshInFlight: Promise<void> | undefined;
   private connectionState: ActivityConnectionState = 'active';
   private stopped = false;
 
@@ -51,10 +52,14 @@ export class ActivitySessionController {
       initialSession.expiresAt,
       'activity_session_expiry_invalid',
     );
-    timestamp(initialSession.idleExpiresAt, 'activity_session_idle_expiry_invalid');
+    timestamp(
+      initialSession.idleExpiresAt,
+      'activity_session_idle_expiry_invalid',
+    );
     this.now = options.now ?? Date.now;
     this.scheduleCallback =
-      options.schedule ?? ((callback, delayMs) => window.setTimeout(callback, delayMs));
+      options.schedule ??
+      ((callback, delayMs) => window.setTimeout(callback, delayMs));
     this.cancelCallback =
       options.cancel ?? ((handle) => window.clearTimeout(handle as number));
   }
@@ -84,7 +89,17 @@ export class ActivitySessionController {
     this.setState('stopped');
   }
 
-  async refreshNow(): Promise<void> {
+  refreshNow(): Promise<void> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+    const operation = this.performRefresh();
+    const tracked = operation.finally(() => {
+      if (this.refreshInFlight === tracked) this.refreshInFlight = undefined;
+    });
+    this.refreshInFlight = tracked;
+    return tracked;
+  }
+
+  private async performRefresh(): Promise<void> {
     if (this.stopped) return;
     if (this.isExpired()) {
       this.expire();
@@ -92,6 +107,7 @@ export class ActivitySessionController {
     }
     try {
       const replacement = await this.options.refresh(this.session.sessionToken);
+      if (this.stopped) return;
       const replacementExpiry = timestamp(
         replacement.expiresAt,
         'activity_session_expiry_invalid',
@@ -114,6 +130,7 @@ export class ActivitySessionController {
       this.options.onSession?.(this.current());
       this.scheduleRefresh();
     } catch (error) {
+      if (this.stopped) return;
       if (this.isExpired() || terminalSessionError(error)) {
         this.expire();
         return;
@@ -127,7 +144,10 @@ export class ActivitySessionController {
     return (
       this.now() >= this.absoluteExpiry ||
       this.now() >=
-        timestamp(this.session.idleExpiresAt, 'activity_session_idle_expiry_invalid')
+        timestamp(
+          this.session.idleExpiresAt,
+          'activity_session_idle_expiry_invalid',
+        )
     );
   }
 
@@ -156,6 +176,7 @@ export class ActivitySessionController {
   }
 
   private expire(): void {
+    if (this.connectionState === 'expired') return;
     if (this.handle !== undefined) this.cancelCallback(this.handle);
     this.handle = undefined;
     this.setState('expired');

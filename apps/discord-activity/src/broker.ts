@@ -32,7 +32,8 @@ async function postJson<T>(
   if (!response.ok) {
     const record = isRecord(payload) ? payload : {};
     const error = isRecord(record.error) ? record.error : {};
-    const code = typeof error.code === 'string' ? error.code : `http_${response.status}`;
+    const code =
+      typeof error.code === 'string' ? error.code : `http_${response.status}`;
     throw new Error(code);
   }
   return payload as T;
@@ -49,11 +50,13 @@ async function authorizedJson<T>(
     headers: { authorization: `Bearer ${sessionToken}` },
     cache: 'no-store',
   });
-  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  const payload =
+    response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const record = isRecord(payload) ? payload : {};
     const error = isRecord(record.error) ? record.error : {};
-    const code = typeof error.code === 'string' ? error.code : `http_${response.status}`;
+    const code =
+      typeof error.code === 'string' ? error.code : `http_${response.status}`;
     throw new Error(code);
   }
   return payload as T;
@@ -87,7 +90,10 @@ export function readActivitySessionContext(
 ): Promise<ActivitySessionContext> {
   return authorizedJson<ActivitySessionContext>(
     fetchImplementation,
-    new URL('api/v1/discord/activity/session', base(controlPlaneUrl)).toString(),
+    new URL(
+      'api/v1/discord/activity/session',
+      base(controlPlaneUrl),
+    ).toString(),
     sessionToken,
     'GET',
   );

@@ -1,7 +1,4 @@
-import {
-  QueryClient,
-  QueryClientProvider,
-} from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   configureDefaultOperatorClient,
   createOperatorClient,
@@ -144,14 +141,18 @@ export function DiscordActivityApp({
       <main className="activity-state" role="alert">
         <h1>Activity unavailable</h1>
         <p>{state.code}</p>
-        <p>Close and relaunch the Activity from its trusted Discord entry point.</p>
+        <p>
+          Close and relaunch the Activity from its trusted Discord entry point.
+        </p>
       </main>
     );
   if (state.kind === 'expired')
     return (
       <main className="activity-state" role="alert">
         <h1>Session expired</h1>
-        <p>Close and relaunch the Activity to obtain a fresh verified session.</p>
+        <p>
+          Close and relaunch the Activity to obtain a fresh verified session.
+        </p>
       </main>
     );
 

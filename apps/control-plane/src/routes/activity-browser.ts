@@ -16,12 +16,14 @@ function noStore(reply: FastifyReply): FastifyReply {
 }
 
 function unauthorized(reply: FastifyReply) {
-  return noStore(reply).code(401).send({
-    error: {
-      code: 'activity_session_invalid',
-      message: 'Activity session is missing, expired, revoked, or invalid.',
-    },
-  });
+  return noStore(reply)
+    .code(401)
+    .send({
+      error: {
+        code: 'activity_session_invalid',
+        message: 'Activity session is missing, expired, revoked, or invalid.',
+      },
+    });
 }
 
 export async function registerActivityBrowserRoutes(
@@ -36,12 +38,14 @@ export async function registerActivityBrowserRoutes(
       const session = token ? await authorizer.resolveSession(token) : null;
       if (!session) return unauthorized(reply);
       if (!session.boundRunId)
-        return noStore(reply).code(409).send({
-          error: {
-            code: 'activity_run_binding_required',
-            message: 'Activity session is not bound to a run.',
-          },
-        });
+        return noStore(reply)
+          .code(409)
+          .send({
+            error: {
+              code: 'activity_run_binding_required',
+              message: 'Activity session is not bound to a run.',
+            },
+          });
       return noStore(reply).send({
         instanceBindingId: session.instanceBindingId,
         applicationId: session.applicationId,
