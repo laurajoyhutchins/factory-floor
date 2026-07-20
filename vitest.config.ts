@@ -49,7 +49,14 @@ export default defineConfig({
       include: rootCoverageInclude,
       exclude: rootCoverageExclude,
       reportsDirectory: '.factory-floor/coverage/typescript',
-      reporter: ['text-summary', 'json-summary', 'json', 'lcov', 'cobertura', 'html'],
+      reporter: [
+        'text-summary',
+        'json-summary',
+        'json',
+        'lcov',
+        'cobertura',
+        'html',
+      ],
       reportOnFailure: true,
     },
     projects: [
