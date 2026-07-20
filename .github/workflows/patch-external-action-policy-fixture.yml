@@ -1,0 +1,110 @@
+name: Patch external action policy fixture
+
+on:
+  push:
+    branches:
+      - agent/external-action-recovery
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-external-action-policy-fixture
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: agent/external-action-recovery
+
+      - name: Patch fixture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/integration/runtime-core/external-action-recovery.test.ts')
+          text = path.read_text()
+
+          old_import = "  ExternalActionService,\n  SchedulerService,\n"
+          new_import = "  ExternalActionService,\n  PolicyDecisionService,\n  SchedulerService,\n"
+          if text.count(old_import) != 1:
+              raise SystemExit('expected one runtime import patch match')
+          text = text.replace(old_import, new_import)
+
+          old_decision = """  const actionId = createUuidV7();
+  const policyDecisionId = createUuidV7();
+  await db
+    .insertInto('policy_decisions')
+    .values({
+      id: policyDecisionId,
+      policy_id: null,
+      policy_name: 'external-action-test-policy',
+      policy_version: '1',
+      evaluator_version: 'test',
+      subject_kind: 'external_action',
+      subject_id: actionId,
+      input_artifact_id: artifactId,
+      normalized_inputs: {},
+      outcome: 'allow',
+      reason: null,
+      modifications: [],
+    })
+    .execute();
+"""
+          new_decision = """  const actionId = createUuidV7();
+  await db
+    .insertInto('policies')
+    .values({
+      id: createUuidV7(),
+      name: 'external-action-test-policy',
+      version: '1',
+      content_digest: 'e'.repeat(64),
+      policy: {
+        spec: {
+          outcome: 'allow',
+          reason: 'Allow the deterministic recovery test action.',
+        },
+      },
+    })
+    .execute();
+  const policyDecision = await new PolicyDecisionService(
+    db,
+    'external-action-recovery-test',
+    () => new Date(),
+  ).evaluate({
+    policyName: 'external-action-test-policy',
+    policyVersion: '1',
+    subjectKind: 'external_action',
+    subjectId: actionId,
+    inputArtifactId: artifactId,
+    normalizedInputs: {},
+  });
+"""
+          if text.count(old_decision) != 1:
+              raise SystemExit('expected one policy decision patch match')
+          text = text.replace(old_decision, new_decision)
+          text = text.replace(
+              '      policy_decision_id: policyDecisionId,\n',
+              '      policy_decision_id: policyDecision.decisionId,\n',
+              1,
+          )
+          path.write_text(text)
+          PY
+
+      - name: Format and commit
+        run: |
+          corepack prepare pnpm@10.12.1 --activate
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec prettier --write tests/integration/runtime-core/external-action-recovery.test.ts
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/integration/runtime-core/external-action-recovery.test.ts
+          git commit -m 'test: use production policy evaluation for external actions'
+          git push origin HEAD:agent/external-action-recovery
