@@ -162,12 +162,17 @@ jobs:
             scripts/run-operator-browser-smoke.mjs \
             apps/console/vite.config.ts
 
-      - name: Commit required browser smoke wiring
+      - name: Preserve generated workflow separately
+        run: |
+          mkdir -p .factory-floor/generated
+          cp .github/workflows/repository-verification.yml .factory-floor/generated/repository-verification.yml
+          git checkout -- .github/workflows/repository-verification.yml
+
+      - name: Commit source and test wiring
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
-            .github/workflows/repository-verification.yml \
             scripts/summarize-ci-metrics.mjs \
             scripts/ci-test-accounting.test.mjs \
             playwright.config.ts \
@@ -176,3 +181,11 @@ jobs:
             apps/console/vite.config.ts
           git commit -m 'test: require production operator browser smoke'
           git push origin HEAD:test/operator-browser-smoke
+
+      - name: Upload formatted verification workflow
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generated-browser-smoke-workflow-${{ github.run_number }}
+          path: .factory-floor/generated/repository-verification.yml
+          if-no-files-found: error
+          retention-days: 7
