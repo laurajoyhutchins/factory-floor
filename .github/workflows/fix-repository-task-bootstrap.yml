@@ -1,0 +1,54 @@
+name: Fix repository-task trusted bootstrap
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fix-repository-task-bootstrap.yml'
+      - 'workers/repository-task-ts/src/index.ts'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-repository-task-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/repository-task-worker
+      - name: Use the canonical workspace bootstrap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('workers/repository-task-ts/src/index.ts')
+          text = path.read_text()
+          old = """        {
+          id: 'install',
+          executable: 'pnpm',
+          args: ['install', '--frozen-lockfile'],
+          timeoutMs: 180_000,
+        },"""
+          new = """        {
+          id: 'bootstrap',
+          executable: 'bash',
+          args: ['scripts/bootstrap-workspace.sh'],
+          timeoutMs: 300_000,
+        },"""
+          if old not in text:
+              raise SystemExit('expected trusted install stage not found')
+          path.write_text(text.replace(old, new))
+          PY
+      - name: Commit trusted profile fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add workers/repository-task-ts/src/index.ts
+          git commit -m "fix(repository-task): bootstrap isolated verification workspace"
+          git push origin HEAD:feat/repository-task-worker
