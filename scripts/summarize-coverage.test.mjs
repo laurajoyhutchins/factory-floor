@@ -58,7 +58,10 @@ function writeValidReports(directory) {
       },
     ],
   ]) {
-    writeFileSync(join(directory, name, 'coverage.json'), JSON.stringify({ totals }));
+    writeFileSync(
+      join(directory, name, 'coverage.json'),
+      JSON.stringify({ totals }),
+    );
   }
 }
 
