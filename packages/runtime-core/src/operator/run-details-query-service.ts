@@ -195,28 +195,34 @@ export class RunDetailsQueryService {
         : [];
     assertWithinBound(resources, limit, 'run_details_resource_bound_exceeded');
 
+    const outputs = executionIds.length
+      ? await this.db
+          .selectFrom('execution_outputs')
+          .select('artifact_id')
+          .where('execution_id', 'in', executionIds)
+          .orderBy('artifact_id')
+          .limit(limit + 1)
+          .execute()
+      : [];
+    assertWithinBound(outputs, limit, 'run_details_output_bound_exceeded');
+
+    const inputs = executionIds.length
+      ? await this.db
+          .selectFrom('execution_inputs')
+          .select('artifact_id')
+          .where('execution_id', 'in', executionIds)
+          .where('artifact_id', 'is not', null)
+          .orderBy('artifact_id')
+          .limit(limit + 1)
+          .execute()
+      : [];
+    assertWithinBound(inputs, limit, 'run_details_input_bound_exceeded');
+
     const artifactIds = unique([
-      ...(executionIds.length
-        ? (
-            await this.db
-              .selectFrom('execution_outputs')
-              .select('artifact_id')
-              .where('execution_id', 'in', executionIds)
-              .orderBy('artifact_id')
-              .execute()
-          ).map((output) => output.artifact_id)
-        : []),
-      ...(executionIds.length
-        ? (
-            await this.db
-              .selectFrom('execution_inputs')
-              .select('artifact_id')
-              .where('execution_id', 'in', executionIds)
-              .where('artifact_id', 'is not', null)
-              .orderBy('artifact_id')
-              .execute()
-          ).flatMap((input) => (input.artifact_id ? [input.artifact_id] : []))
-        : []),
+      ...outputs.map((output) => output.artifact_id),
+      ...inputs.flatMap((input) =>
+        input.artifact_id ? [input.artifact_id] : [],
+      ),
       ...actions.map((action) => action.outbound_request_artifact_id),
     ]);
     assertWithinBound(
