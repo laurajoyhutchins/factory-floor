@@ -30,14 +30,6 @@ const corpus = JSON.parse(
   }>;
 };
 
-const claimCaseIds = new Set([
-  'claim.claimed',
-  'claim.no-work',
-  'claim.deprecated-capabilities',
-  'response.malformed',
-  'transport.retryable',
-]);
-
 function fixture(path: string): unknown {
   return JSON.parse(readFileSync(new URL(path, rootUrl), 'utf8')) as unknown;
 }
@@ -106,8 +98,8 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
 }
 
 describe('TypeScript worker claim conformance', () => {
-  for (const testCase of corpus.cases.filter((item) =>
-    claimCaseIds.has(item.id),
+  for (const testCase of corpus.cases.filter(
+    (item) => item.operation === 'claim',
   ))
     it(testCase.id, async () => {
       await expect(runClaimCase(testCase)).resolves.toEqual(testCase.expected);
