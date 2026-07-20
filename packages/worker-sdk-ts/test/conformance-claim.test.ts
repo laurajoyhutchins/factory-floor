@@ -12,7 +12,10 @@ const corpus = JSON.parse(
   cases: Array<{
     id: string;
     operation: string;
-    request?: {
+    request: {
+      method: string;
+      path: string;
+      body?: Record<string, unknown>;
       sdkInputAlias?: string;
       componentSelectors?: string[];
       expectedWireBody?: Record<string, unknown>;
@@ -56,8 +59,10 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
     workerId: 'conformance-worker',
     sleep: async () => undefined,
     jitter: () => 0,
-    fetch: async (_url, init) => {
+    fetch: async (url, init) => {
       attempts += 1;
+      expect(init?.method).toBe(testCase.request.method);
+      expect(new URL(String(url)).pathname).toBe(testCase.request.path);
       wireBody = init?.body ? JSON.parse(String(init.body)) : undefined;
       if (
         testCase.response.transportError &&
@@ -77,9 +82,10 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
 
   try {
     const result = await client.claim(
-      testCase.request?.componentSelectors ?? ['verify@1'],
+      testCase.request.componentSelectors ?? ['verify@1'],
     );
-    if (testCase.request?.expectedWireBody) {
+    if (testCase.request.body) expect(wireBody).toEqual(testCase.request.body);
+    if (testCase.request.expectedWireBody) {
       expect(testCase.request.sdkInputAlias).toBe('capabilities');
       expect(wireBody).toEqual(testCase.request.expectedWireBody);
       expect(wireBody).not.toHaveProperty('capabilities');
