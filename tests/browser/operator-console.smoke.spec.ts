@@ -31,10 +31,16 @@ test.describe('production operator console', () => {
 
     await page.goto('/');
     await expect(page).toHaveTitle(/Factory Floor/i);
-    await expect(page.getByRole('heading', { name: 'Factory Floor' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Factory Floor' }),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
-    await expect(page.getByText('healthy', { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Projection freshness' })).toBeVisible();
+    await expect(
+      page.getByText('healthy', { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Projection freshness' }),
+    ).toBeVisible();
 
     await expect
       .poll(() => streamRequests.length, { timeout: 15_000 })
@@ -47,10 +53,14 @@ test.describe('production operator console', () => {
       .getByRole('heading', { name: 'Recent runtime events' })
       .locator('xpath=..')
       .locator('xpath=following-sibling::*[1]');
-    const ids = await recentEvents.locator('tbody tr td:first-child').allTextContents();
+    const ids = await recentEvents
+      .locator('tbody tr td:first-child')
+      .allTextContents();
     expect(new Set(ids).size).toBe(ids.length);
     if (ids[0]) {
-      await expect(recentEvents.getByText(ids[0], { exact: true })).toHaveCount(1);
+      await expect(recentEvents.getByText(ids[0], { exact: true })).toHaveCount(
+        1,
+      );
     }
 
     const topologyLink = page.getByRole('link', { name: 'Topology' });
@@ -70,12 +80,18 @@ test.describe('production operator console', () => {
     const errors = browserErrors(page);
 
     await page.goto(`/runs/${fixture.runId}`);
-    await expect(page.getByRole('heading', { name: 'Run status' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Run topology' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Run status' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Run topology' }),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Bounded durable trace' }),
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Run artifacts' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Run artifacts' }),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Finite run event stream' }),
     ).toBeVisible();

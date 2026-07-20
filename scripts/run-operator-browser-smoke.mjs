@@ -143,7 +143,9 @@ function assertNoPrivilegedCredentialsInBundle() {
   };
   for (const [name, value] of Object.entries(privileged)) {
     if (value && bundle.includes(value)) {
-      throw new Error(`privileged credential leaked into browser bundle: ${name}`);
+      throw new Error(
+        `privileged credential leaked into browser bundle: ${name}`,
+      );
     }
   }
 }
@@ -165,7 +167,9 @@ async function latestRunCandidates(demoOutput) {
     )) {
       candidates.push(match[1]);
     }
-    return [...new Set(candidates.filter((value) => typeof value === 'string'))];
+    return [
+      ...new Set(candidates.filter((value) => typeof value === 'string')),
+    ];
   } finally {
     await client.end();
   }

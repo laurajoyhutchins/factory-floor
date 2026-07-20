@@ -88,6 +88,29 @@ describe('CI test accounting', () => {
     expect(summary.validation.missingLayers).toEqual(['integration']);
   });
 
+  it('requires nonzero browser evidence for a completed browser-smoke stage', () => {
+    const { result, summary } = runSummary(['browser-smoke'], {
+      'playwright-browser.xml': junit(
+        'operator-console.smoke.spec.ts',
+        'desktop production smoke',
+      ),
+    });
+    expect(result.status).toBe(0);
+    expect(summary.tests.layers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          layer: 'browser-smoke',
+          files: 1,
+          tests: 1,
+        }),
+      ]),
+    );
+
+    const missing = runSummary(['browser-smoke'], {});
+    expect(missing.result.status).toBe(1);
+    expect(missing.summary.validation.missingLayers).toEqual(['browser-smoke']);
+  });
+
   it('resets the database after integration failure and preserves the failure', () => {
     const directory = makeTemporaryDirectory();
     const bin = join(directory, 'bin');
