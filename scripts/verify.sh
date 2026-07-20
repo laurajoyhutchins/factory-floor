@@ -65,13 +65,30 @@ verify_services() {
 }
 
 verify_integration() {
-  pnpm typecheck
-  pnpm test:integration
-  pnpm db:reset
+  local status=0 cleanup_status=0
+
+  pnpm typecheck || status=$?
+  if [[ "$status" -eq 0 ]]; then
+    if [[ "${CI:-false}" == "true" ]]; then
+      pnpm test:integration:ci || status=$?
+    else
+      pnpm test:integration || status=$?
+    fi
+  fi
+
+  pnpm db:reset || cleanup_status=$?
+  if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
+    status="$cleanup_status"
+  fi
+  return "$status"
 }
 
 verify_acceptance() {
-  pnpm test:acceptance
+  if [[ "${CI:-false}" == "true" ]]; then
+    pnpm test:acceptance:ci
+  else
+    pnpm test:acceptance
+  fi
 }
 
 cleanup_services() {
