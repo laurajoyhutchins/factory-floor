@@ -40,6 +40,10 @@ export const DEFAULT_SUPPORTED_REPOSITORY_TASK_RECIPES = Object.freeze({
   'typescript-module': Object.freeze(['1']),
 });
 
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function pointerSegment(value) {
   return String(value).replaceAll('~', '~0').replaceAll('/', '~1');
 }
@@ -69,9 +73,10 @@ function schemaDiagnostics(errors = []) {
 
 function sortDiagnostics(diagnostics) {
   return [...diagnostics].sort((left, right) =>
-    [left.code, left.path, left.message]
-      .join('\0')
-      .localeCompare([right.code, right.path, right.message].join('\0')),
+    compareStrings(
+      [left.code, left.path, left.message].join('\0'),
+      [right.code, right.path, right.message].join('\0'),
+    ),
   );
 }
 
@@ -80,9 +85,7 @@ function collapseWhitespace(value) {
 }
 
 function sortUnique(values, normalize = (value) => value.trim()) {
-  return [...new Set(values.map(normalize))].sort((left, right) =>
-    left.localeCompare(right),
-  );
+  return [...new Set(values.map(normalize))].sort(compareStrings);
 }
 
 export function canonicalizeRepositoryTaskValue(value) {
@@ -91,7 +94,7 @@ export function canonicalizeRepositoryTaskValue(value) {
   if (value && typeof value === 'object')
     return Object.fromEntries(
       Object.keys(value)
-        .sort((left, right) => left.localeCompare(right))
+        .sort(compareStrings)
         .map((key) => [key, canonicalizeRepositoryTaskValue(value[key])]),
     );
   return value;
@@ -121,9 +124,31 @@ function isUnsafeRepositoryPath(value) {
   return segments.includes('..') || segments.includes('.git');
 }
 
+function hasUnsupportedAllowedPathPattern(value) {
+  const path = value.trim();
+  const withoutTerminalRecursiveGlob = path.endsWith('/**')
+    ? path.slice(0, -3)
+    : path;
+  return /[*?[\]]/.test(withoutTerminalRecursiveGlob);
+}
+
+function hasOutputGlob(value) {
+  return /[*?[\]]/.test(value);
+}
+
+function pathMatchesConstraint(path, constraint) {
+  if (constraint.endsWith('/**')) {
+    const prefix = constraint.slice(0, -3);
+    return path === prefix || path.startsWith(`${prefix}/`);
+  }
+  return path === constraint;
+}
+
 function semanticDiagnostics(plan, options) {
   const diagnostics = [];
-  for (const [index, path] of plan.allowedPaths.entries())
+  const allowedPaths = plan.allowedPaths.map((path) => path.trim());
+
+  for (const [index, path] of plan.allowedPaths.entries()) {
     if (isUnsafeRepositoryPath(path))
       diagnostics.push(
         diagnostic(
@@ -132,16 +157,38 @@ function semanticDiagnostics(plan, options) {
           `Repository path ${JSON.stringify(path)} is not a safe relative path.`,
         ),
       );
+    else if (hasUnsupportedAllowedPathPattern(path))
+      diagnostics.push(
+        diagnostic(
+          'path.unsupported-pattern',
+          `/allowedPaths/${index}`,
+          'Allowed paths may be exact paths or end with a recursive /** glob.',
+        ),
+      );
+  }
 
-  for (const [index, output] of plan.outputContract.outputs.entries())
-    if (isUnsafeRepositoryPath(output.path))
+  for (const [index, output] of plan.outputContract.outputs.entries()) {
+    if (isUnsafeRepositoryPath(output.path) || hasOutputGlob(output.path))
       diagnostics.push(
         diagnostic(
           'path.unsafe',
           `/outputContract/outputs/${index}/path`,
-          `Output path ${JSON.stringify(output.path)} is not a safe relative path.`,
+          `Output path ${JSON.stringify(output.path)} must be a concrete safe relative path.`,
         ),
       );
+    else if (
+      !allowedPaths.some((constraint) =>
+        pathMatchesConstraint(output.path.trim(), constraint),
+      )
+    )
+      diagnostics.push(
+        diagnostic(
+          'output.outside-allowed-paths',
+          `/outputContract/outputs/${index}/path`,
+          `Output path ${output.path} is outside the authored allowed path set.`,
+        ),
+      );
+  }
 
   const duplicateOutputNames = new Set();
   const seenOutputNames = new Set();
@@ -149,12 +196,24 @@ function semanticDiagnostics(plan, options) {
     if (seenOutputNames.has(output.name)) duplicateOutputNames.add(output.name);
     seenOutputNames.add(output.name);
   }
-  for (const name of [...duplicateOutputNames].sort())
+  for (const name of [...duplicateOutputNames].sort(compareStrings))
     diagnostics.push(
       diagnostic(
         'output.duplicate-name',
         '/outputContract/outputs',
         `Output name ${name} is declared more than once.`,
+      ),
+    );
+
+  const fileOutputCount = plan.outputContract.outputs.filter((output) =>
+    ['file', 'test', 'export'].includes(output.kind),
+  ).length;
+  if (fileOutputCount > plan.resourceBounds.maxFiles)
+    diagnostics.push(
+      diagnostic(
+        'resource.max-files-exceeded',
+        '/resourceBounds/maxFiles',
+        `The plan declares ${fileOutputCount} file outputs but maxFiles is ${plan.resourceBounds.maxFiles}.`,
       ),
     );
 
@@ -210,9 +269,10 @@ function normalizePlan(plan) {
     outputs: plan.outputContract.outputs
       .map(normalizeOutput)
       .sort((left, right) =>
-        [left.name, left.kind, left.path]
-          .join('\0')
-          .localeCompare([right.name, right.kind, right.path].join('\0')),
+        compareStrings(
+          [left.name, left.kind, left.path].join('\0'),
+          [right.name, right.kind, right.path].join('\0'),
+        ),
       ),
     verificationProfile: plan.verificationProfile.trim(),
     resourceBounds: {
