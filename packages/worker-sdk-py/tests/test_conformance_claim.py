@@ -18,13 +18,6 @@ ROOT = Path(__file__).resolve().parents[3]
 CORPUS = json.loads(
     (ROOT / "contracts/conformance/worker-protocol-v1.cases.json").read_text()
 )
-CLAIM_CASE_IDS = {
-    "claim.claimed",
-    "claim.no-work",
-    "claim.deprecated-capabilities",
-    "response.malformed",
-    "transport.retryable",
-}
 
 
 def fixture(path: str) -> Any:
@@ -103,7 +96,7 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "case",
-    [case for case in CORPUS["cases"] if case["id"] in CLAIM_CASE_IDS],
+    [case for case in CORPUS["cases"] if case["operation"] == "claim"],
     ids=lambda case: case["id"],
 )
 async def test_python_worker_claim_conformance(case: dict[str, Any]) -> None:
