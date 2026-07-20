@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import console from 'node:console';
 import { once } from 'node:events';
 import {
   createWriteStream,
@@ -69,7 +70,7 @@ async function stopChild(child) {
   signalProcessTree(child, 'SIGTERM');
   await Promise.race([
     once(child, 'exit'),
-    new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000)),
+    new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, 5_000)),
   ]);
   signalProcessTree(child, 'SIGKILL');
 }
@@ -105,13 +106,13 @@ async function waitForHttp(url, headers = {}) {
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { headers });
+      const response = await globalThis.fetch(url, { headers });
       if (response.ok) return response;
       lastError = new Error(`${url} returned ${response.status}`);
     } catch (error) {
       lastError = error;
     }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 200));
+    await new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, 200));
   }
   throw lastError ?? new Error(`${url} did not become ready`);
 }
@@ -183,7 +184,7 @@ async function selectRunId(controlPlaneUrl, candidates) {
     'x-factory-floor-adapter': 'playwright-browser-smoke',
   };
   for (const candidate of candidates) {
-    const response = await fetch(
+    const response = await globalThis.fetch(
       `${controlPlaneUrl}/api/v1/operator/runs/${encodeURIComponent(candidate)}`,
       { headers },
     );
