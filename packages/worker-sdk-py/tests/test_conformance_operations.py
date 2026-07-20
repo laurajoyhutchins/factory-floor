@@ -79,7 +79,12 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
         assert str(request.url) == str(endpoint)
         wire_body = json.loads(request.content)
         if fixture_path := expected_request.get("fixture"):
-            expected_body = fixture(fixture_path)
+            if case["operation"] == "result":
+                expected_body = ProposedResult.model_validate(
+                    fixture(fixture_path)
+                ).model_dump(mode="json", by_alias=True)
+            else:
+                expected_body = fixture(fixture_path)
         else:
             expected_body = {
                 "protocolVersion": "1.0",
