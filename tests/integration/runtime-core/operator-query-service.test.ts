@@ -176,6 +176,8 @@ describe('operator query service', () => {
       capabilities: ['retrieve@1'],
     });
     if (!firstClaim.claimed) throw new Error('expected first claim');
+    const firstDeliveryId = firstClaim.envelope.inputs[0]?.deliveryId;
+    if (!firstDeliveryId) throw new Error('expected first delivery');
     const second = await commands.submitDevelopmentTask(
       operator,
       task('Second topology'),
@@ -185,15 +187,17 @@ describe('operator query service', () => {
       capabilities: ['retrieve@1'],
     });
     if (!secondClaim.claimed) throw new Error('expected second claim');
+    const secondDeliveryId = secondClaim.envelope.inputs[0]?.deliveryId;
+    if (!secondDeliveryId) throw new Error('expected second delivery');
 
     const topology = await queries.getRunTopology(operator, first.runId);
     expect(topology.run.id).toBe(first.runId);
     expect(topology.regions.map((region) => region.id)).toContain(regionId);
     expect(topology.deliveries.map((delivery) => delivery.id)).toContain(
-      firstClaim.envelope.deliveryId,
+      firstDeliveryId,
     );
     expect(topology.deliveries.map((delivery) => delivery.id)).not.toContain(
-      secondClaim.envelope.deliveryId,
+      secondDeliveryId,
     );
     expect(topology.executions.map((execution) => execution.id)).toContain(
       firstClaim.envelope.executionId,
@@ -277,6 +281,12 @@ describe('operator query service', () => {
       ])
       .execute();
 
+    const expectedEvents = await db
+      .selectFrom('events')
+      .select('id')
+      .where('correlation_id', '=', first.runId)
+      .orderBy('id')
+      .execute();
     const firstPage = await queries.listRunEvents(operator, first.runId, {
       limit: 1,
     });
@@ -290,10 +300,12 @@ describe('operator query service', () => {
       cursor: firstPage.nextCursor!,
     });
     const observed = [...firstPage.items, ...secondPage.items];
-    expect(observed.map((event) => event.id)).toEqual([
-      firstEventId,
-      secondEventId,
-    ]);
+    expect(observed.map((event) => event.id)).toEqual(
+      expectedEvents.map((event) => event.id),
+    );
+    expect(observed.map((event) => event.event_type)).not.toContain(
+      'operator.test.foreign',
+    );
     expect(new Set(observed.map((event) => event.id)).size).toBe(
       observed.length,
     );
@@ -310,10 +322,18 @@ describe('operator query service', () => {
       }),
     ).rejects.toThrow('cursor_run_mismatch');
 
-    await db.deleteFrom('events').where('id', '=', firstEventId).execute();
+    const expiredCursor = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        kind: 'run-events',
+        runId: first.runId,
+        after: createUuidV7(),
+      }),
+      'utf8',
+    ).toString('base64url');
     await expect(
       queries.listRunEvents(operator, first.runId, {
-        cursor: firstPage.nextCursor!,
+        cursor: expiredCursor,
       }),
     ).rejects.toThrow('cursor_expired');
   });
