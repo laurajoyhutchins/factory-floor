@@ -1,9 +1,12 @@
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import {
+  canonicalizeJson,
+  canonicalJsonDigest,
+} from '../packages/runtime-core/src/declarations/canonical-json.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const schemaDirectory = resolve(root, 'contracts/schemas');
@@ -88,26 +91,14 @@ function sortUnique(values, normalize = (value) => value.trim()) {
   return [...new Set(values.map(normalize))].sort(compareStrings);
 }
 
-export function canonicalizeRepositoryTaskValue(value) {
-  if (Array.isArray(value))
-    return value.map((item) => canonicalizeRepositoryTaskValue(item));
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort(compareStrings)
-        .map((key) => [key, canonicalizeRepositoryTaskValue(value[key])]),
-    );
-  return value;
-}
-
-export function canonicalRepositoryTaskJson(value) {
-  return JSON.stringify(canonicalizeRepositoryTaskValue(value));
-}
+export const canonicalRepositoryTaskJson = canonicalizeJson;
 
 export function computeRepositoryTaskPlanDigest(planWithoutDigest) {
-  return createHash('sha256')
-    .update(canonicalRepositoryTaskJson(planWithoutDigest), 'utf8')
-    .digest('hex');
+  return canonicalJsonDigest(planWithoutDigest);
+}
+
+function canonicalRepositoryTaskValue(value) {
+  return JSON.parse(canonicalizeJson(value));
 }
 
 function isUnsafeRepositoryPath(value) {
@@ -269,7 +260,7 @@ function normalizePlan(plan) {
     recipe: {
       name: plan.recipe.name.trim(),
       version: plan.recipe.version.trim(),
-      inputs: canonicalizeRepositoryTaskValue(plan.recipe.inputs),
+      inputs: canonicalRepositoryTaskValue(plan.recipe.inputs),
     },
     outputs: plan.outputContract.outputs
       .map(normalizeOutput)
