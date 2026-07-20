@@ -102,7 +102,9 @@ export class ExternalActionService {
       if (action.status === 'reconciled')
         return { disposition: 'terminal' as const, status: action.status };
       if (
-        !['dispatching', 'indeterminate', 'acknowledged'].includes(action.status)
+        !['dispatching', 'indeterminate', 'acknowledged'].includes(
+          action.status,
+        )
       )
         return { disposition: 'terminal' as const, status: action.status };
 
@@ -134,9 +136,13 @@ export class ExternalActionService {
     );
   }
 
-  async reconcilePending(limit = 100): Promise<ExternalActionReconciliationReport> {
+  async reconcilePending(
+    limit = 100,
+  ): Promise<ExternalActionReconciliationReport> {
     if (!Number.isSafeInteger(limit) || limit < 1)
-      throw new RangeError('external action reconciliation limit must be positive');
+      throw new RangeError(
+        'external action reconciliation limit must be positive',
+      );
     const candidates = await this.db
       .selectFrom('external_actions')
       .select('id')
@@ -167,7 +173,11 @@ export class ExternalActionService {
     return this.db.transaction().execute(async (trx) => {
       const action = await trx
         .selectFrom('external_actions as action')
-        .innerJoin('executions as execution', 'execution.id', 'action.execution_id')
+        .innerJoin(
+          'executions as execution',
+          'execution.id',
+          'action.execution_id',
+        )
         .innerJoin('regions as region', 'region.id', 'execution.region_id')
         .select([
           'action.id',
@@ -207,7 +217,9 @@ export class ExternalActionService {
 
       const previous = await trx
         .selectFrom('external_action_attempts')
-        .select(({ fn }) => fn.max<number>('attempt_number').as('attempt_number'))
+        .select(({ fn }) =>
+          fn.max<number>('attempt_number').as('attempt_number'),
+        )
         .where('external_action_id', '=', action.id)
         .executeTakeFirst();
       const attemptNumber = Number(previous?.attempt_number ?? 0) + 1;
@@ -243,7 +255,12 @@ export class ExternalActionService {
     result: ExternalActionProviderResult,
   ) {
     const actionStatus = result.status;
-    await this.persistResult(actionId, attemptId, actionStatus, result.response);
+    await this.persistResult(
+      actionId,
+      attemptId,
+      actionStatus,
+      result.response,
+    );
     return { disposition: 'dispatched' as const, status: actionStatus };
   }
 
@@ -254,7 +271,12 @@ export class ExternalActionService {
   ) {
     const actionStatus =
       result.status === 'acknowledged' ? 'reconciled' : result.status;
-    await this.persistResult(actionId, attemptId, actionStatus, result.response);
+    await this.persistResult(
+      actionId,
+      attemptId,
+      actionStatus,
+      result.response,
+    );
     return { disposition: 'reconciled' as const, status: actionStatus };
   }
 
@@ -279,12 +301,20 @@ export class ExternalActionService {
         .forUpdate()
         .executeTakeFirstOrThrow();
       if (action.status === 'reconciled') return;
-      if (!['dispatching', 'indeterminate', 'acknowledged'].includes(action.status))
+      if (
+        !['dispatching', 'indeterminate', 'acknowledged'].includes(
+          action.status,
+        )
+      )
         throw new ExternalActionError(
           'external_action_state_conflict',
           `external action cannot complete from ${action.status}`,
         );
-      if (!['dispatching', 'indeterminate', 'acknowledged'].includes(attempt.status))
+      if (
+        !['dispatching', 'indeterminate', 'acknowledged'].includes(
+          attempt.status,
+        )
+      )
         throw new ExternalActionError(
           'external_action_attempt_state_conflict',
           `external action attempt cannot complete from ${attempt.status}`,

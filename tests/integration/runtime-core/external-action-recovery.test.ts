@@ -407,7 +407,9 @@ describe('external action dispatch and startup recovery', () => {
     const provider = new ConfirmThenLoseResponseProvider();
 
     await expect(
-      new ExternalActionService(db, provider, () => now).dispatch(seeded.actionId),
+      new ExternalActionService(db, provider, () => now).dispatch(
+        seeded.actionId,
+      ),
     ).resolves.toEqual({ disposition: 'cancelled' });
     expect(provider.dispatchCalls).toBe(0);
     await expect(
@@ -431,7 +433,9 @@ describe('external action dispatch and startup recovery', () => {
     const provider = new ProgrammingFailureProvider();
 
     await expect(
-      new ExternalActionService(db, provider, () => now).dispatch(seeded.actionId),
+      new ExternalActionService(db, provider, () => now).dispatch(
+        seeded.actionId,
+      ),
     ).rejects.toThrow('provider adapter invariant failed');
     expect(provider.dispatchCalls).toBe(1);
     expect(provider.reconcileCalls).toBe(0);
