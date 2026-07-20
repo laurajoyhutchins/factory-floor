@@ -18,6 +18,8 @@ const corpus = JSON.parse(
     id: string;
     operation: string;
     request: {
+      method: string;
+      endpointFromEnvelope: keyof InvocationEnvelope;
       body?: Record<string, unknown>;
       bodyMutations?: Partial<InvocationEnvelope>;
       fixture?: string;
@@ -71,7 +73,7 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
     workerId: 'conformance-worker',
     sleep: async () => undefined,
     jitter: () => 0,
-    fetch: async (_url, init) => {
+    fetch: async (url, init) => {
       if (init?.method === 'PUT') {
         uploaded.push(
           ...new Uint8Array(await new Response(init.body).arrayBuffer()),
@@ -89,9 +91,25 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
       }
+
+      expect(init?.method).toBe(testCase.request.method);
+      expect(String(url)).toBe(
+        String(envelope[testCase.request.endpointFromEnvelope]),
+      );
       wireBody = init?.body
         ? (JSON.parse(String(init.body)) as Record<string, unknown>)
         : undefined;
+      const expectedBody = testCase.request.fixture
+        ? fixture<Record<string, unknown>>(testCase.request.fixture)
+        : {
+            protocolVersion: '1.0',
+            executionId: envelope.executionId,
+            attemptId: envelope.attemptId,
+            leaseToken: envelope.leaseToken,
+            lifecycleEpoch: envelope.lifecycleEpoch,
+            ...(testCase.request.body ?? {}),
+          };
+      expect(wireBody).toEqual(expectedBody);
       return new Response(JSON.stringify(responseBody(testCase)), {
         status: testCase.response.status ?? 200,
         headers: { 'content-type': 'application/json' },
