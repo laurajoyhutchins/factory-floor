@@ -29,7 +29,9 @@ const fixtureUrl = new URL(
   import.meta.url,
 );
 const fixtureBytes = readFileSync(fixtureUrl);
-const fixture = JSON.parse(fixtureBytes.toString('utf8')) as RevalidationFixture;
+const fixture = JSON.parse(
+  fixtureBytes.toString('utf8'),
+) as RevalidationFixture;
 
 describe('Discord Activity revalidation contract fixture', () => {
   it('matches the shared raw digest and endpoint version', () => {
