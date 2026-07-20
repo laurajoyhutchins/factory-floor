@@ -195,7 +195,8 @@ export function DiscordActivityApp({
 
   const loadDetails = (runId: string) => {
     const sessionToken = controller.current?.current().sessionToken;
-    if (!sessionToken) return Promise.reject(new Error('activity_session_invalid'));
+    if (!sessionToken)
+      return Promise.reject(new Error('activity_session_invalid'));
     return createRunDetailsClient({
       baseUrl: config.controlPlaneUrl,
       token: sessionToken,
