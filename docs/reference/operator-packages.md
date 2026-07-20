@@ -28,7 +28,9 @@ Mutation retries remain the caller's responsibility and must reuse the same dura
 
 ## `@factory-floor/operator-ui-react`
 
-The React package owns the existing overview, topology, execution trace, artifact lineage, template-instantiation, resource, policy, projection, and operations views. It consumes the reusable client facade and preserves textual graph alternatives, keyboard navigation, responsive layouts, opaque JSON rendering, and reduced-motion behavior.
+The React package owns reusable overview, topology, execution trace, artifact lineage, template-instantiation, resource, policy, projection, and operations views. It also exposes bounded run-status, run-topology, durable trace, current-alert, finite-event, run-artifact, and pending-approval panels over the authoritative operator HTTP API.
+
+The views preserve textual graph alternatives, keyboard navigation, responsive layouts, opaque JSON rendering, loading and disconnected states, and reduced-motion behavior. Pending approvals remain read-only until the safe mutation workflow is added through the existing idempotent operator command boundary.
 
 The host still owns:
 
