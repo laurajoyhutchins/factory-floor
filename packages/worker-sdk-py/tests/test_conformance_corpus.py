@@ -9,7 +9,7 @@ CORPUS = ROOT / "contracts/conformance/worker-protocol-v1.cases.json"
 REQUIRED_CASE_IDS = {
     "claim.claimed",
     "claim.no-work",
-    "invocation.deprecated-fields",
+    "claim.deprecated-capabilities",
     "heartbeat.lease-error",
     "cancellation.stale-epoch",
     "artifact.stage-upload",
