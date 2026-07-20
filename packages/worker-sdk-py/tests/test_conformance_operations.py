@@ -68,7 +68,24 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                     "sizeBytes": len(uploaded),
                 },
             )
+
+        expected_request = case["request"]
+        assert request.method == expected_request["method"]
+        endpoint = getattr(envelope, expected_request["endpointFromEnvelope"])
+        assert str(request.url) == str(endpoint)
         wire_body = json.loads(request.content)
+        if fixture_path := expected_request.get("fixture"):
+            expected_body = fixture(fixture_path)
+        else:
+            expected_body = {
+                "protocolVersion": "1.0",
+                "executionId": envelope.executionId,
+                "attemptId": envelope.attemptId,
+                "leaseToken": envelope.leaseToken,
+                "lifecycleEpoch": envelope.lifecycleEpoch,
+                **expected_request.get("body", {}),
+            }
+        assert wire_body == expected_body
         return httpx.Response(
             case["response"].get("status", 200), json=response_body(case)
         )
