@@ -1,0 +1,48 @@
+name: Temporary operator package formatting
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.head_ref == 'refactor/extract-operator-packages'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: refactor/extract-operator-packages
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Bootstrap workspace
+        run: bash scripts/bootstrap-workspace.sh
+
+      - name: Format extracted package files
+        run: |
+          pnpm exec prettier --write \
+            packages/operator-client-ts/src/index.ts \
+            packages/operator-client-ts/src/index.test.ts \
+            packages/operator-ui-react/src/minimal-shell.test.tsx
+
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo 'Formatting already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            packages/operator-client-ts/src/index.ts \
+            packages/operator-client-ts/src/index.test.ts \
+            packages/operator-ui-react/src/minimal-shell.test.tsx
+          git commit -m 'style: format extracted operator packages'
+          git push origin HEAD:refactor/extract-operator-packages
