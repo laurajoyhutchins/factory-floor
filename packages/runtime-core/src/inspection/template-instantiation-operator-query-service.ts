@@ -6,18 +6,32 @@ import {
   OperatorNotFoundError,
   OperatorValidationError,
 } from '../operator/errors.js';
+import {
+  RunDetailsQueryService,
+  type RunDetailsRequest,
+} from '../operator/run-details-query-service.js';
 import { RunScopedOperatorQueryService } from '../operator/run-scoped-operator-query-service.js';
 import type { OperatorContext, PageRequest } from '../operator/types.js';
 import { TemplateInstantiationInspectionService } from './template-instantiation-inspection-service.js';
 
 export class OperatorQueryService extends RunScopedOperatorQueryService {
   private readonly instantiations: TemplateInstantiationInspectionService;
+  private readonly details: RunDetailsQueryService;
 
   constructor(inspectionDb: Kysely<Database>, blobs?: ArtifactBlobStore) {
     super(inspectionDb, blobs);
     this.instantiations = new TemplateInstantiationInspectionService(
       inspectionDb,
     );
+    this.details = new RunDetailsQueryService(inspectionDb);
+  }
+
+  getRunDetails(
+    context: OperatorContext,
+    runId: string,
+    request: RunDetailsRequest = {},
+  ) {
+    return this.details.getRunDetails(context, runId, request);
   }
 
   async listRunTemplateInstantiations(
