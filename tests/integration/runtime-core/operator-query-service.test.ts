@@ -107,7 +107,7 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
     .set({ active_topology_revision_id: topologyId })
     .where('id', '=', regionId)
     .execute();
-  return schemaId;
+  return { schemaId, regionId };
 }
 
 function task(objective: string) {
@@ -128,6 +128,7 @@ describe('operator query service', () => {
     baseUrl: 'http://127.0.0.1:3000',
   });
   let schemaId: string;
+  let regionId: string;
 
   beforeAll(async () => {
     await admin.query(`create database ${databaseName}`);
@@ -137,7 +138,7 @@ describe('operator query service', () => {
     expect(
       (await resetDatabaseForDevelopment(db, 'test')).error,
     ).toBeUndefined();
-    schemaId = await seedRuntime(db);
+    ({ schemaId, regionId } = await seedRuntime(db));
   });
   afterAll(async () => {
     await db.destroy();
@@ -165,7 +166,189 @@ describe('operator query service', () => {
     });
   });
 
-  it('lists only artifacts produced by the requested run', async () => {
+  it('returns topology records only from the selected run correlation', async () => {
+    const first = await commands.submitDevelopmentTask(
+      operator,
+      task('First topology'),
+    );
+    const firstClaim = await workers.claim({
+      workerId: 'worker-a',
+      capabilities: ['retrieve@1'],
+    });
+    if (!firstClaim.claimed) throw new Error('expected first claim');
+    const second = await commands.submitDevelopmentTask(
+      operator,
+      task('Second topology'),
+    );
+    const secondClaim = await workers.claim({
+      workerId: 'worker-b',
+      capabilities: ['retrieve@1'],
+    });
+    if (!secondClaim.claimed) throw new Error('expected second claim');
+
+    const topology = await queries.getRunTopology(operator, first.runId);
+    expect(topology.run.id).toBe(first.runId);
+    expect(topology.regions.map((region) => region.id)).toContain(regionId);
+    expect(topology.deliveries.map((delivery) => delivery.id)).toContain(
+      firstClaim.envelope.deliveryId,
+    );
+    expect(topology.deliveries.map((delivery) => delivery.id)).not.toContain(
+      secondClaim.envelope.deliveryId,
+    );
+    expect(topology.executions.map((execution) => execution.id)).toContain(
+      firstClaim.envelope.executionId,
+    );
+    expect(topology.executions.map((execution) => execution.id)).not.toContain(
+      secondClaim.envelope.executionId,
+    );
+    expect(topology.relationships).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'execution_delivery',
+          target: { kind: 'execution', id: firstClaim.envelope.executionId },
+        }),
+      ]),
+    );
+    expect(second.runId).not.toBe(first.runId);
+  });
+
+  it('pages finite run events deterministically and rejects foreign or expired cursors', async () => {
+    const first = await commands.submitDevelopmentTask(
+      operator,
+      task('First event stream'),
+    );
+    const second = await commands.submitDevelopmentTask(
+      operator,
+      task('Second event stream'),
+    );
+    const firstEventId = createUuidV7();
+    const secondEventId = createUuidV7();
+    await db
+      .insertInto('events')
+      .values([
+        {
+          id: firstEventId,
+          region_id: regionId,
+          event_type: 'operator.test.first',
+          payload: { ordinal: 1 },
+          stream_key: `operator-test:${first.runId}`,
+          sequence_number: '1',
+          correlation_id: first.runId,
+          source_kind: 'command',
+          source_command_id: first.runId,
+          source_event_id: null,
+          source_execution_id: null,
+          source_attempt_id: null,
+          source_component_instance_id: null,
+          source_port_name: null,
+        },
+        {
+          id: secondEventId,
+          region_id: regionId,
+          event_type: 'operator.test.second',
+          payload: { ordinal: 2 },
+          stream_key: `operator-test:${first.runId}`,
+          sequence_number: '2',
+          correlation_id: first.runId,
+          source_kind: 'command',
+          source_command_id: first.runId,
+          source_event_id: null,
+          source_execution_id: null,
+          source_attempt_id: null,
+          source_component_instance_id: null,
+          source_port_name: null,
+        },
+        {
+          id: createUuidV7(),
+          region_id: regionId,
+          event_type: 'operator.test.foreign',
+          payload: { ordinal: 99 },
+          stream_key: `operator-test:${second.runId}`,
+          sequence_number: '1',
+          correlation_id: second.runId,
+          source_kind: 'command',
+          source_command_id: second.runId,
+          source_event_id: null,
+          source_execution_id: null,
+          source_attempt_id: null,
+          source_component_instance_id: null,
+          source_port_name: null,
+        },
+      ])
+      .execute();
+
+    const firstPage = await queries.listRunEvents(operator, first.runId, {
+      limit: 1,
+    });
+    expect(firstPage.items).toHaveLength(1);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+    expect(firstPage.resumeCursor).toEqual(firstPage.nextCursor);
+    expect(firstPage.complete).toBe(false);
+
+    const secondPage = await queries.listRunEvents(operator, first.runId, {
+      limit: 10,
+      cursor: firstPage.nextCursor!,
+    });
+    const observed = [...firstPage.items, ...secondPage.items];
+    expect(observed.map((event) => event.id)).toEqual([
+      firstEventId,
+      secondEventId,
+    ]);
+    expect(new Set(observed.map((event) => event.id)).size).toBe(observed.length);
+    expect(observed.every((event) => event.correlation_id === first.runId)).toBe(
+      true,
+    );
+    expect(secondPage.complete).toBe(true);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.resumeCursor).toEqual(expect.any(String));
+
+    await expect(
+      queries.listRunEvents(operator, second.runId, {
+        cursor: firstPage.nextCursor!,
+      }),
+    ).rejects.toThrow('cursor_run_mismatch');
+
+    await db.deleteFrom('events').where('id', '=', firstEventId).execute();
+    await expect(
+      queries.listRunEvents(operator, first.runId, {
+        cursor: firstPage.nextCursor!,
+      }),
+    ).rejects.toThrow('cursor_expired');
+  });
+
+  it('derives alerts from current durable state and clears them with state', async () => {
+    const receipt = await commands.submitDevelopmentTask(
+      operator,
+      task('Blocked alert'),
+    );
+    await db
+      .updateTable('regions')
+      .set({ lifecycle_status: 'blocked' })
+      .where('id', '=', regionId)
+      .execute();
+
+    const blocked = await queries.listRunAlerts(operator, receipt.runId);
+    expect(blocked.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'blocked_work',
+          source: { kind: 'region', id: regionId },
+        }),
+      ]),
+    );
+
+    await db
+      .updateTable('regions')
+      .set({ lifecycle_status: 'running' })
+      .where('id', '=', regionId)
+      .execute();
+    const cleared = await queries.listRunAlerts(operator, receipt.runId);
+    expect(cleared.items.some((alert) => alert.kind === 'blocked_work')).toBe(
+      false,
+    );
+  });
+
+  it('lists and reads only artifacts produced by the requested run', async () => {
     const first = await commands.submitDevelopmentTask(
       operator,
       task('First run'),
@@ -250,5 +433,11 @@ describe('operator query service', () => {
       items: [{ id: secondArtifactId }],
       nextCursor: null,
     });
+    await expect(
+      queries.readRunArtifact(operator, first.runId, firstArtifactId),
+    ).resolves.toMatchObject({ artifactId: firstArtifactId });
+    await expect(
+      queries.readRunArtifact(operator, first.runId, secondArtifactId),
+    ).rejects.toThrow('artifact_not_found');
   });
 });
