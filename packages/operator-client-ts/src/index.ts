@@ -62,7 +62,7 @@ export type OperatorClientConfig = {
   retry?: RetryOptions;
 };
 
-const paths = {
+const inspectionPaths = {
   health: '/health',
   regions: '/api/v1/inspect/regions',
   events: '/api/v1/inspect/events',
@@ -76,10 +76,10 @@ const paths = {
   topology: '/api/v1/inspect/topology',
   instantiations: '/api/v1/inspect/instantiations',
   stream: '/api/v1/inspect/stream',
-  operator: '/api/v1/operator',
 } as const;
+const operatorPath = '/api/v1/operator';
 
-export const readOnlyInspectionPaths = paths;
+export const readOnlyInspectionPaths = inspectionPaths;
 
 const OPAQUE_RUNTIME_FIELDS = new Set([
   'attributes',
@@ -371,7 +371,7 @@ export function createOperatorClient(
     body?: unknown,
     signal?: AbortSignal,
   ): Promise<unknown> => {
-    const operator = path.startsWith(paths.operator);
+    const operator = path.startsWith(operatorPath);
     const attempts = method === 'GET' ? maxAttempts : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       let response: Response;
@@ -467,7 +467,7 @@ export function createOperatorClient(
   return {
     inspectionHeaders: (accept) => headers(accept, false, false),
     health: async (signal) => {
-      const value = await getRecord(paths.health, 'health', signal);
+      const value = await getRecord(inspectionPaths.health, 'health', signal);
       if (typeof value.status !== 'string' || typeof value.service !== 'string')
         throw new OperatorClientError(
           'malformed-response',
@@ -475,36 +475,36 @@ export function createOperatorClient(
         );
       return { status: value.status, service: value.service };
     },
-    regions: (options, signal) => getPage(paths.regions, options, signal),
-    events: (options, signal) => getPage(paths.events, options, signal),
-    deliveries: (options, signal) => getPage(paths.deliveries, options, signal),
-    executions: (options, signal) => getPage(paths.executions, options, signal),
+    regions: (options, signal) => getPage(inspectionPaths.regions, options, signal),
+    events: (options, signal) => getPage(inspectionPaths.events, options, signal),
+    deliveries: (options, signal) => getPage(inspectionPaths.deliveries, options, signal),
+    executions: (options, signal) => getPage(inspectionPaths.executions, options, signal),
     execution: (id, signal) =>
       getRecord(
-        `${paths.executions}/${encodeURIComponent(id)}`,
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}`,
         'an execution trace',
         signal,
       ),
     executionAttempts: (id, options, signal) =>
       getPage(
-        `${paths.executions}/${encodeURIComponent(id)}/attempts`,
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}/attempts`,
         options,
         signal,
       ),
-    attempts: (options, signal) => getPage(paths.attempts, options, signal),
-    artifacts: (options, signal) => getPage(paths.artifacts, options, signal),
+    attempts: (options, signal) => getPage(inspectionPaths.attempts, options, signal),
+    artifacts: (options, signal) => getPage(inspectionPaths.artifacts, options, signal),
     artifactLineage: (id, signal) =>
       getRecord(
-        `${paths.artifacts}/${encodeURIComponent(id)}/lineage`,
+        `${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`,
         'artifact lineage',
         signal,
       ),
-    resources: (options, signal) => getPage(paths.resources, options, signal),
+    resources: (options, signal) => getPage(inspectionPaths.resources, options, signal),
     policyDecisions: (options, signal) =>
-      getPage(paths.policies, options, signal),
+      getPage(inspectionPaths.policies, options, signal),
     projections: async (signal) => {
       const value = await getRecord(
-        paths.projections,
+        inspectionPaths.projections,
         'projection status',
         signal,
       );
@@ -515,10 +515,10 @@ export function createOperatorClient(
         );
       return { items: value.items };
     },
-    topology: (signal) => getRecord(paths.topology, 'active topology', signal),
+    topology: (signal) => getRecord(inspectionPaths.topology, 'active topology', signal),
     templateInstantiations: async (scope, options = {}, signal) => {
       const url = new URL(
-        pagePath(paths.instantiations, options),
+        pagePath(inspectionPaths.instantiations, options),
         'http://factory-floor.local',
       );
       if (scope.regionId) url.searchParams.set('regionId', scope.regionId);
@@ -534,31 +534,31 @@ export function createOperatorClient(
     },
     templateInstantiation: (id, signal) =>
       getRecord(
-        `${paths.instantiations}/${encodeURIComponent(id)}`,
+        `${inspectionPaths.instantiations}/${encodeURIComponent(id)}`,
         'a template instantiation',
         signal,
       ),
-    streamPath: targetUrl(baseUrl, paths.stream),
+    streamPath: targetUrl(baseUrl, inspectionPaths.stream),
     operatorStatus: (signal) =>
-      getRecord(`${paths.operator}/status`, 'operator status', signal),
+      getRecord(`${operatorPath}/status`, 'operator status', signal),
     submitTask: (request, signal) =>
-      postRecord(`${paths.operator}/tasks`, request, signal),
+      postRecord(`${operatorPath}/tasks`, request, signal),
     run: (runId, signal) =>
       getRecord(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}`,
         'run status',
         signal,
       ),
     runTrace: (runId, signal) =>
       getRecord(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}/trace`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/trace`,
         'run trace',
         signal,
       ),
     runTopology: (runId, options = {}, signal) =>
       getRecord(
         withQuery(
-          `${paths.operator}/runs/${encodeURIComponent(runId)}/topology`,
+          `${operatorPath}/runs/${encodeURIComponent(runId)}/topology`,
           options,
         ),
         'run topology',
@@ -566,7 +566,7 @@ export function createOperatorClient(
       ),
     runAlerts: (runId, options, signal) =>
       getPage(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}/alerts`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/alerts`,
         options,
         signal,
       ),
@@ -575,7 +575,7 @@ export function createOperatorClient(
         await requestJson(
           'GET',
           pagePath(
-            `${paths.operator}/runs/${encodeURIComponent(runId)}/events`,
+            `${operatorPath}/runs/${encodeURIComponent(runId)}/events`,
             options,
           ),
           undefined,
@@ -584,36 +584,36 @@ export function createOperatorClient(
       ),
     runInstantiations: (runId, options, signal) =>
       getPage(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}/instantiations`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/instantiations`,
         options,
         signal,
       ),
     runArtifacts: (runId, options, signal) =>
       getPage(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}/artifacts`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts`,
         options,
         signal,
       ),
     runArtifact: (runId, artifactId, maxBytes, signal) =>
       getRecord(
         withQuery(
-          `${paths.operator}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`,
+          `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`,
           { maxBytes },
         ),
         'a run artifact',
         signal,
       ),
     pendingApprovals: (options, signal) =>
-      getPage(`${paths.operator}/approvals`, options, signal),
+      getPage(`${operatorPath}/approvals`, options, signal),
     decideApproval: (approvalId, request, signal) =>
       postRecord(
-        `${paths.operator}/approvals/${encodeURIComponent(approvalId)}/decision`,
+        `${operatorPath}/approvals/${encodeURIComponent(approvalId)}/decision`,
         request,
         signal,
       ),
     cancelRun: (runId, request, signal) =>
       postRecord(
-        `${paths.operator}/runs/${encodeURIComponent(runId)}/cancel`,
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/cancel`,
         request,
         signal,
       ),
