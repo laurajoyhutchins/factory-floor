@@ -155,6 +155,8 @@ describe('template-instantiation console views', () => {
     expect(screen.getByText('checkpoint@1')).toBeInTheDocument();
     expect(screen.getByLabelText('Copy artifact-a')).toBeInTheDocument();
     expect(screen.getByText(/completedSteps/)).toBeInTheDocument();
-    expect(screen.getByText(/templateInstantiation/)).toBeInTheDocument();
+    expect(screen.getAllByText(/templateInstantiation/).length).toBeGreaterThan(
+      1,
+    );
   });
 });
