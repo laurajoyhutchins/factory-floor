@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://factory-floor.local/contracts/conformance/worker-protocol-v1.cases.schema.json",
+  "title": "WorkerProtocolConformanceCorpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "protocolVersion", "description", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "protocolVersion": { "const": "1.0" },
+    "description": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "operation", "request", "response", "expected"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+          },
+          "operation": {
+            "enum": [
+              "claim",
+              "heartbeat",
+              "cancellation",
+              "artifact",
+              "capability",
+              "result"
+            ]
+          },
+          "request": {
+            "type": "object",
+            "required": ["method"],
+            "properties": {
+              "method": { "enum": ["POST", "PUT"] },
+              "path": { "type": "string", "minLength": 1 },
+              "endpointFromEnvelope": { "type": "string", "minLength": 1 },
+              "body": { "type": "object" },
+              "bodyMutations": { "type": "object" },
+              "fixture": { "type": "string", "minLength": 1 },
+              "uploadBytesUtf8": { "type": "string" },
+              "sdkInputAlias": { "type": "string", "minLength": 1 },
+              "componentSelectors": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "expectedWireBody": { "type": "object" }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": ["path"],
+                "properties": {
+                  "path": true,
+                  "endpointFromEnvelope": false
+                }
+              },
+              {
+                "required": ["endpointFromEnvelope"],
+                "properties": {
+                  "path": false,
+                  "endpointFromEnvelope": true
+                }
+              }
+            ]
+          },
+          "response": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+              "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+              "fixture": { "type": "string", "minLength": 1 },
+              "body": { "type": "object" },
+              "rawBody": { "type": "string" },
+              "transportError": { "type": "string", "minLength": 1 },
+              "succeedAfterAttempts": { "type": "integer", "minimum": 1 },
+              "successFixture": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["classification", "retryable"],
+            "properties": {
+              "classification": {
+                "enum": [
+                  "claimed",
+                  "no_work",
+                  "lease_error",
+                  "staged",
+                  "capability_denied",
+                  "accepted",
+                  "duplicate",
+                  "conflict",
+                  "protocol_error"
+                ]
+              },
+              "retryable": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

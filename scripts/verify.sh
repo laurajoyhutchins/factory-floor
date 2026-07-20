@@ -15,6 +15,7 @@ verify_static() {
   pnpm contracts:validate
   pnpm contracts:check
   pnpm conformance:check
+  pnpm worker-sdk:conformance:check
   pnpm ci:quality:check
   pnpm audit:publication:syntax
   pnpm lint

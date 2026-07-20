@@ -54,11 +54,29 @@ def redact(value: object) -> str:
     )
 
 
+def _error_kind(code: str, status_code: int) -> str:
+    if "auth" in code:
+        return "authentication"
+    if "version" in code:
+        return "unsupported_protocol_version"
+    if "lease" in code or "inactive" in code or "stale" in code:
+        return "lease"
+    if "conflicting" in code:
+        return "conflict"
+    if "capability" in code:
+        return "capability_denied"
+    if status_code >= 500:
+        return "transient"
+    return "invalid_request"
+
+
 class WorkerSdkError(Exception):
+    kind = "protocol"
     retryable = False
 
 
 class TransportError(WorkerSdkError):
+    kind = "network"
     retryable = True
 
 
@@ -67,6 +85,7 @@ class ProtocolError(WorkerSdkError):
         super().__init__(redact(f"{error.code}: {error.message} ({error.requestId})"))
         self.error = error
         self.status_code = status_code
+        self.kind = _error_kind(str(error.code), status_code)
         self.retryable = error.retryable
 
 
@@ -75,7 +94,16 @@ class ConflictingResultError(ProtocolError):
 
 
 class ProtocolValidationError(WorkerSdkError):
-    pass
+    kind = "protocol"
+
+
+def _response_json(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ProtocolValidationError(
+            "worker protocol returned non-json response"
+        ) from exc
 
 
 @dataclass(frozen=True)
@@ -152,13 +180,14 @@ class WorkerClient:
                 )
                 if response.status_code >= 400:
                     try:
-                        error = WorkerError.model_validate(response.json())
+                        error = WorkerError.model_validate(_response_json(response))
+                    except ProtocolValidationError:
+                        raise
                     except Exception as exc:
                         raise ProtocolValidationError(redact(response.text)) from exc
                     error_class = (
                         ConflictingResultError
-                        if response.status_code == 409
-                        or error.code == "duplicate_conflicting_result"
+                        if error.code == "duplicate_conflicting_result"
                         else ProtocolError
                     )
                     protocol_error = error_class(error, response.status_code)
@@ -171,7 +200,7 @@ class WorkerClient:
                         continue
                     raise protocol_error
 
-                payload = response.json()
+                payload = _response_json(response)
                 if model is None:
                     if payload.get("protocolVersion") != PROTOCOL_VERSION:
                         raise ProtocolValidationError(
@@ -280,11 +309,13 @@ class WorkerClient:
             )
             if response.status_code >= 400:
                 try:
-                    error = WorkerError.model_validate(response.json())
+                    error = WorkerError.model_validate(_response_json(response))
+                except ProtocolValidationError:
+                    raise
                 except Exception as exc:
                     raise ProtocolValidationError(redact(response.text)) from exc
                 raise ProtocolError(error, response.status_code)
-            return WorkerUploadResponse.model_validate(response.json())
+            return WorkerUploadResponse.model_validate(_response_json(response))
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             raise TransportError(redact(exc)) from exc
         except ValidationError as exc:
