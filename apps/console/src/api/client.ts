@@ -18,6 +18,10 @@ export class ApiError extends Error {
 export type InspectionRecord = Record<string, unknown>;
 export type Page<T> = { items: T[]; nextCursor: string | null };
 export type PageOptions = { cursor?: string | null; limit?: number };
+export type TemplateInstantiationScope = {
+  regionId?: string;
+  runId?: string;
+};
 
 const paths = {
   health: '/health',
@@ -31,6 +35,7 @@ const paths = {
   policies: '/api/v1/inspect/policy-decisions',
   projections: '/api/v1/inspect/projections',
   topology: '/api/v1/inspect/topology',
+  instantiations: '/api/v1/inspect/instantiations',
   stream: '/api/v1/inspect/stream',
 } as const;
 
@@ -53,7 +58,7 @@ function pageUrl(path: string, opts: PageOptions = {}) {
     url.searchParams.set('cursor', opts.cursor);
   if (opts.limit !== undefined)
     url.searchParams.set('limit', String(opts.limit));
-  return url.pathname + url.search;
+  return url;
 }
 
 function errorDetails(body: unknown): { code?: string; message?: string } {
@@ -144,7 +149,9 @@ async function getPage(
   options?: PageOptions,
   signal?: AbortSignal,
 ): Promise<Page<InspectionRecord>> {
-  return assertPage(await getJson(pageUrl(path, options), signal));
+  return assertPage(
+    await getJson(pageUrl(path, options).pathname + pageUrl(path, options).search, signal),
+  );
 }
 
 export const consoleApi = {
@@ -210,6 +217,24 @@ export const consoleApi = {
   },
   topology: async (signal?: AbortSignal) =>
     assertRecord(await getJson(paths.topology, signal), 'active topology'),
+  templateInstantiations: async (
+    scope: TemplateInstantiationScope,
+    options: PageOptions = {},
+    signal?: AbortSignal,
+  ) => {
+    const url = pageUrl(paths.instantiations, options);
+    if (scope.regionId) url.searchParams.set('regionId', scope.regionId);
+    if (scope.runId) url.searchParams.set('runId', scope.runId);
+    return assertPage(await getJson(url.pathname + url.search, signal));
+  },
+  templateInstantiation: async (id: string, signal?: AbortSignal) =>
+    assertRecord(
+      await getJson(
+        `${paths.instantiations}/${encodeURIComponent(id)}`,
+        signal,
+      ),
+      'a template instantiation',
+    ),
   streamPath: paths.stream,
 };
 
