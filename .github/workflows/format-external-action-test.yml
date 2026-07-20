@@ -1,5 +1,6 @@
 name: Format external action test
 
+# Temporary branch-only workflow; removed after formatting lands.
 on:
   push:
     branches:
