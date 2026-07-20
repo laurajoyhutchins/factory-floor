@@ -63,7 +63,10 @@
     "accept:m1": "node scripts/run-with-env.mjs bash scripts/accept-m1.sh",
     "dev:console": "pnpm --filter @factory-floor/console dev",
     "build:console": "pnpm --filter @factory-floor/console build",
-    "test:console": "pnpm --filter @factory-floor/console test"
+    "test:console": "pnpm --filter @factory-floor/console test",
+    "dev:discord-activity": "pnpm --filter @factory-floor/discord-activity dev",
+    "build:discord-activity": "pnpm --filter @factory-floor/discord-activity build",
+    "test:discord-activity": "pnpm --filter @factory-floor/discord-activity test"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
