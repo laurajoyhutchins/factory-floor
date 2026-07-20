@@ -313,3 +313,37 @@ jobs:
       - name: Enforce M1 evidence publication
         if: always() && steps.evidence-upload.outcome == 'failure'
         run: exit 1
+
+  promote-durable-result-handoff:
+    name: Promote verified durable result handoff
+    needs: m1-acceptance
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/durable-result-handoff-recovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Promote verified implementation
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: bash scripts/promote-durable-result-handoff.sh
