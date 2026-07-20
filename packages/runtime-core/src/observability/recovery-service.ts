@@ -12,6 +12,10 @@ import {
 } from '../artifacts/artifact-reconciliation-service.js';
 import { EventService } from '../events/event-service.js';
 import {
+  type ExternalActionReconciliationReport,
+  type ExternalActionService,
+} from '../external-actions/external-action-service.js';
+import {
   ObservabilityService,
   PROJECTION_NAMES,
 } from './observability-service.js';
@@ -38,12 +42,14 @@ export interface StartupRecoverySummary {
   cancelledDeliveriesSettled: number;
   projectionsResumed: number;
   artifactReconciliation: ArtifactReconciliationReport | null;
+  externalActionReconciliation: ExternalActionReconciliationReport | null;
   recoveryEventId: string | null;
 }
 
 export interface StartupRecoveryDependencies {
   observability?: ObservabilityService;
   blobStore?: ArtifactBlobStore;
+  externalActions?: ExternalActionService;
   clock?: () => Date;
 }
 
@@ -66,6 +72,7 @@ export class StartupRecoveryService {
       now?: Date;
       projectionBatchSize?: number;
       reconciliationBatchSize?: number;
+      externalActionReconciliationBatchSize?: number;
       removeOrphanArtifacts?: boolean;
       orphanGraceSeconds?: number;
     } = {},
@@ -333,6 +340,12 @@ export class StartupRecoveryService {
       cancelledDeliveriesSettled += settled.deliveries;
     }
 
+    const externalActionReconciliation = this.deps.externalActions
+      ? await this.deps.externalActions.reconcilePending(
+          options.externalActionReconciliationBatchSize ?? 100,
+        )
+      : null;
+
     const artifactReconciliation = await this.reconcileArtifacts({
       batchSize: options.reconciliationBatchSize ?? 500,
       removeOrphans: options.removeOrphanArtifacts ?? false,
@@ -357,6 +370,10 @@ export class StartupRecoveryService {
         artifactReconciliation === null
           ? null
           : (JSON.parse(JSON.stringify(artifactReconciliation)) as Json),
+      externalActionReconciliation:
+        externalActionReconciliation === null
+          ? null
+          : (JSON.parse(JSON.stringify(externalActionReconciliation)) as Json),
       projectorVersion: 'task10.v2',
       projectionsExpected: PROJECTION_NAMES.length,
       completedAt: now.toISOString(),
@@ -384,6 +401,7 @@ export class StartupRecoveryService {
       cancelledDeliveriesSettled,
       projectionsResumed: projections.checkpointed,
       artifactReconciliation,
+      externalActionReconciliation,
       recoveryEventId: recoveryEvent?.id ?? null,
     };
   }
