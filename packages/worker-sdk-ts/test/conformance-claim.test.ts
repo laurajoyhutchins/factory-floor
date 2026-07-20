@@ -95,7 +95,9 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   });
 
   try {
-    const result = await client.claim(normalizeClaimSelectors(testCase.request));
+    const result = await client.claim(
+      normalizeClaimSelectors(testCase.request),
+    );
     if (testCase.request.body) expect(wireBody).toEqual(testCase.request.body);
     if (testCase.request.expectedWireBody) {
       expect(testCase.request.sdkInputAlias).toBe('capabilities');
