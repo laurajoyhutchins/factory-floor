@@ -155,7 +155,8 @@ describe('template-instantiation observability in PostgreSQL', () => {
     const before = await service.projectionStatus();
     const snapshotBefore = before.find(
       (projection) =>
-        projection.projectionName === 'template-instantiation-history',
+        String(projection.projectionName) ===
+        'template-instantiation-history',
     );
     expect(snapshotBefore?.snapshot).toMatchObject({
       instantiations: 1,
@@ -170,7 +171,8 @@ describe('template-instantiation observability in PostgreSQL', () => {
     expect(
       after.find(
         (projection) =>
-          projection.projectionName === 'template-instantiation-history',
+          String(projection.projectionName) ===
+          'template-instantiation-history',
       )?.snapshot,
     ).toEqual(snapshotBefore?.snapshot);
 
