@@ -6,11 +6,11 @@ import {
   OperatorNotFoundError,
   OperatorValidationError,
 } from '../operator/errors.js';
-import { OperatorQueryService as BaseOperatorQueryService } from '../operator/operator-query-service.js';
+import { RunScopedOperatorQueryService } from '../operator/run-scoped-operator-query-service.js';
 import type { OperatorContext, PageRequest } from '../operator/types.js';
 import { TemplateInstantiationInspectionService } from './template-instantiation-inspection-service.js';
 
-export class OperatorQueryService extends BaseOperatorQueryService {
+export class OperatorQueryService extends RunScopedOperatorQueryService {
   private readonly instantiations: TemplateInstantiationInspectionService;
 
   constructor(inspectionDb: Kysely<Database>, blobs?: ArtifactBlobStore) {
