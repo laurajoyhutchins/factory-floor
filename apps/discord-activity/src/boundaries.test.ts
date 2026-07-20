@@ -9,18 +9,19 @@ function files(root: string): string[] {
   });
 }
 
+function implementationFiles(root: string): string[] {
+  return files(root)
+    .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
+    .filter((path) => !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path));
+}
+
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 describe('Discord Activity architecture boundaries', () => {
   it('keeps the Discord SDK in the host adapter only', () => {
-    const sourceFiles = files(
+    const sdkImports = implementationFiles(
       resolve(repositoryRoot, 'apps/discord-activity/src'),
-    )
-      .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
-      .filter(
-        (path) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'),
-      );
-    const sdkImports = sourceFiles.filter((path) =>
+    ).filter((path) =>
       readFileSync(path, 'utf8').includes('@discord/embedded-app-sdk'),
     );
     expect(sdkImports.map((path) => path.split('/').at(-1))).toEqual([
@@ -29,8 +30,9 @@ describe('Discord Activity architecture boundaries', () => {
   });
 
   it('does not persist session or service credentials in browser storage', () => {
-    const source = files(resolve(repositoryRoot, 'apps/discord-activity/src'))
-      .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
+    const source = implementationFiles(
+      resolve(repositoryRoot, 'apps/discord-activity/src'),
+    )
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
     expect(source).not.toMatch(/\b(localStorage|sessionStorage|indexedDB)\b/);
@@ -40,10 +42,9 @@ describe('Discord Activity architecture boundaries', () => {
 
   it('keeps reusable operator packages Discord-free', () => {
     for (const packageName of ['operator-client-ts', 'operator-ui-react']) {
-      const source = files(
+      const source = implementationFiles(
         resolve(repositoryRoot, `packages/${packageName}/src`),
       )
-        .filter((path) => /\.[cm]?[jt]sx?$/.test(path))
         .map((path) => readFileSync(path, 'utf8'))
         .join('\n');
       expect(source).not.toContain('@discord/');
