@@ -1,0 +1,88 @@
+name: Fix repository-task artifact wait
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fix-repository-task-artifact-wait.yml'
+      - 'examples/repository-task/run-dogfood.ts'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-repository-task-artifact-wait
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/repository-task-worker
+      - name: Add bounded committed-artifact wait
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('examples/repository-task/run-dogfood.ts')
+          text = path.read_text()
+          old = '''async function outputArtifacts(
+  blobStore: FilesystemArtifactBlobStore,
+  state: Awaited<ReturnType<typeof runState>>,
+): Promise<Record<string, any>> {
+  return Object.fromEntries(
+    await Promise.all(
+      state.outputs.map(async (output) => [
+        output.port_name,
+        JSON.parse(
+          await streamText(await blobStore.readCommitted(output.digest)),
+        ),
+      ]),
+    ),
+  );
+}'''
+          new = '''async function readCommittedJson(
+  blobStore: FilesystemArtifactBlobStore,
+  digest: string,
+): Promise<any> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    try {
+      return JSON.parse(
+        await streamText(await blobStore.readCommitted(digest)),
+      );
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      if (code !== 'not_found' || Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+}
+
+async function outputArtifacts(
+  blobStore: FilesystemArtifactBlobStore,
+  state: Awaited<ReturnType<typeof runState>>,
+): Promise<Record<string, any>> {
+  return Object.fromEntries(
+    await Promise.all(
+      state.outputs.map(async (output) => [
+        output.port_name,
+        await readCommittedJson(blobStore, output.digest),
+      ]),
+    ),
+  );
+}'''
+          if old not in text:
+              raise SystemExit('expected outputArtifacts implementation not found')
+          path.write_text(text.replace(old, new))
+          PY
+      - name: Commit bounded artifact wait
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add examples/repository-task/run-dogfood.ts
+          git commit -m "fix(repository-task): wait for committed artifact promotion"
+          git push origin HEAD:feat/repository-task-worker
