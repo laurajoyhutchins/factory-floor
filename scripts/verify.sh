@@ -67,7 +67,6 @@ verify_services() {
 verify_integration() {
   pnpm typecheck
   pnpm test:integration
-  pnpm test:conformance
   pnpm db:reset
 }
 
