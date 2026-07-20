@@ -3,26 +3,24 @@ name: Prepare Discord Activity pull request
 on:
   pull_request:
     branches:
-      - main
+      - feat/discord-activity-readonly-shell
 
 permissions:
   contents: write
 
 jobs:
   prepare:
-    if: >-
-      github.event.pull_request.head.ref == 'feat/discord-activity-readonly-shell' &&
-      github.actor != 'github-actions[bot]' &&
-      !contains(github.event.head_commit.message || '', 'prepare Discord Activity pull request')
+    if: github.event.pull_request.head.ref == 'ci/discord-activity-preparation'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: feat/discord-activity-readonly-shell
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - name: Compose control plane
+      - name: Compose and clean the branch
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -93,30 +91,62 @@ jobs:
 """
           if old in source:
               source = source.replace(old, new, 1)
-          if (
-              "import { DatabaseActivitySessionAuthorizer }" not in source
-              or 'registerActivityBrowserRoutes' not in source
-              or 'activitySessionAuthorizer' not in source
-          ):
+          required = (
+              "import { DatabaseActivitySessionAuthorizer }",
+              "import { registerActivityBrowserRoutes }",
+              'activitySessionAuthorizer',
+          )
+          if not all(item in source for item in required):
               raise SystemExit('activity composition incomplete')
           path.write_text(source)
+
+          app_path = Path('apps/discord-activity/src/app.tsx')
+          app = app_path.read_text().replace(
+              'useRef<ActivitySessionController>();',
+              'useRef<ActivitySessionController | undefined>(undefined);',
+              1,
+          )
+          app_path.write_text(app)
+
+          env_path = Path('.env.example')
+          env = env_path.read_text()
+          marker = '# Discord Activity browser host (disabled by default)'
+          if marker not in env:
+              env += """
+
+# Discord Activity browser host (disabled by default)
+VITE_FACTORY_FLOOR_DISCORD_ACTIVITY_ENABLED=false
+VITE_DISCORD_CLIENT_ID=
+VITE_FACTORY_FLOOR_BROKER_URL=https://broker.example
+VITE_FACTORY_FLOOR_CONTROL_PLANE_URL=https://factory-floor.example
+VITE_DISCORD_OAUTH_REDIRECT_URI=https://your-application-id.discordsays.com/.proxy/oauth/callback
+"""
+          env_path.write_text(env)
           PY
-      - name: Generate reproducible workspace
+
+          rm -f \
+            .github/activity-composition-trigger.txt \
+            .github/workflows/apply-discord-activity-composition.yml \
+            .github/workflows/publish-discord-activity-composition.yml
+      - name: Generate canonical workspace state
         run: |
           corepack enable
           pnpm install --lockfile-only
+          git fetch origin main --depth=1
+          git checkout origin/main -- scripts/bootstrap-workspace.sh
           pnpm exec prettier --write \
-            package.json pnpm-lock.yaml tsconfig.json vitest.config.ts scripts/verify.sh \
+            .env.example package.json pnpm-lock.yaml tsconfig.json vitest.config.ts scripts/verify.sh \
             apps/control-plane/src/app.ts apps/control-plane/src/security.ts \
             apps/control-plane/src/activity-session-read-authorizer.ts \
             apps/control-plane/src/routes/activity-browser.ts \
             apps/control-plane/test/security.test.ts \
             apps/control-plane/test/activity-browser-routes.test.ts \
             apps/discord-activity
-      - name: Commit preparation
+      - name: Publish prepared branch
         run: |
+          rm -f .github/workflows/prepare-discord-activity-pr.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .
-          git diff --cached --quiet || git commit -m 'chore(discord-activity): prepare Discord Activity pull request'
+          git add -A
+          git diff --cached --quiet || git commit -m 'chore(discord-activity): prepare embedded shell for verification'
           git push origin HEAD:feat/discord-activity-readonly-shell
