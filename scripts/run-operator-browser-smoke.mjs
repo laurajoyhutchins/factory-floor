@@ -112,7 +112,9 @@ async function waitForHttp(url, headers = {}) {
     } catch (error) {
       lastError = error;
     }
-    await new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, 200));
+    await new Promise((resolveDelay) =>
+      globalThis.setTimeout(resolveDelay, 200),
+    );
   }
   throw lastError ?? new Error(`${url} did not become ready`);
 }
