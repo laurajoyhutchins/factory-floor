@@ -107,7 +107,11 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
 
     const executions = await this.runDb
       .selectFrom('executions as execution')
-      .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
+      .innerJoin(
+        'deliveries as delivery',
+        'delivery.id',
+        'execution.delivery_id',
+      )
       .select([
         'execution.id',
         'execution.delivery_id',
@@ -366,11 +370,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       items,
       nextCursor:
         hasMore && items.length
-          ? encodeRunCursor(
-              'run-alerts',
-              run.id,
-              alertSortKey(items.at(-1)!),
-            )
+          ? encodeRunCursor('run-alerts', run.id, alertSortKey(items.at(-1)!))
           : null,
       complete: !hasMore,
       generatedAt: new Date().toISOString(),
@@ -387,8 +387,16 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     const run = await this.loadRun(runId);
     const owned = await this.runDb
       .selectFrom('execution_outputs as output')
-      .innerJoin('executions as execution', 'execution.id', 'output.execution_id')
-      .innerJoin('deliveries as delivery', 'delivery.id', 'execution.delivery_id')
+      .innerJoin(
+        'executions as execution',
+        'execution.id',
+        'output.execution_id',
+      )
+      .innerJoin(
+        'deliveries as delivery',
+        'delivery.id',
+        'execution.delivery_id',
+      )
       .select('output.artifact_id')
       .where('output.artifact_id', '=', artifactId)
       .where('delivery.correlation_id', '=', run.correlation_id)
@@ -436,13 +444,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       await Promise.all([
         this.runDb
           .selectFrom('deliveries')
-          .select([
-            'id',
-            'region_id',
-            'status',
-            'attempts_count',
-            'created_at',
-          ])
+          .select(['id', 'region_id', 'status', 'attempts_count', 'created_at'])
           .where('correlation_id', '=', run.correlation_id)
           .orderBy('id')
           .execute(),
@@ -535,12 +537,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     const attempts = executions.length
       ? await this.runDb
           .selectFrom('execution_attempts')
-          .select([
-            'id',
-            'execution_id',
-            'completed_at',
-            'created_at',
-          ])
+          .select(['id', 'execution_id', 'completed_at', 'created_at'])
           .where(
             'execution_id',
             'in',
@@ -625,7 +622,8 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     }
     for (const resource of resourceRows) {
       const limit = budgetLimit(resource.attributes);
-      if (limit === null || !isBudgetPressure(resource.quantity, limit)) continue;
+      if (limit === null || !isBudgetPressure(resource.quantity, limit))
+        continue;
       alerts.push({
         id: `budget-pressure:${resource.id}`,
         kind: 'budget_pressure',
@@ -645,7 +643,10 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     for (const checkpoint of checkpoints) {
       const updatedAt = new Date(String(checkpoint.updated_at));
       const stalenessMs = Math.max(0, Date.now() - updatedAt.getTime());
-      if (!Number.isFinite(stalenessMs) || stalenessMs <= PROJECTION_STALE_AFTER_MS)
+      if (
+        !Number.isFinite(stalenessMs) ||
+        stalenessMs <= PROJECTION_STALE_AFTER_MS
+      )
         continue;
       alerts.push({
         id: `projection-stale:${checkpoint.projection_name}`,
