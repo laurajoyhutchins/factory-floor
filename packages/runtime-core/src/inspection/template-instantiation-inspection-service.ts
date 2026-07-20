@@ -77,8 +77,7 @@ export interface TemplateInstantiationInitialStateInspection {
   createdAt: Date;
 }
 
-export interface TemplateInstantiationDetail
-  extends TemplateInstantiationSummary {
+export interface TemplateInstantiationDetail extends TemplateInstantiationSummary {
   parameters: Json;
   componentConfiguration: Json;
   source: Json;
