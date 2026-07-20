@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   controlPlaneSecurityFromEnv,
   registerControlPlaneSecurity,
@@ -19,9 +19,7 @@ describe('control-plane HTTP security', () => {
 
     await expect(
       app.inject({ method: 'GET', url: '/health' }),
-    ).resolves.toMatchObject({
-      statusCode: 200,
-    });
+    ).resolves.toMatchObject({ statusCode: 200 });
     await expect(
       app.inject({ method: 'GET', url: '/api/v1/inspect/events' }),
     ).resolves.toMatchObject({ statusCode: 401 });
@@ -57,16 +55,92 @@ describe('control-plane HTTP security', () => {
     await app.close();
   });
 
-  it('does not intercept the separately authenticated worker namespace', async () => {
+  it('accepts Activity sessions only for immutable bound-run reads and overrides browser assertions', async () => {
+    const app = Fastify();
+    const resolveSession = vi.fn(async () => ({
+      sessionId: 'session-1',
+      instanceBindingId: 'binding-1',
+      applicationId: 'app-1',
+      instanceId: 'instance-1',
+      installationId: 'installation-1',
+      guildId: 'guild-1',
+      channelId: 'channel-1',
+      threadId: null,
+      principalId: 'discord:user-1',
+      adapter: 'discord-agent',
+      boundRunId: 'run-1',
+      expiresAt: new Date(Date.now() + 60_000),
+      idleExpiresAt: new Date(Date.now() + 30_000),
+    }));
+    registerControlPlaneSecurity(
+      app,
+      { operatorToken: 'operator-secret', adminToken: 'admin-secret' },
+      { resolveSession },
+    );
+    app.get('/api/v1/operator/runs/:runId', async (request) => ({
+      principal: request.headers['x-factory-floor-principal-id'],
+      adapter: request.headers['x-factory-floor-adapter'],
+    }));
+    app.post('/api/v1/operator/runs/:runId/cancel', async () => ({ ok: true }));
+    app.get('/api/v1/inspect/events', async () => ({ items: [] }));
+
+    const allowed = await app.inject({
+      method: 'GET',
+      url: '/api/v1/operator/runs/run-1',
+      headers: {
+        authorization: 'Bearer activity-session-token',
+        'x-factory-floor-principal-id': 'attacker',
+        'x-factory-floor-adapter': 'attacker',
+      },
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.headers['cache-control']).toBe('no-store');
+    expect(allowed.json()).toEqual({
+      principal: 'discord:user-1',
+      adapter: 'discord-agent',
+    });
+
+    await expect(
+      app.inject({
+        method: 'GET',
+        url: '/api/v1/operator/runs/run-2',
+        headers: { authorization: 'Bearer activity-session-token' },
+      }),
+    ).resolves.toMatchObject({ statusCode: 403 });
+    await expect(
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/operator/runs/run-1/cancel',
+        headers: { authorization: 'Bearer activity-session-token' },
+      }),
+    ).resolves.toMatchObject({ statusCode: 403 });
+    await expect(
+      app.inject({
+        method: 'GET',
+        url: '/api/v1/inspect/events',
+        headers: { authorization: 'Bearer activity-session-token' },
+      }),
+    ).resolves.toMatchObject({ statusCode: 403 });
+    expect(resolveSession).toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('does not intercept separately authenticated worker or Activity lifecycle namespaces', async () => {
     const app = Fastify();
     registerControlPlaneSecurity(app, {
       operatorToken: 'operator-secret',
       adminToken: 'admin-secret',
     });
     app.post('/worker/v1/claim', async () => ({ claimed: false }));
+    app.get('/api/v1/discord/activity/session', async () => ({
+      session: true,
+    }));
 
     await expect(
       app.inject({ method: 'POST', url: '/worker/v1/claim' }),
+    ).resolves.toMatchObject({ statusCode: 200 });
+    await expect(
+      app.inject({ method: 'GET', url: '/api/v1/discord/activity/session' }),
     ).resolves.toMatchObject({ statusCode: 200 });
 
     await app.close();
