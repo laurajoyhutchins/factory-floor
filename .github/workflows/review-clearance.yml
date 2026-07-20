@@ -22,52 +22,59 @@ permissions:
 
 jobs:
   evaluate:
-    name: Publish exact-head review clearance
+    name: Publish exact-head verification and review clearance
     if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out trusted clearance logic
+      - name: Check out trusted pull request state logic
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - name: Evaluate review clearance
+      - name: Evaluate trusted pull request statuses
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const logic = await import(
+            const shared = await import(
+              pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/github-pr-state.mjs`).href
+            );
+            const review = await import(
               pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/review-clearance-state.mjs`).href
             );
             const { owner, repo } = context.repo;
-            const pullNumbers = logic.selectPullNumbersForClearanceEvent({
+            const pullNumbers = shared.selectPullNumbersForEvent({
               eventName: context.eventName,
               payload: context.payload,
             });
 
             for (const pullNumber of pullNumbers) {
-              const { data: pull } = await github.rest.pulls.get({
+              const state = await shared.resolvePullRequestState({
+                github,
                 owner,
                 repo,
-                pull_number: pullNumber,
-              });
-              const runs = await github.paginate(
-                github.rest.actions.listWorkflowRunsForRepo,
-                {
-                  owner,
-                  repo,
-                  head_sha: pull.head.sha,
-                  event: 'pull_request',
-                  per_page: 100,
-                },
-              );
-              const workflowRun = logic.selectAuthoritativeWorkflowRun(runs, {
-                workflowName: 'Repository Verification',
-                headSha: pull.head.sha,
                 pullNumber,
               });
+              const { pull, workflowRun, reviewThreads } = state;
+              if (state.reviewThreadsError) {
+                core.warning(
+                  `Could not read complete review-thread state for PR #${pullNumber}: ${state.reviewThreadsError}`,
+                );
+              }
+
+              const verification = shared.determineVerificationStatus(workflowRun);
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha: pull.head.sha,
+                state: verification.state,
+                context: 'verify',
+                description: verification.description.slice(0, 140),
+                target_url: workflowRun?.html_url ?? pull.html_url,
+              });
+
               const comments = await github.paginate(
                 github.rest.issues.listComments,
                 {
@@ -77,29 +84,12 @@ jobs:
                   per_page: 100,
                 },
               );
-              const clearance = logic.parseReviewClearance({
+              const clearance = review.parseReviewClearance({
                 comments,
                 ownerLogin: context.payload.repository.owner.login,
                 headSha: pull.head.sha,
               });
-
-              let reviewThreads;
-              try {
-                reviewThreads = await logic.readReviewThreadState({
-                  graphql: github.graphql,
-                  owner,
-                  repo,
-                  pullNumber,
-                });
-              } catch (error) {
-                core.warning(`Could not read complete review-thread state for PR #${pullNumber}: ${error.message}`);
-                reviewThreads = {
-                  status: 'unavailable',
-                  unresolvedCount: null,
-                };
-              }
-
-              const decision = logic.determineReviewClearanceStatus({
+              const decision = review.determineReviewClearanceStatus({
                 draft: pull.draft,
                 workflowRun,
                 reviewThreads,
@@ -116,6 +106,6 @@ jobs:
               });
 
               core.info(
-                `PR #${pullNumber} at ${pull.head.sha}: ${decision.state} — ${decision.description}`,
+                `PR #${pullNumber} at ${pull.head.sha}: verify=${verification.state}; review=${decision.state}`,
               );
             }

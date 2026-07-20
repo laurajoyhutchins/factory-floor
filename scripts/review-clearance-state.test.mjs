@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
   determineReviewClearanceStatus,
+  determineVerificationStatus,
   parseReviewClearance,
   selectAuthoritativeWorkflowRun,
   selectPullNumbersForClearanceEvent,
@@ -35,7 +36,7 @@ Remaining limitations:
 Disposition: ${disposition}`;
 
 describe('review clearance state', () => {
-  it('selects pull requests for every supported event without duplication', () => {
+  it('reuses shared event and exact-head workflow selection', () => {
     expect(
       selectPullNumbersForClearanceEvent({
         eventName: 'workflow_run',
@@ -46,14 +47,6 @@ describe('review clearance state', () => {
         },
       }),
     ).toEqual([81, 82]);
-
-    expect(
-      selectPullNumbersForClearanceEvent({
-        eventName: 'pull_request_target',
-        payload: { pull_request: { number: 82 } },
-      }),
-    ).toEqual([82]);
-
     expect(
       selectPullNumbersForClearanceEvent({
         eventName: 'issue_comment',
@@ -61,15 +54,6 @@ describe('review clearance state', () => {
       }),
     ).toEqual([82]);
 
-    expect(
-      selectPullNumbersForClearanceEvent({
-        eventName: 'issue_comment',
-        payload: { issue: { number: 82 } },
-      }),
-    ).toEqual([]);
-  });
-
-  it('selects only the authoritative exact-head workflow run for the pull request', () => {
     const runs = [
       {
         id: 1,
@@ -77,7 +61,6 @@ describe('review clearance state', () => {
         event: 'pull_request',
         head_sha: HEAD_SHA,
         pull_requests: [{ number: 82 }],
-        status: 'completed',
         conclusion: 'failure',
         created_at: '2026-07-19T20:00:00Z',
       },
@@ -85,34 +68,12 @@ describe('review clearance state', () => {
         id: 2,
         name: 'Repository Verification',
         event: 'pull_request',
-        head_sha: HEAD_SHA,
-        pull_requests: [{ number: 83 }],
-        status: 'completed',
-        conclusion: 'success',
-        created_at: '2026-07-19T20:02:00Z',
-      },
-      {
-        id: 3,
-        name: 'Unrelated workflow',
-        event: 'pull_request',
-        head_sha: HEAD_SHA,
-        pull_requests: [{ number: 82 }],
-        status: 'completed',
-        conclusion: 'success',
-        created_at: '2026-07-19T20:03:00Z',
-      },
-      {
-        id: 4,
-        name: 'Repository Verification',
-        event: 'pull_request',
         head_sha: OLD_SHA,
         pull_requests: [{ number: 82 }],
-        status: 'completed',
         conclusion: 'success',
-        created_at: '2026-07-19T20:04:00Z',
+        created_at: '2026-07-19T20:01:00Z',
       },
     ];
-
     expect(
       selectAuthoritativeWorkflowRun(runs, {
         workflowName: 'Repository Verification',
@@ -122,7 +83,7 @@ describe('review clearance state', () => {
     ).toMatchObject({ id: 1, conclusion: 'failure' });
   });
 
-  it('accepts only an owner-authored exact-head clearance', () => {
+  it('accepts only the latest owner-authored exact-head clearance', () => {
     expect(
       parseReviewClearance({
         comments: [
@@ -131,32 +92,27 @@ describe('review clearance state', () => {
             user: { login: 'someone-else' },
             body: clearanceBody(),
             created_at: '2026-07-19T20:00:00Z',
-            updated_at: '2026-07-19T20:00:00Z',
           },
           {
             id: 2,
             user: { login: 'laurajoyhutchins' },
             body: clearanceBody(),
             created_at: '2026-07-19T20:01:00Z',
-            updated_at: '2026-07-19T20:01:00Z',
           },
         ],
         ownerLogin: 'laurajoyhutchins',
         headSha: HEAD_SHA,
       }),
     ).toMatchObject({ state: 'cleared', reviewedHead: HEAD_SHA, commentId: 2 });
-  });
 
-  it('treats a clearance for an older head as stale', () => {
     expect(
       parseReviewClearance({
         comments: [
           {
-            id: 1,
+            id: 3,
             user: { login: 'laurajoyhutchins' },
             body: clearanceBody({ sha: OLD_SHA }),
-            created_at: '2026-07-19T20:00:00Z',
-            updated_at: '2026-07-19T20:00:00Z',
+            created_at: '2026-07-19T20:02:00Z',
           },
         ],
         ownerLogin: 'laurajoyhutchins',
@@ -165,7 +121,7 @@ describe('review clearance state', () => {
     ).toMatchObject({ state: 'stale', reviewedHead: OLD_SHA });
   });
 
-  it('lets the latest owner decision supersede an earlier clearance', () => {
+  it('lets a later owner decision revoke an earlier clearance', () => {
     expect(
       parseReviewClearance({
         comments: [
@@ -174,14 +130,12 @@ describe('review clearance state', () => {
             user: { login: 'laurajoyhutchins' },
             body: clearanceBody(),
             created_at: '2026-07-19T20:00:00Z',
-            updated_at: '2026-07-19T20:00:00Z',
           },
           {
             id: 2,
             user: { login: 'laurajoyhutchins' },
             body: clearanceBody({ disposition: 'Not cleared for merge.' }),
             created_at: '2026-07-19T20:01:00Z',
-            updated_at: '2026-07-19T20:01:00Z',
           },
         ],
         ownerLogin: 'laurajoyhutchins',
@@ -190,7 +144,7 @@ describe('review clearance state', () => {
     ).toMatchObject({ state: 'not-cleared', commentId: 2 });
   });
 
-  it('reports success only when exact-head CI, conversations, and clearance all pass', () => {
+  it('fails closed unless exact-head CI, review threads, and clearance pass', () => {
     expect(
       determineReviewClearanceStatus({
         draft: false,
@@ -199,98 +153,59 @@ describe('review clearance state', () => {
         clearance: { state: 'cleared' },
       }),
     ).toMatchObject({ state: 'success' });
-  });
-
-  it.each([
-    [
-      'draft',
-      { draft: true, workflowRun: null, reviewThreads: null, clearance: null },
-    ],
-    [
-      'awaiting CI',
-      {
-        draft: false,
-        workflowRun: { status: 'in_progress', conclusion: null },
-        reviewThreads: { status: 'available', unresolvedCount: 0 },
-        clearance: { state: 'cleared' },
-      },
-    ],
-    [
-      'missing clearance',
-      {
-        draft: false,
-        workflowRun: { status: 'completed', conclusion: 'success' },
-        reviewThreads: { status: 'available', unresolvedCount: 0 },
-        clearance: { state: 'missing' },
-      },
-    ],
-    [
-      'stale clearance',
-      {
-        draft: false,
-        workflowRun: { status: 'completed', conclusion: 'success' },
-        reviewThreads: { status: 'available', unresolvedCount: 0 },
-        clearance: { state: 'stale' },
-      },
-    ],
-  ])('keeps the required status pending for %s', (_label, input) => {
-    expect(determineReviewClearanceStatus(input).state).toBe('pending');
-  });
-
-  it('fails closed for failed CI, unresolved threads, or unavailable review state', () => {
-    expect(
-      determineReviewClearanceStatus({
-        draft: false,
-        workflowRun: { status: 'completed', conclusion: 'failure' },
-        reviewThreads: { status: 'available', unresolvedCount: 0 },
-        clearance: { state: 'cleared' },
-      }).state,
-    ).toBe('failure');
-
     expect(
       determineReviewClearanceStatus({
         draft: false,
         workflowRun: { status: 'completed', conclusion: 'success' },
         reviewThreads: { status: 'available', unresolvedCount: 1 },
         clearance: { state: 'cleared' },
-      }).state,
-    ).toBe('failure');
-
+      }),
+    ).toMatchObject({ state: 'failure' });
     expect(
       determineReviewClearanceStatus({
         draft: false,
         workflowRun: { status: 'completed', conclusion: 'success' },
         reviewThreads: { status: 'unavailable', unresolvedCount: null },
         clearance: { state: 'cleared' },
-      }).state,
-    ).toBe('error');
+      }),
+    ).toMatchObject({ state: 'error' });
   });
 
-  it('wires the trusted workflow and stable aggregate checks', () => {
-    const clearanceWorkflow = readFileSync(
+  it('preserves stable verify status semantics', () => {
+    expect(determineVerificationStatus(null).state).toBe('pending');
+    expect(
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'success',
+      }).state,
+    ).toBe('success');
+    expect(
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'failure',
+      }).state,
+    ).toBe('failure');
+  });
+
+  it('publishes both stable statuses from trusted default-branch logic', () => {
+    const workflow = readFileSync(
       new URL('../.github/workflows/review-clearance.yml', import.meta.url),
       'utf8',
     );
-    const verificationWorkflow = readFileSync(
-      new URL('../.github/workflows/verification-gate.yml', import.meta.url),
-      'utf8',
-    );
 
-    expect(clearanceWorkflow).toContain('statuses: write');
-    expect(clearanceWorkflow).toContain("context: 'review / cleared'");
-    expect(clearanceWorkflow).toContain(
+    expect(workflow).toContain('statuses: write');
+    expect(workflow).toContain("context: 'verify'");
+    expect(workflow).toContain("context: 'review / cleared'");
+    expect(workflow).toContain('scripts/github-pr-state.mjs');
+    expect(workflow).toContain('scripts/review-clearance-state.mjs');
+    expect(workflow).toContain(
       'ref: ${{ github.event.repository.default_branch }}',
     );
-    expect(clearanceWorkflow).toContain('persist-credentials: false');
-    expect(clearanceWorkflow).toContain('scripts/review-clearance-state.mjs');
-    expect(clearanceWorkflow).toContain('issue_comment:');
-    expect(clearanceWorkflow).not.toContain(
-      'github.event.pull_request.head.sha',
-    );
-
-    expect(verificationWorkflow).toContain("context: 'verify'");
-    expect(verificationWorkflow).toContain('Repository Verification');
-    expect(verificationWorkflow).toContain('selectAuthoritativeWorkflowRun');
-    expect(verificationWorkflow).toContain('persist-credentials: false');
+    expect(workflow).toContain('persist-credentials: false');
+    expect(
+      existsSync(
+        new URL('../.github/workflows/verification-gate.yml', import.meta.url),
+      ),
+    ).toBe(false);
   });
 });

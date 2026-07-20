@@ -1,3 +1,19 @@
+import {
+  determineVerificationStatus,
+  readReviewThreadState,
+  resolvePullRequestState,
+  selectAuthoritativeWorkflowRun,
+  selectPullNumbersForEvent,
+} from './github-pr-state.mjs';
+
+export {
+  determineVerificationStatus,
+  readReviewThreadState,
+  resolvePullRequestState,
+  selectAuthoritativeWorkflowRun,
+};
+export const selectPullNumbersForClearanceEvent = selectPullNumbersForEvent;
+
 export const REVIEW_CLEARANCE_MARKER = '<!-- review-clearance:v1 -->';
 
 const REQUIRED_REVIEW_SECTIONS = [
@@ -8,111 +24,9 @@ const REQUIRED_REVIEW_SECTIONS = [
   'Remaining limitations:',
 ];
 
-const isPullNumber = (value) => Number.isInteger(value) && value > 0;
-
-const eventPullNumber = (payload) => {
-  const pullNumber = payload.pull_request?.number;
-  return isPullNumber(pullNumber) ? [pullNumber] : [];
-};
-
-export const selectPullNumbersForClearanceEvent = ({ eventName, payload }) => {
-  if (
-    eventName === 'pull_request_target' ||
-    eventName === 'pull_request_review' ||
-    eventName === 'pull_request_review_comment'
-  ) {
-    return eventPullNumber(payload);
-  }
-
-  if (eventName === 'issue_comment') {
-    const pullNumber = payload.issue?.pull_request
-      ? payload.issue?.number
-      : null;
-    return isPullNumber(pullNumber) ? [pullNumber] : [];
-  }
-
-  if (eventName === 'workflow_run') {
-    return [
-      ...new Set(
-        (payload.workflow_run?.pull_requests ?? [])
-          .map((pullRequest) => pullRequest.number)
-          .filter(isPullNumber),
-      ),
-    ];
-  }
-
-  return [];
-};
-
 const timestamp = (value) => {
   const parsed = Date.parse(value ?? '');
   return Number.isFinite(parsed) ? parsed : 0;
-};
-
-export const selectAuthoritativeWorkflowRun = (
-  runs,
-  { workflowName, headSha, pullNumber },
-) =>
-  runs
-    .filter(
-      (run) =>
-        run.name === workflowName &&
-        run.event === 'pull_request' &&
-        run.head_sha === headSha &&
-        run.pull_requests?.some(
-          (pullRequest) => pullRequest.number === pullNumber,
-        ),
-    )
-    .sort((left, right) => {
-      const timeDifference =
-        timestamp(right.created_at) - timestamp(left.created_at);
-      if (timeDifference !== 0) return timeDifference;
-      return Number(right.id ?? 0) - Number(left.id ?? 0);
-    })[0] ?? null;
-
-export const readReviewThreadState = async ({
-  graphql,
-  owner,
-  repo,
-  pullNumber,
-}) => {
-  let after = null;
-  let unresolvedCount = 0;
-
-  do {
-    const data = await graphql(
-      `
-        query ($owner: String!, $repo: String!, $number: Int!, $after: String) {
-          repository(owner: $owner, name: $repo) {
-            pullRequest(number: $number) {
-              reviewThreads(first: 100, after: $after) {
-                nodes {
-                  isResolved
-                }
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-              }
-            }
-          }
-        }
-      `,
-      { owner, repo, number: pullNumber, after },
-    );
-    const page = data.repository?.pullRequest?.reviewThreads;
-    if (!page) {
-      throw new Error('GitHub did not return pull-request review threads.');
-    }
-
-    unresolvedCount += page.nodes.filter((thread) => !thread.isResolved).length;
-    after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
-    if (page.pageInfo.hasNextPage && !after) {
-      throw new Error('GitHub review-thread pagination omitted an end cursor.');
-    }
-  } while (after);
-
-  return { status: 'available', unresolvedCount };
 };
 
 const commentTimestamp = (comment) =>
