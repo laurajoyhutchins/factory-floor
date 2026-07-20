@@ -22,15 +22,6 @@ ROOT = Path(__file__).resolve().parents[3]
 CORPUS = json.loads(
     (ROOT / "contracts/conformance/worker-protocol-v1.cases.json").read_text()
 )
-OPERATION_CASE_IDS = {
-    "heartbeat.lease-error",
-    "cancellation.stale-epoch",
-    "artifact.stage-upload",
-    "capability.denied",
-    "result.accepted",
-    "result.duplicate-identical",
-    "result.duplicate-conflict",
-}
 
 
 def fixture(path: str) -> Any:
@@ -95,11 +86,12 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
     )
 
     try:
-        if case["id"] == "heartbeat.lease-error":
+        operation = case["operation"]
+        if operation == "heartbeat":
             await worker.heartbeat(envelope)
-        elif case["id"] == "cancellation.stale-epoch":
+        elif operation == "cancellation":
             await worker.cancellation(envelope)
-        elif case["id"] == "capability.denied":
+        elif operation == "capability":
             values = case["request"]["body"]
             await worker.invoke_capability(
                 envelope,
@@ -113,7 +105,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                     input=values["input"],
                 ),
             )
-        elif case["id"] == "artifact.stage-upload":
+        elif operation == "artifact":
             values = case["request"]["body"]
             stage = await worker.stage_artifact(
                 envelope,
@@ -134,7 +126,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
             await worker.upload(str(stage.uploadUrl), content)
             assert uploaded == content
             return {"classification": "staged", "retryable": False}
-        else:
+        elif operation == "result":
             result = ProposedResult.model_validate(fixture(case["request"]["fixture"]))
             response = await worker.submit_result(envelope, result)
             return {
@@ -143,6 +135,8 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                 else "accepted",
                 "retryable": False,
             }
+        else:
+            raise AssertionError(f"unsupported operation {operation}")
         raise AssertionError(f"case {case['id']} unexpectedly succeeded")
     except WorkerSdkError as error:
         if case["id"] == "cancellation.stale-epoch":
@@ -157,7 +151,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "case",
-    [case for case in CORPUS["cases"] if case["id"] in OPERATION_CASE_IDS],
+    [case for case in CORPUS["cases"] if case["operation"] != "claim"],
     ids=lambda case: case["id"],
 )
 async def test_python_worker_operation_conformance(case: dict[str, Any]) -> None:
