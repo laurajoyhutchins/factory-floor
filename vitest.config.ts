@@ -22,6 +22,7 @@ export const rootUnitTestExclude = [
 export const rootNodeUnitTestExclude = [
   ...rootUnitTestExclude,
   'apps/console/**',
+  'packages/operator-ui-react/**',
 ];
 
 export const rootCoverageInclude = [
@@ -68,6 +69,7 @@ export default defineConfig({
         },
       },
       'apps/console/vitest.config.ts',
+      'packages/operator-ui-react/vitest.config.ts',
     ],
   },
 });
