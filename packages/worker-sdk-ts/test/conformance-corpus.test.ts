@@ -9,7 +9,7 @@ const corpusUrl = new URL(
 const requiredCaseIds = [
   'claim.claimed',
   'claim.no-work',
-  'invocation.deprecated-fields',
+  'claim.deprecated-capabilities',
   'heartbeat.lease-error',
   'cancellation.stale-epoch',
   'artifact.stage-upload',
