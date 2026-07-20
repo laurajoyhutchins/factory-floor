@@ -17,7 +17,10 @@ import {
 const base =
   process.env.TEST_DATABASE_URL ??
   'postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor';
-const admin = new pg.Pool({ connectionString: base, connectionTimeoutMillis: 10_000 });
+const admin = new pg.Pool({
+  connectionString: base,
+  connectionTimeoutMillis: 10_000,
+});
 const databaseName = `ff_instantiation_observability_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
 
@@ -86,7 +89,9 @@ describe('template-instantiation observability in PostgreSQL', () => {
 
   afterAll(async () => {
     await db.destroy();
-    await admin.query(`drop database if exists ${databaseName}`).catch(() => undefined);
+    await admin
+      .query(`drop database if exists ${databaseName}`)
+      .catch(() => undefined);
     await admin.end();
   });
 
