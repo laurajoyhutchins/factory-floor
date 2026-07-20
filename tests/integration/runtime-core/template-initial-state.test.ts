@@ -200,6 +200,11 @@ describe('template-provided initial state in PostgreSQL', () => {
       commandId: command.id,
     });
     const executionId = createUuidV7();
+    const region = await db
+      .selectFrom('regions')
+      .select('lifecycle_epoch')
+      .where('id', '=', regionId)
+      .executeTakeFirstOrThrow();
     await db
       .insertInto('executions')
       .values({
@@ -208,6 +213,7 @@ describe('template-provided initial state in PostgreSQL', () => {
         region_id: regionId,
         component_instance_id: component.id,
         topology_revision_id: first.revision.id,
+        lifecycle_epoch: region.lifecycle_epoch,
         input_set_digest: 'd'.repeat(64),
         completed_at: null,
         failed_at: null,
