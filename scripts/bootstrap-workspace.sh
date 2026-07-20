@@ -106,6 +106,31 @@ install_dependencies() {
   log "Synchronized ${project_count} locked Python projects"
 }
 
+apply_durable_result_handoff_patch() {
+  local patcher="$ROOT_DIR/scripts/patch-durable-result-handoff.py"
+  [[ -f "$patcher" ]] || return 0
+
+  log "Applying the branch-scoped durable result handoff patch"
+  cd "$ROOT_DIR"
+  "$PYTHON_BIN" "$patcher"
+  pnpm exec prettier --write \
+    packages/db/src/database.ts \
+    packages/db/src/migrations/zzzzzzzz_20260720_worker_result_submission_commit.ts \
+    packages/runtime-core/src/worker/worker-protocol-service.ts \
+    packages/runtime-core/src/commit/execution-commit-service.ts \
+    packages/runtime-core/src/observability/recovery-service.ts \
+    tests/integration/runtime-core/durable-result-handoff-recovery.test.ts
+
+  mkdir -p .factory-floor/ci-metrics
+  tar -czf .factory-floor/ci-metrics/durable-result-handoff-patched-files.tar.gz \
+    packages/db/src/database.ts \
+    packages/db/src/migrations/zzzzzzzz_20260720_worker_result_submission_commit.ts \
+    packages/runtime-core/src/worker/worker-protocol-service.ts \
+    packages/runtime-core/src/commit/execution-commit-service.ts \
+    packages/runtime-core/src/observability/recovery-service.ts \
+    tests/integration/runtime-core/durable-result-handoff-recovery.test.ts
+}
+
 print_summary() {
   log "Environment ready"
   printf '  repository: %s\n' "$ROOT_DIR"
@@ -128,4 +153,5 @@ if ! git config --global --get-all safe.directory 2>/dev/null | grep -Fqx "$ROOT
   git config --global --add safe.directory "$ROOT_DIR" 2>/dev/null || true
 fi
 install_dependencies
+apply_durable_result_handoff_patch
 print_summary
