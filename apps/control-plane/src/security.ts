@@ -21,9 +21,7 @@ function tokenMatches(actual: string, expected: string): boolean {
 
 function securityError(
   code:
-    | 'authentication_required'
-    | 'forbidden'
-    | 'activity_run_binding_mismatch',
+    'authentication_required' | 'forbidden' | 'activity_run_binding_mismatch',
 ) {
   const message =
     code === 'authentication_required'

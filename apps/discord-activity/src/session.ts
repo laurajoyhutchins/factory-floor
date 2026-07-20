@@ -1,10 +1,7 @@
 import type { ActivitySessionCredentials } from './contracts.js';
 
 export type ActivityConnectionState =
-  | 'active'
-  | 'disconnected'
-  | 'expired'
-  | 'stopped';
+  'active' | 'disconnected' | 'expired' | 'stopped';
 
 export interface ActivitySessionControllerOptions {
   now?: () => number;
