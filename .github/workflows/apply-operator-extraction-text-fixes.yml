@@ -1,0 +1,59 @@
+name: Apply operator extraction text fixes
+
+on:
+  push:
+    branches:
+      - feat/extract-operator-client-ui
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, 'split read-only operator paths')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/extract-operator-client-ui
+      - name: Apply text fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          client_path = Path('packages/operator-client-ts/src/index.ts')
+          source = client_path.read_text()
+          source = source.replace('const paths = {', 'const inspectionPaths = {', 1)
+          source = source.replace(
+              "  stream: '/api/v1/inspect/stream',\n  operator: '/api/v1/operator',\n} as const;\n\nexport const readOnlyInspectionPaths = paths;",
+              "  stream: '/api/v1/inspect/stream',\n} as const;\nconst operatorPath = '/api/v1/operator';\n\nexport const readOnlyInspectionPaths = inspectionPaths;",
+              1,
+          )
+          source = source.replace('paths.operator', 'operatorPath')
+          source = source.replace('paths.', 'inspectionPaths.')
+          if 'const paths =' in source or 'paths.operator' in source:
+              raise SystemExit('operator path split incomplete')
+          client_path.write_text(source)
+
+          ui_path = Path('packages/operator-ui-react/src/components/ui.tsx')
+          ui = ui_path.read_text()
+          needle = '          <NavLink to="/operations">Operations</NavLink>\n'
+          if '<NavLink to="/approvals">Approvals</NavLink>' not in ui:
+              if needle not in ui:
+                  raise SystemExit('operations navigation link not found')
+              ui = ui.replace(
+                  needle,
+                  needle + '          <NavLink to="/approvals">Approvals</NavLink>\n',
+                  1,
+              )
+          ui_path.write_text(ui)
+          PY
+      - name: Commit fixes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/operator-client-ts/src/index.ts packages/operator-ui-react/src/components/ui.tsx
+          git diff --cached --quiet || git commit -m 'fix(operator): split read-only operator paths'
+          git push origin HEAD:feat/extract-operator-client-ui
