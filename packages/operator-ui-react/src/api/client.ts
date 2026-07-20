@@ -8,5 +8,6 @@ export {
   type InspectionRecord,
   type Page,
   type PageOptions,
+  type RunEventPage,
   type TemplateInstantiationScope,
 } from '@factory-floor/operator-client-ts';
