@@ -54,6 +54,11 @@ export class WorkerProtocolError extends Error {
 export interface WorkerProtocolOptions {
   leaseDurationMs: number;
   baseUrl?: string;
+  afterResultHandoffCommitted?: (input: {
+    executionId: string;
+    attemptId: string;
+    submissionDigest: string;
+  }) => void | Promise<void>;
 }
 
 interface AttemptIdentityInput {
@@ -732,6 +737,22 @@ export class WorkerProtocolService {
     const proposedState = input.proposedState
       ? normalizeStagedArtifact(input.proposedState)
       : undefined;
+    const commitInput = {
+      protocolVersion: input.protocolVersion,
+      executionId: attempt.executionId,
+      attemptId: attempt.attemptId,
+      leaseToken: attempt.leaseToken,
+      lifecycleEpoch: attempt.regionFencingEpoch,
+      status: input.status,
+      stagedArtifacts: stagedArtifacts.map(toWorkerV1StagedArtifact),
+      proposedEvents: input.proposedEvents,
+      externalActionProposals: input.externalActionProposals,
+      resourceUsage: input.resourceUsage,
+      ...(proposedState
+        ? { proposedState: toWorkerV1StagedArtifact(proposedState) }
+        : {}),
+      ...(input.failure === undefined ? {} : { failure: input.failure }),
+    };
     const digest = canonicalJsonDigest(input);
     const handoff = await this.db.transaction().execute(async (transaction) => {
       const existing = await transaction
@@ -756,7 +777,8 @@ export class WorkerProtocolService {
           execution_id: attempt.executionId,
           attempt_id: attempt.attemptId,
           submission_digest: digest,
-          result: input as unknown as Json,
+          result: commitInput as unknown as Json,
+          committed_at: null,
         })
         .onConflict((conflict) => conflict.column('attempt_id').doNothing())
         .returning('submission_digest')
@@ -783,32 +805,17 @@ export class WorkerProtocolService {
       ]);
       return { duplicate: false as const };
     });
+    await this.options.afterResultHandoffCommitted?.({
+      executionId: attempt.executionId,
+      attemptId: attempt.attemptId,
+      submissionDigest: digest,
+    });
     try {
-      const commitInput = {
-        protocolVersion: input.protocolVersion,
-        executionId: input.executionId,
-        attemptId: input.attemptId,
-        leaseToken: input.leaseToken,
-        lifecycleEpoch: attempt.regionFencingEpoch,
-        status: input.status,
-        stagedArtifacts: stagedArtifacts.map(toWorkerV1StagedArtifact),
-        proposedEvents: input.proposedEvents,
-        externalActionProposals: input.externalActionProposals,
-        resourceUsage: input.resourceUsage,
-        ...(proposedState
-          ? { proposedState: toWorkerV1StagedArtifact(proposedState) }
-          : {}),
-        ...(input.failure === undefined ? {} : { failure: input.failure }),
-      };
       await new ExecutionCommitService(
         this.db,
         this.blobStore,
         this.clock,
-      ).commit(
-        commitInput as unknown as Parameters<
-          ExecutionCommitService['commit']
-        >[0],
-      );
+      ).commitSubmittedResult(attempt.attemptId);
     } catch (error) {
       if (error instanceof ExecutionCommitError)
         throw new WorkerProtocolError(
