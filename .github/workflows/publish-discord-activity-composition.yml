@@ -1,0 +1,117 @@
+name: Publish Discord Activity composition
+
+on:
+  push:
+    branches:
+      - feat/discord-activity-readonly-shell
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, 'publish Discord Activity composition')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/discord-activity-readonly-shell
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Compose control plane
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/control-plane/src/app.ts')
+          source = path.read_text()
+          source = source.replace(
+              "import { ActivitySessionService } from './activity-session-service.js';\nimport { registerActivityRoutes } from './routes/activity.js';",
+              "import { ActivitySessionService } from './activity-session-service.js';\nimport { DatabaseActivitySessionAuthorizer } from './activity-session-read-authorizer.js';\nimport { registerActivityRoutes } from './routes/activity.js';\nimport { registerActivityBrowserRoutes } from './routes/activity-browser.js';",
+              1,
+          )
+          source = source.replace(
+              "  if (deps.controlPlaneSecurity)\n    registerControlPlaneSecurity(app, deps.controlPlaneSecurity);\n  app.get('/health'",
+              "  app.get('/health'",
+              1,
+          )
+          database = """  const db =
+    deps.database ??
+    (process.env.DATABASE_URL
+      ? createDatabase(process.env.DATABASE_URL)
+      : undefined);
+"""
+          if 'const activitySessionAuthorizer = db' not in source:
+              source = source.replace(
+                  database,
+                  database + """  const activitySessionService = db
+    ? new ActivitySessionService(db)
+    : undefined;
+  const activitySessionAuthorizer = db
+    ? new DatabaseActivitySessionAuthorizer(db)
+    : undefined;
+  if (deps.controlPlaneSecurity)
+    registerControlPlaneSecurity(
+      app,
+      deps.controlPlaneSecurity,
+      activitySessionAuthorizer,
+    );
+""",
+                  1,
+              )
+          old = """  if (deps.serviceAuthKeys && db) {
+    const serviceAuthConfig: ServiceAuthConfig = {
+      keys: deps.serviceAuthKeys,
+      db: createNonceRepository(db),
+    };
+    registerServiceAuth(app, serviceAuthConfig);
+    await registerActivityRoutes(app, new ActivitySessionService(db));
+  }
+"""
+          new = """  if (
+    deps.serviceAuthKeys &&
+    db &&
+    activitySessionService &&
+    activitySessionAuthorizer
+  ) {
+    const serviceAuthConfig: ServiceAuthConfig = {
+      keys: deps.serviceAuthKeys,
+      db: createNonceRepository(db),
+    };
+    registerServiceAuth(app, serviceAuthConfig);
+    await registerActivityRoutes(app, activitySessionService);
+    await registerActivityBrowserRoutes(
+      app,
+      activitySessionService,
+      activitySessionAuthorizer,
+    );
+  }
+"""
+          if old in source:
+              source = source.replace(old, new, 1)
+          if 'registerActivityBrowserRoutes' not in source or 'activitySessionAuthorizer' not in source:
+              raise SystemExit('activity composition incomplete')
+          path.write_text(source)
+          PY
+      - name: Generate lockfile and format
+        run: |
+          corepack enable
+          pnpm install --lockfile-only
+          pnpm exec prettier --write \
+            package.json pnpm-lock.yaml tsconfig.json vitest.config.ts scripts/verify.sh \
+            apps/control-plane/src/app.ts apps/control-plane/src/security.ts \
+            apps/control-plane/src/activity-session-read-authorizer.ts \
+            apps/control-plane/src/routes/activity-browser.ts \
+            apps/control-plane/test/security.test.ts \
+            apps/control-plane/test/activity-browser-routes.test.ts \
+            apps/discord-activity
+      - name: Publish
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .
+          git diff --cached --quiet || git commit -m 'feat(discord-activity): publish Discord Activity composition'
+          git push origin HEAD:feat/discord-activity-readonly-shell
