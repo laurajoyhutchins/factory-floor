@@ -69,9 +69,9 @@ describe('canonical workspace bootstrap', () => {
       expect(workflow).not.toContain(duplicatedSetup);
     }
 
-    expect(workflow.match(/bash scripts\/bootstrap-workspace\.sh/g)).toHaveLength(
-      2,
-    );
+    expect(
+      workflow.match(/bash scripts\/bootstrap-workspace\.sh/g),
+    ).toHaveLength(2);
     expect(workflow).toContain('bash scripts/accept-m1.sh');
   });
 });
