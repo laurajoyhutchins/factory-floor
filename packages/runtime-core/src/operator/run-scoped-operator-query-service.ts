@@ -1,6 +1,6 @@
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
 import type { Database, Json } from '@factory-floor/db';
-import type { Kysely, Selectable } from 'kysely';
+import type { Kysely } from 'kysely';
 import {
   OperatorAuthorizationError,
   OperatorNotFoundError,
@@ -26,15 +26,14 @@ const MAX_RECORD_LIMIT = 2_000;
 const PROJECTION_STALE_AFTER_MS = 60_000;
 const OPERATOR_CANCELLATION_CODE = 'operator_cancelled';
 
-type RunRow = {
+type RunIdentity = {
   id: string;
   region_id: string;
   region_name: string;
   command_type: string;
   correlation_id: string;
   status: string;
-  rejection: Selectable<Database['commands']>['rejection'];
-  created_at: Date;
+  created_at: unknown;
 };
 
 type CursorKind = 'run-events' | 'run-alerts';
@@ -59,7 +58,7 @@ type RunAlert = {
   severity: AlertSeverity;
   title: string;
   message: string;
-  observedAt: Date;
+  observedAt: unknown;
   source: { kind: string; id: string };
   details: Record<string, Json>;
 };
@@ -78,33 +77,8 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     options: RunTopologyRequest = {},
   ) {
     requireOperator(context);
-    const run = await this.findRun(runId);
-    const bounds = {
-      regionLimit: normalizeBound(
-        options.regionLimit,
-        DEFAULT_REGION_LIMIT,
-        MAX_REGION_LIMIT,
-        'invalid_region_limit',
-      ),
-      componentLimit: normalizeBound(
-        options.componentLimit,
-        DEFAULT_COMPONENT_LIMIT,
-        MAX_COMPONENT_LIMIT,
-        'invalid_component_limit',
-      ),
-      connectionLimit: normalizeBound(
-        options.connectionLimit,
-        DEFAULT_CONNECTION_LIMIT,
-        MAX_CONNECTION_LIMIT,
-        'invalid_connection_limit',
-      ),
-      recordLimit: normalizeBound(
-        options.recordLimit,
-        DEFAULT_RECORD_LIMIT,
-        MAX_RECORD_LIMIT,
-        'invalid_record_limit',
-      ),
-    };
+    const run = await this.loadRun(runId);
+    const bounds = topologyBounds(options);
 
     const deliveries = await this.runDb
       .selectFrom('deliveries')
@@ -125,7 +99,11 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       .orderBy('id')
       .limit(bounds.recordLimit + 1)
       .execute();
-    assertWithinBound(deliveries, bounds.recordLimit, 'topology_record_bound_exceeded');
+    assertWithinBound(
+      deliveries,
+      bounds.recordLimit,
+      'topology_record_bound_exceeded',
+    );
 
     const executions = await this.runDb
       .selectFrom('executions as execution')
@@ -147,14 +125,16 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       .orderBy('execution.id')
       .limit(bounds.recordLimit + 1)
       .execute();
-    assertWithinBound(executions, bounds.recordLimit, 'topology_record_bound_exceeded');
+    assertWithinBound(
+      executions,
+      bounds.recordLimit,
+      'topology_record_bound_exceeded',
+    );
 
-    const topologyRevisionIds = [
-      ...new Set([
-        ...deliveries.map((delivery) => delivery.topology_revision_id),
-        ...executions.map((execution) => execution.topology_revision_id),
-      ]),
-    ];
+    const topologyRevisionIds = unique([
+      ...deliveries.map((delivery) => delivery.topology_revision_id),
+      ...executions.map((execution) => execution.topology_revision_id),
+    ]);
     const topologyRevisions = topologyRevisionIds.length
       ? await this.runDb
           .selectFrom('topology_revisions')
@@ -173,14 +153,12 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
           .execute()
       : [];
 
-    const regionIds = [
-      ...new Set([
-        run.region_id,
-        ...deliveries.map((delivery) => delivery.region_id),
-        ...executions.map((execution) => execution.region_id),
-        ...topologyRevisions.map((revision) => revision.region_id),
-      ]),
-    ];
+    const regionIds = unique([
+      run.region_id,
+      ...deliveries.map((delivery) => delivery.region_id),
+      ...executions.map((execution) => execution.region_id),
+      ...topologyRevisions.map((revision) => revision.region_id),
+    ]);
     const regions = await this.runDb
       .selectFrom('regions')
       .select([
@@ -196,7 +174,11 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       .orderBy('id')
       .limit(bounds.regionLimit + 1)
       .execute();
-    assertWithinBound(regions, bounds.regionLimit, 'topology_region_bound_exceeded');
+    assertWithinBound(
+      regions,
+      bounds.regionLimit,
+      'topology_region_bound_exceeded',
+    );
 
     const components = topologyRevisionIds.length
       ? await this.runDb
@@ -230,11 +212,9 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       'topology_component_bound_exceeded',
     );
 
-    const definitionIds = [
-      ...new Set(
-        components.map((component) => component.component_definition_id),
-      ),
-    ];
+    const definitionIds = unique(
+      components.map((component) => component.component_definition_id),
+    );
     const ports = definitionIds.length
       ? await this.runDb
           .selectFrom('port_definitions')
@@ -253,12 +233,10 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
           .orderBy('id')
           .execute()
       : [];
-    const portsByDefinition = new Map<string, typeof ports>();
-    for (const port of ports)
-      portsByDefinition.set(port.component_definition_id, [
-        ...(portsByDefinition.get(port.component_definition_id) ?? []),
-        port,
-      ]);
+    const portsByDefinition = groupBy(
+      ports,
+      (port) => port.component_definition_id,
+    );
 
     const connections = topologyRevisionIds.length
       ? await this.runDb
@@ -279,50 +257,6 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       bounds.connectionLimit,
       'topology_connection_bound_exceeded',
     );
-
-    const relationships = [
-      ...connections.map((connection) => ({
-        id: `connection:${connection.id}`,
-        kind: 'connection' as const,
-        source: {
-          kind: 'component' as const,
-          id: connection.source_component_instance_id,
-          port: connection.source_port_name,
-        },
-        target: {
-          kind: 'component' as const,
-          id: connection.target_component_instance_id,
-          port: connection.target_port_name,
-        },
-      })),
-      ...deliveries.map((delivery) => ({
-        id: `delivery-target:${delivery.id}`,
-        kind: 'delivery_target' as const,
-        source: { kind: 'delivery' as const, id: delivery.id },
-        target: {
-          kind: 'component' as const,
-          id: delivery.target_component_instance_id,
-          port: delivery.target_port_name,
-        },
-      })),
-      ...executions.flatMap((execution) => [
-        {
-          id: `execution-delivery:${execution.id}`,
-          kind: 'execution_delivery' as const,
-          source: { kind: 'delivery' as const, id: execution.delivery_id },
-          target: { kind: 'execution' as const, id: execution.id },
-        },
-        {
-          id: `execution-component:${execution.id}`,
-          kind: 'execution_component' as const,
-          source: { kind: 'execution' as const, id: execution.id },
-          target: {
-            kind: 'component' as const,
-            id: execution.component_instance_id,
-          },
-        },
-      ]),
-    ];
 
     return {
       run: {
@@ -353,7 +287,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       connections,
       deliveries,
       executions,
-      relationships,
+      relationships: topologyRelationships(connections, deliveries, executions),
     };
   }
 
@@ -363,7 +297,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     page: PageRequest = {},
   ) {
     requireOperator(context);
-    const run = await this.findRun(runId);
+    const run = await this.loadRun(runId);
     const limit = normalizePageLimit(page.limit);
     const cursor = decodeRunCursor(page.cursor, 'run-events', run.id);
     if (cursor)
@@ -414,13 +348,15 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     page: PageRequest = {},
   ) {
     requireOperator(context);
-    const run = await this.findRun(runId);
+    const run = await this.loadRun(runId);
     const limit = normalizePageLimit(page.limit);
     const alerts = await this.projectRunAlerts(run);
     const cursor = decodeRunCursor(page.cursor, 'run-alerts', run.id);
     let start = 0;
     if (cursor) {
-      const index = alerts.findIndex((alert) => alertSortKey(alert) === cursor.after);
+      const index = alerts.findIndex(
+        (alert) => alertSortKey(alert) === cursor.after,
+      );
       if (index < 0) throw new OperatorValidationError('cursor_expired');
       start = index + 1;
     }
@@ -448,7 +384,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     maxBytes?: number,
   ) {
     requireOperator(context);
-    const run = await this.findRun(runId);
+    const run = await this.loadRun(runId);
     const owned = await this.runDb
       .selectFrom('execution_outputs as output')
       .innerJoin('executions as execution', 'execution.id', 'output.execution_id')
@@ -461,7 +397,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     return this.readArtifact(context, artifactId, maxBytes);
   }
 
-  private async findRun(runId: string): Promise<RunRow> {
+  private async loadRun(runId: string): Promise<RunIdentity> {
     const run = await this.runDb
       .selectFrom('commands as command')
       .innerJoin('regions as region', 'region.id', 'command.region_id')
@@ -472,7 +408,6 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
         'command.command_type',
         'command.correlation_id',
         'command.status',
-        'command.rejection',
         'command.created_at',
       ])
       .where('command.id', '=', runId)
@@ -496,7 +431,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
     if (!anchor) throw new OperatorValidationError('cursor_expired');
   }
 
-  private async projectRunAlerts(run: RunRow): Promise<RunAlert[]> {
+  private async projectRunAlerts(run: RunIdentity): Promise<RunAlert[]> {
     const [deliveries, executions, approvals, checkpoints, resourceRows] =
       await Promise.all([
         this.runDb
@@ -557,12 +492,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
           .execute(),
         this.runDb
           .selectFrom('projection_checkpoints')
-          .select([
-            'id',
-            'projection_name',
-            'stream_key',
-            'updated_at',
-          ])
+          .select(['id', 'projection_name', 'updated_at'])
           .where('stream_key', '=', 'global')
           .orderBy('projection_name')
           .execute(),
@@ -591,38 +521,40 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
           .execute(),
       ]);
 
-    const regionIds = [run.region_id, ...deliveries.map((row) => row.region_id)];
     const blockedRegions = await this.runDb
       .selectFrom('regions')
-      .select(['id', 'name', 'lifecycle_status', 'created_at'])
-      .where('id', 'in', [...new Set(regionIds)])
+      .select(['id', 'name', 'created_at'])
+      .where(
+        'id',
+        'in',
+        unique([run.region_id, ...deliveries.map((row) => row.region_id)]),
+      )
       .where('lifecycle_status', '=', 'blocked')
       .orderBy('id')
       .execute();
-    const executionIds = executions.map((execution) => execution.id);
-    const attempts = executionIds.length
+    const attempts = executions.length
       ? await this.runDb
           .selectFrom('execution_attempts')
           .select([
             'id',
             'execution_id',
-            'status',
-            'failure',
             'completed_at',
             'created_at',
           ])
-          .where('execution_id', 'in', executionIds)
+          .where(
+            'execution_id',
+            'in',
+            executions.map((execution) => execution.id),
+          )
           .where('status', 'in', ['failed', 'abandoned'])
           .orderBy('execution_id')
           .orderBy('id')
           .execute()
       : [];
-    const attemptsByExecution = new Map<string, typeof attempts>();
-    for (const attempt of attempts)
-      attemptsByExecution.set(attempt.execution_id, [
-        ...(attemptsByExecution.get(attempt.execution_id) ?? []),
-        attempt,
-      ]);
+    const attemptsByExecution = groupBy(
+      attempts,
+      (attempt) => attempt.execution_id,
+    );
 
     const alerts: RunAlert[] = [];
     for (const approval of approvals)
@@ -710,10 +642,11 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
         },
       });
     }
-    const now = Date.now();
     for (const checkpoint of checkpoints) {
-      const ageMs = Math.max(0, now - checkpoint.updated_at.getTime());
-      if (ageMs <= PROJECTION_STALE_AFTER_MS) continue;
+      const updatedAt = new Date(String(checkpoint.updated_at));
+      const stalenessMs = Math.max(0, Date.now() - updatedAt.getTime());
+      if (!Number.isFinite(stalenessMs) || stalenessMs <= PROJECTION_STALE_AFTER_MS)
+        continue;
       alerts.push({
         id: `projection-stale:${checkpoint.projection_name}`,
         kind: 'projection_stale',
@@ -721,13 +654,10 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
         title: 'Projection is stale',
         message: `${checkpoint.projection_name} has not advanced within the operator freshness window.`,
         observedAt: checkpoint.updated_at,
-        source: {
-          kind: 'projection_checkpoint',
-          id: checkpoint.id,
-        },
+        source: { kind: 'projection_checkpoint', id: checkpoint.id },
         details: {
           projectionName: checkpoint.projection_name,
-          stalenessMs: ageMs,
+          stalenessMs,
         },
       });
     }
@@ -736,6 +666,99 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
       alertSortKey(left).localeCompare(alertSortKey(right)),
     );
   }
+}
+
+function topologyBounds(options: RunTopologyRequest) {
+  return {
+    regionLimit: normalizeBound(
+      options.regionLimit,
+      DEFAULT_REGION_LIMIT,
+      MAX_REGION_LIMIT,
+      'invalid_region_limit',
+    ),
+    componentLimit: normalizeBound(
+      options.componentLimit,
+      DEFAULT_COMPONENT_LIMIT,
+      MAX_COMPONENT_LIMIT,
+      'invalid_component_limit',
+    ),
+    connectionLimit: normalizeBound(
+      options.connectionLimit,
+      DEFAULT_CONNECTION_LIMIT,
+      MAX_CONNECTION_LIMIT,
+      'invalid_connection_limit',
+    ),
+    recordLimit: normalizeBound(
+      options.recordLimit,
+      DEFAULT_RECORD_LIMIT,
+      MAX_RECORD_LIMIT,
+      'invalid_record_limit',
+    ),
+  };
+}
+
+function topologyRelationships(
+  connections: readonly {
+    id: string;
+    source_component_instance_id: string;
+    source_port_name: string;
+    target_component_instance_id: string;
+    target_port_name: string;
+  }[],
+  deliveries: readonly {
+    id: string;
+    target_component_instance_id: string;
+    target_port_name: string;
+  }[],
+  executions: readonly {
+    id: string;
+    delivery_id: string;
+    component_instance_id: string;
+  }[],
+) {
+  return [
+    ...connections.map((connection) => ({
+      id: `connection:${connection.id}`,
+      kind: 'connection' as const,
+      source: {
+        kind: 'component' as const,
+        id: connection.source_component_instance_id,
+        port: connection.source_port_name,
+      },
+      target: {
+        kind: 'component' as const,
+        id: connection.target_component_instance_id,
+        port: connection.target_port_name,
+      },
+    })),
+    ...deliveries.map((delivery) => ({
+      id: `delivery-target:${delivery.id}`,
+      kind: 'delivery_target' as const,
+      source: { kind: 'delivery' as const, id: delivery.id },
+      target: {
+        kind: 'component' as const,
+        id: delivery.target_component_instance_id,
+        port: delivery.target_port_name,
+      },
+    })),
+    ...executions.flatMap((execution) => [
+      {
+        id: `execution-delivery:${execution.id}`,
+        kind: 'execution_delivery' as const,
+        source: { kind: 'delivery' as const, id: execution.delivery_id },
+        target: { kind: 'execution' as const, id: execution.id },
+      },
+      {
+        id: `execution-component:${execution.id}`,
+        kind: 'execution_component' as const,
+        source: { kind: 'execution' as const, id: execution.id },
+        target: {
+          kind: 'component' as const,
+          id: execution.component_instance_id,
+        },
+      },
+    ]),
+  ];
 }
 
 function requireOperator(context: OperatorContext): void {
@@ -855,6 +878,20 @@ function failureMessage(value: Json | null, fallback: string): string {
   if (!value || !isRecord(value)) return fallback;
   const message = value.message;
   return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
+function groupBy<T>(
+  values: readonly T[],
+  key: (value: T) => string,
+): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const value of values)
+    grouped.set(key(value), [...(grouped.get(key(value)) ?? []), value]);
+  return grouped;
 }
 
 export const runScopedCursorSemantics = {
