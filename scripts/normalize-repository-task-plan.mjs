@@ -121,7 +121,12 @@ function isUnsafeRepositoryPath(value) {
   )
     return true;
   const segments = path.split('/');
-  return segments.includes('..') || segments.includes('.git');
+  return (
+    segments.includes('') ||
+    segments.includes('.') ||
+    segments.includes('..') ||
+    segments.includes('.git')
+  );
 }
 
 function hasUnsupportedAllowedPathPattern(value) {
@@ -256,8 +261,8 @@ function normalizePlan(plan) {
     schemaVersion: 1,
     objective: collapseWhitespace(plan.objective),
     repository: {
-      owner: plan.repository.owner.trim(),
-      name: plan.repository.name.trim(),
+      owner: plan.repository.owner.trim().toLowerCase(),
+      name: plan.repository.name.trim().toLowerCase(),
       baseRevision: plan.repository.baseRevision,
     },
     allowedPaths: sortUnique(plan.allowedPaths),
