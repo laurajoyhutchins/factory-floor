@@ -46,7 +46,9 @@ describe('minimal operator UI shell', () => {
       <QueryClientProvider
         client={
           new QueryClient({
-            defaultOptions: { queries: { retry: false, refetchInterval: false } },
+            defaultOptions: {
+              queries: { retry: false, refetchInterval: false },
+            },
           })
         }
       >

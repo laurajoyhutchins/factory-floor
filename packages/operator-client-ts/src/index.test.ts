@@ -58,7 +58,9 @@ describe('operator client', () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(json({ error: { code: 'busy' } }, { status: 503 }))
-      .mockResolvedValueOnce(json({ status: 'healthy', service: 'control-plane' }));
+      .mockResolvedValueOnce(
+        json({ status: 'healthy', service: 'control-plane' }),
+      );
     const client = createOperatorClient({
       fetch,
       retryAttempts: 2,

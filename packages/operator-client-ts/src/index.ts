@@ -1,9 +1,5 @@
 export type OperatorFailureKind =
-  | 'transport'
-  | 'http'
-  | 'malformed-response'
-  | 'not-found'
-  | 'aborted';
+  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
 
 export class OperatorApiError extends Error {
   constructor(
@@ -187,10 +183,7 @@ export function mergeFiniteRunEvents(
 }
 
 export type StreamState =
-  | 'connecting'
-  | 'live'
-  | 'reconnecting'
-  | 'disconnected';
+  'connecting' | 'live' | 'reconnecting' | 'disconnected';
 export type RuntimeEvent = { id?: string; [key: string]: unknown };
 
 export function appendDedupedRunEvents(
@@ -367,8 +360,14 @@ export function createOperatorClient(options: OperatorClientOptions = {}) {
     headers,
     streamPath: inspectionPaths.stream,
     health: async (signal?: AbortSignal) => {
-      const value = assertRecord(await requestJson(inspectionPaths.health, signal), 'health');
-      if (typeof value.status !== 'string' || typeof value.service !== 'string') {
+      const value = assertRecord(
+        await requestJson(inspectionPaths.health, signal),
+        'health',
+      );
+      if (
+        typeof value.status !== 'string' ||
+        typeof value.service !== 'string'
+      ) {
         throw new OperatorApiError(
           'malformed-response',
           'The control-plane health response is incomplete.',
@@ -474,7 +473,10 @@ export function createOperatorClient(options: OperatorClientOptions = {}) {
       topologyOptions: RunTopologyOptions = {},
       signal?: AbortSignal,
     ) => {
-      const url = new URL(runPath(runId, '/topology'), 'http://factory-floor.local');
+      const url = new URL(
+        runPath(runId, '/topology'),
+        'http://factory-floor.local',
+      );
       for (const [key, value] of Object.entries(topologyOptions)) {
         if (value !== undefined) url.searchParams.set(key, String(value));
       }
@@ -483,15 +485,21 @@ export function createOperatorClient(options: OperatorClientOptions = {}) {
         'run topology',
       );
     },
-    runAlerts: (runId: string, pageOptions?: PageOptions, signal?: AbortSignal) =>
-      getPage(runPath(runId, '/alerts'), pageOptions, signal),
+    runAlerts: (
+      runId: string,
+      pageOptions?: PageOptions,
+      signal?: AbortSignal,
+    ) => getPage(runPath(runId, '/alerts'), pageOptions, signal),
     runEvents: async (
       runId: string,
       pageOptions?: PageOptions,
       signal?: AbortSignal,
     ) =>
       assertFiniteRunEventPage(
-        await requestJson(pageUrl(runPath(runId, '/events'), pageOptions), signal),
+        await requestJson(
+          pageUrl(runPath(runId, '/events'), pageOptions),
+          signal,
+        ),
       ),
     runInstantiations: (
       runId: string,
