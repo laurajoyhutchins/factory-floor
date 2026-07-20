@@ -174,12 +174,16 @@ describe('review clearance state', () => {
   it('preserves stable verify status semantics', () => {
     expect(determineVerificationStatus(null).state).toBe('pending');
     expect(
-      determineVerificationStatus({ status: 'completed', conclusion: 'success' })
-        .state,
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'success',
+      }).state,
     ).toBe('success');
     expect(
-      determineVerificationStatus({ status: 'completed', conclusion: 'failure' })
-        .state,
+      determineVerificationStatus({
+        status: 'completed',
+        conclusion: 'failure',
+      }).state,
     ).toBe('failure');
   });
 
