@@ -48,23 +48,21 @@ jobs:
           service = replace_once(
               service,
               '      - name: Start services and run migrations\n',
-              """      - name: Install Chromium for browser smoke
-                id: browser-install
-                run: pnpm exec playwright install --with-deps chromium
-
-              - name: Start services and run migrations
-          """,
+              '      - name: Install Chromium for browser smoke\n'
+              '        id: browser-install\n'
+              '        run: pnpm exec playwright install --with-deps chromium\n'
+              '\n'
+              '      - name: Start services and run migrations\n',
               'browser install step',
           )
           service = replace_once(
               service,
               '      - name: Stop development services\n',
-              """      - name: Run production operator browser smoke
-                id: browser-smoke
-                run: node scripts/run-ci-stage.mjs --stage browser-smoke --output .factory-floor/ci-metrics/browser-smoke.json -- bash -c 'set -o pipefail; pnpm test:browser:smoke 2>&1 | tee browser-smoke.log'
-
-              - name: Stop development services
-          """,
+              "      - name: Run production operator browser smoke\n"
+              "        id: browser-smoke\n"
+              "        run: node scripts/run-ci-stage.mjs --stage browser-smoke --output .factory-floor/ci-metrics/browser-smoke.json -- bash -c 'set -o pipefail; pnpm test:browser:smoke 2>&1 | tee browser-smoke.log'\n"
+              "\n"
+              "      - name: Stop development services\n",
               'browser smoke step',
           )
           service = replace_once(
