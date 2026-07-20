@@ -1,11 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import {
-  consoleApi,
-  type InspectionRecord,
-  type Page,
-} from '../api/client.js';
+import { consoleApi, type InspectionRecord, type Page } from '../api/client.js';
 import {
   CopyId,
   JsonBlock,
@@ -35,8 +31,7 @@ export function TemplateInstantiations() {
   const [regionId, setRegionId] = useState('');
 
   useEffect(() => {
-    if (!regionId && regionItems[0]?.id)
-      setRegionId(String(regionItems[0].id));
+    if (!regionId && regionItems[0]?.id) setRegionId(String(regionItems[0].id));
   }, [regionId, regionItems]);
 
   const history = useInfiniteQuery({
