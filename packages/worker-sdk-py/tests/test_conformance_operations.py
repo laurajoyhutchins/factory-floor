@@ -12,7 +12,6 @@ from factory_floor_contracts.proposed_result_schema import ProposedResult
 from factory_floor_contracts.worker.capability_request_schema import WorkerCapabilityRequest
 from factory_floor_contracts.worker.stage_request_schema import WorkerStageRequest
 from factory_floor_worker_sdk import (
-    ProtocolError,
     WorkerClient,
     WorkerClientConfig,
     WorkerSdkError,
@@ -46,24 +45,24 @@ def response_body(case: dict[str, Any]) -> Any:
 
 
 def classification(error: WorkerSdkError) -> str:
-    if isinstance(error, ProtocolError):
-        code = error.error.code
-        if code in {"stale_lease_token", "stale_lifecycle_epoch"}:
-            return "lease_error"
-        if code == "capability_denied":
-            return "capability_denied"
-        if code == "duplicate_conflicting_result":
-            return "conflict"
-    return type(error).__name__
+    return {
+        "lease": "lease_error",
+        "capability_denied": "capability_denied",
+        "conflict": "conflict",
+    }.get(error.kind, error.kind)
 
 
 async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
     envelope = InvocationEnvelope.model_validate(
         fixture("contracts/fixtures/worker/invocation-envelope.valid.json")
     )
+    if mutations := case["request"].get("bodyMutations"):
+        envelope = envelope.model_copy(update=mutations)
     uploaded = bytearray()
+    wire_body: dict[str, Any] | None = None
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal wire_body
         if request.method == "PUT":
             uploaded.extend(await request.aread())
             stage = fixture("contracts/fixtures/worker/stage-response.valid.json")
@@ -78,6 +77,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                     "sizeBytes": len(uploaded),
                 },
             )
+        wire_body = json.loads(request.content)
         return httpx.Response(
             case["response"].get("status", 200), json=response_body(case)
         )
@@ -145,6 +145,9 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
             }
         raise AssertionError(f"case {case['id']} unexpectedly succeeded")
     except WorkerSdkError as error:
+        if case["id"] == "cancellation.stale-epoch":
+            assert wire_body is not None
+            assert wire_body["lifecycleEpoch"] == 0
         return {
             "classification": classification(error),
             "retryable": error.retryable,
