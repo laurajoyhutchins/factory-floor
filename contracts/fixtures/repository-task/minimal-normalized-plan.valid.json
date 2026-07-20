@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "objective": "Add a deterministic utility module.",
+  "repository": {
+    "owner": "laurajoyhutchins",
+    "name": "factory-floor",
+    "baseRevision": "62c91dc5a033eb2b74b09df3c196d052916ec062"
+  },
+  "allowedPaths": [
+    "packages/example/package.json",
+    "packages/example/src/**",
+    "packages/example/test/**"
+  ],
+  "recipe": {
+    "name": "typescript-module",
+    "version": "1",
+    "inputs": {
+      "moduleName": "canonical-value",
+      "package": "@factory-floor/example"
+    }
+  },
+  "outputs": [
+    {
+      "name": "implementation",
+      "kind": "file",
+      "path": "packages/example/src/canonical-value.ts",
+      "mediaType": "text/typescript",
+      "required": true
+    },
+    {
+      "name": "unit-test",
+      "kind": "test",
+      "path": "packages/example/test/canonical-value.test.ts",
+      "mediaType": "text/typescript",
+      "required": true
+    }
+  ],
+  "verificationProfile": "package-unit",
+  "resourceBounds": {
+    "maxFiles": 4,
+    "maxPatchBytes": 32768,
+    "maxVerificationSeconds": 120
+  },
+  "requestedCapabilities": [
+    "repository.proposePatch",
+    "repository.read",
+    "verification.request"
+  ],
+  "completionCriteria": [
+    "The focused unit test passes.",
+    "The public export is available."
+  ],
+  "planDigest": "e311be28e68d25157ed58b9a4f5f7fb0858fa80c5a0b91845e8c895ed0caeb3f"
+}
