@@ -38,12 +38,15 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const logic = await import(
+            const shared = await import(
+              pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/github-pr-state.mjs`).href
+            );
+            const handoffLogic = await import(
               pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/agent-pr-handoff-state.mjs`).href
             );
             const marker = '<!-- agent-handoff:v1 -->';
             const { owner, repo } = context.repo;
-            const pullNumbers = logic.selectPullNumbersForEvent({
+            const pullNumbers = shared.selectPullNumbersForEvent({
               eventName: context.eventName,
               payload: context.payload,
             });
@@ -53,44 +56,20 @@ jobs:
             }
 
             for (const pullNumber of pullNumbers) {
-              const { data: pull } = await github.rest.pulls.get({
+              const state = await shared.resolvePullRequestState({
+                github,
                 owner,
                 repo,
-                pull_number: pullNumber,
-              });
-              const runs = await github.paginate(
-                github.rest.actions.listWorkflowRunsForRepo,
-                {
-                  owner,
-                  repo,
-                  head_sha: pull.head.sha,
-                  event: 'pull_request',
-                  per_page: 100,
-                },
-              );
-              const latestRun = logic.selectRepositoryVerificationRun(
-                runs,
-                pull.head.sha,
                 pullNumber,
-              );
-
-              let reviewThreads;
-              try {
-                reviewThreads = await logic.readReviewThreadState({
-                  graphql: github.graphql,
-                  owner,
-                  repo,
-                  pullNumber,
-                });
-              } catch (error) {
-                core.warning(`Could not read complete review-thread state for PR #${pullNumber}: ${error.message}`);
-                reviewThreads = {
-                  status: 'unavailable',
-                  unresolvedCount: null,
-                };
+              });
+              const { pull, workflowRun: latestRun, reviewThreads } = state;
+              if (state.reviewThreadsError) {
+                core.warning(
+                  `Could not read complete review-thread state for PR #${pullNumber}: ${state.reviewThreadsError}`,
+                );
               }
 
-              const decision = logic.determineHandoffState({
+              const decision = handoffLogic.determineHandoffState({
                 draft: pull.draft,
                 verificationRun: latestRun,
                 reviewThreads,
