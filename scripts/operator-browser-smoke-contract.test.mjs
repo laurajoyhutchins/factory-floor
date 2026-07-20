@@ -24,7 +24,9 @@ describe('production operator browser smoke', () => {
     const config = read('playwright.config.ts');
     expect(config).toContain("name: 'chromium-desktop'");
     expect(config).toContain("name: 'chromium-mobile'");
-    expect(config).toContain("outputDir: '.factory-floor/browser-smoke/test-results'");
+    expect(config).toContain(
+      "outputDir: '.factory-floor/browser-smoke/test-results'",
+    );
     expect(config).toContain("trace: 'retain-on-failure'");
     expect(config).toContain("screenshot: 'only-on-failure'");
   });
@@ -41,7 +43,9 @@ describe('production operator browser smoke', () => {
     expect(runner).toContain('CONTROL_PLANE_ADMIN_TOKEN');
     expect(runner).toContain('WORKER_API_BEARER_TOKEN');
     expect(runner).toContain('databaseUrl');
-    expect(runner).toContain('privileged credential leaked into browser bundle');
+    expect(runner).toContain(
+      'privileged credential leaked into browser bundle',
+    );
   });
 
   it('covers routing, auth, finite events, SSE continuation, and responsive views', () => {
@@ -49,7 +53,9 @@ describe('production operator browser smoke', () => {
     expect(spec).toContain("test.describe('production operator console'");
     expect(spec).toContain("getByRole('heading', { name: 'Run status' })");
     expect(spec).toContain("getByRole('heading', { name: 'Run topology' })");
-    expect(spec).toContain("getByRole('heading', { name: 'Bounded durable trace' })");
+    expect(spec).toContain(
+      "getByRole('heading', { name: 'Bounded durable trace' })",
+    );
     expect(spec).toContain("getByRole('heading', { name: 'Run artifacts' })");
     expect(spec).toContain('status: 401');
     expect(spec).toContain("searchParams.has('cursor')");
@@ -66,7 +72,9 @@ describe('production operator browser smoke', () => {
       .map((step) => step.with?.path ?? '')
       .join('\n');
 
-    expect(commands).toContain('pnpm exec playwright install --with-deps chromium');
+    expect(commands).toContain(
+      'pnpm exec playwright install --with-deps chromium',
+    );
     expect(commands).toContain(
       'node scripts/run-ci-stage.mjs --stage browser-smoke',
     );
