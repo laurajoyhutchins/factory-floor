@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Database, Json } from '@factory-floor/db';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 export interface TemplateInstantiationInspectionScope {
   regionId?: string;
@@ -77,7 +77,8 @@ export interface TemplateInstantiationInitialStateInspection {
   createdAt: Date;
 }
 
-export interface TemplateInstantiationDetail extends TemplateInstantiationSummary {
+export interface TemplateInstantiationDetail
+  extends TemplateInstantiationSummary {
   parameters: Json;
   componentConfiguration: Json;
   source: Json;
@@ -118,8 +119,14 @@ type SummaryRow = {
   template_name: string;
   template_version: string;
   template_digest: string;
-  created_at: Date;
+  created_at: unknown;
 };
+
+function dateValue(value: unknown): Date {
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw new Error('invalid_timestamp');
+  return date;
+}
 
 function normalizeLimit(value: number | undefined): number {
   const limit = value ?? 50;
@@ -159,7 +166,10 @@ function decodeCursor(value: string | undefined, scopeDigest: string) {
       Number.isNaN(timestamp.getTime())
     )
       throw new Error('invalid cursor');
-    return { afterCreatedAt: timestamp, afterId: parsed.afterId };
+    return {
+      afterCreatedAt: timestamp.toISOString(),
+      afterId: parsed.afterId,
+    };
   } catch {
     throw new Error('invalid_cursor');
   }
@@ -170,7 +180,7 @@ function encodeCursor(scopeDigest: string, row: SummaryRow): string {
     JSON.stringify({
       v: 1,
       scopeDigest,
-      afterCreatedAt: row.created_at.toISOString(),
+      afterCreatedAt: dateValue(row.created_at).toISOString(),
       afterId: row.id,
     } satisfies Cursor),
     'utf8',
@@ -196,7 +206,7 @@ function toSummary(row: SummaryRow): TemplateInstantiationSummary {
       version: row.template_version,
       digest: row.template_digest,
     },
-    createdAt: row.created_at,
+    createdAt: dateValue(row.created_at),
   };
 }
 
@@ -225,23 +235,20 @@ export class TemplateInstantiationInspectionService {
         revisionIds!,
       );
     if (cursor)
-      query = query.where((eb) =>
-        eb.or([
-          eb('instantiation.created_at', '>', cursor.afterCreatedAt),
-          eb.and([
-            eb('instantiation.created_at', '=', cursor.afterCreatedAt),
-            eb('instantiation.id', '>', cursor.afterId),
-          ]),
-        ]),
+      query = query.where(
+        sql<boolean>`
+          (instantiation.created_at, instantiation.id) >
+          (${cursor.afterCreatedAt}::timestamptz, ${cursor.afterId}::uuid)
+        `,
       );
 
     const rows = await query
       .orderBy('instantiation.created_at')
       .orderBy('instantiation.id')
       .execute();
-    const selected = rows.slice(0, limit) as SummaryRow[];
+    const selected = rows.slice(0, limit);
     return {
-      items: selected.map(toSummary),
+      items: selected.map((row) => toSummary(row)),
       nextCursor:
         rows.length > limit
           ? encodeCursor(scope.digest, selected.at(-1)!)
@@ -261,7 +268,7 @@ export class TemplateInstantiationInspectionService {
       .executeTakeFirst();
     if (!row) return null;
     return {
-      ...toSummary(row as SummaryRow),
+      ...toSummary(row),
       parameters: row.parameters,
       componentConfiguration: row.component_configuration,
       source: row.source,
@@ -279,7 +286,7 @@ export class TemplateInstantiationInspectionService {
       .orderBy('instantiation.id')
       .limit(100)
       .execute();
-    return (rows as SummaryRow[]).map(toSummary);
+    return rows.map((row) => toSummary(row));
   }
 
   async forArtifact(
@@ -304,7 +311,7 @@ export class TemplateInstantiationInspectionService {
       .orderBy('instantiation.id')
       .limit(100)
       .execute();
-    return (rows as SummaryRow[]).map(toSummary);
+    return rows.map((row) => toSummary(row));
   }
 
   private summaryQuery() {
@@ -460,7 +467,7 @@ export class TemplateInstantiationInspectionService {
         canonicalSizeBytes: row.canonical_size_bytes,
         source,
         provenance: row.provenance,
-        createdAt: row.created_at,
+        createdAt: dateValue(row.created_at),
       };
     });
   }
