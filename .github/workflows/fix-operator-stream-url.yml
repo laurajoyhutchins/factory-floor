@@ -1,3 +1,4 @@
+# Temporary branch-only migration helper.
 name: Fix operator stream URL
 
 on:
