@@ -180,11 +180,15 @@ export function TemplateInstantiationDetail() {
         <dl className="detail-grid">
           <div>
             <dt>Request</dt>
-            <dd><CopyId value={value.requestId} /></dd>
+            <dd>
+              <CopyId value={value.requestId} />
+            </dd>
           </div>
           <div>
             <dt>Region</dt>
-            <dd>{text(region.name)} · <CopyId value={region.id} /></dd>
+            <dd>
+              {text(region.name)} · <CopyId value={region.id} />
+            </dd>
           </div>
           <div>
             <dt>Template</dt>
@@ -192,11 +196,15 @@ export function TemplateInstantiationDetail() {
           </div>
           <div>
             <dt>Topology revision</dt>
-            <dd>{text(revision.revisionNumber)} · <CopyId value={revision.id} /></dd>
+            <dd>
+              {text(revision.revisionNumber)} · <CopyId value={revision.id} />
+            </dd>
           </div>
           <div>
             <dt>Created</dt>
-            <dd><Timestamp value={value.createdAt} /></dd>
+            <dd>
+              <Timestamp value={value.createdAt} />
+            </dd>
           </div>
         </dl>
       </section>
@@ -216,7 +224,9 @@ export function TemplateInstantiationDetail() {
       <section>
         <h3>Initial state provenance</h3>
         {initialStates.length === 0 ? (
-          <p className="muted">This instantiation did not publish initial state.</p>
+          <p className="muted">
+            This instantiation did not publish initial state.
+          </p>
         ) : (
           initialStates.map((state) => {
             const owner = record(state.owner);
