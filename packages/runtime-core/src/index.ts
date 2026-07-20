@@ -42,9 +42,21 @@ export {
 export { WorkerProtocolService } from './worker/state-aware-worker-protocol-service.js';
 export * from './commit/execution-commit-service.js';
 export * from './inspection/template-instantiation-inspection-service.js';
-export * from './observability/observability-service.js';
+export {
+  type Page,
+  PROJECTION_NAMES as BASE_PROJECTION_NAMES,
+  type ProjectionName as BaseProjectionName,
+  encodeInspectionCursor,
+  ObservabilityService as BaseObservabilityService,
+} from './observability/observability-service.js';
+export {
+  ObservabilityService,
+  PROJECTION_NAMES,
+  type ProjectionName,
+} from './inspection/template-instantiation-observability-service.js';
 export * from './observability/recovery-service.js';
 export * from './operator/types.js';
 export * from './operator/errors.js';
 export * from './operator/operator-command-service.js';
-export * from './operator/operator-query-service.js';
+export { OperatorQueryService as BaseOperatorQueryService } from './operator/operator-query-service.js';
+export { OperatorQueryService } from './inspection/template-instantiation-operator-query-service.js';
