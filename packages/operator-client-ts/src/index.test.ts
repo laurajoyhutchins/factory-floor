@@ -113,7 +113,9 @@ describe('operator client', () => {
       code: 'cursor_expired',
     });
 
-    fetch.mockResolvedValueOnce(json({ items: 'not-an-array', nextCursor: null }));
+    fetch.mockResolvedValueOnce(
+      json({ items: 'not-an-array', nextCursor: null }),
+    );
     await expect(client.regions()).rejects.toMatchObject({
       kind: 'malformed-response',
     });
