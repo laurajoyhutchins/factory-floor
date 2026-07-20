@@ -36,3 +36,10 @@ export interface PageRequest {
   cursor?: string;
   limit?: number;
 }
+
+export interface RunTopologyRequest {
+  regionLimit?: number;
+  componentLimit?: number;
+  connectionLimit?: number;
+  recordLimit?: number;
+}
