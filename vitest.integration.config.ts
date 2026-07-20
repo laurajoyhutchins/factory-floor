@@ -17,7 +17,7 @@ export default defineConfig({
   },
   test: {
     include: ['tests/integration/**/*.test.ts', 'packages/**/*.integration.ts'],
-    passWithNoTests: true,
+    passWithNoTests: false,
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },
