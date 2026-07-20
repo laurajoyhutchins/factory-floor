@@ -4,6 +4,7 @@ import {
   configureDefaultOperatorClient,
   createOperatorClient,
   operatorClient,
+  readOnlyInspectionPaths,
 } from './index.js';
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -122,6 +123,19 @@ describe('operator client', () => {
     await expect(client.regions()).rejects.toMatchObject({
       kind: 'malformed-response',
     });
+  });
+
+  it('keeps the compatibility path export read-only', () => {
+    const paths = Object.values(readOnlyInspectionPaths);
+    expect(paths).toContain('/health');
+    expect(
+      paths.every(
+        (path) => path === '/health' || path.startsWith('/api/v1/inspect/'),
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(readOnlyInspectionPaths)).not.toContain(
+      '/api/v1/operator',
+    );
   });
 
   it('supports a stable injected default facade', async () => {
