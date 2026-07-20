@@ -68,23 +68,9 @@ jobs:
           from pathlib import Path
           path = Path('examples/repository-task/run-dogfood.ts')
           text = path.read_text()
-          old = '''async function outputArtifacts(
-            blobStore: FilesystemArtifactBlobStore,
-            state: Awaited<ReturnType<typeof runState>>,
-          ): Promise<Record<string, any>> {
-            return Object.fromEntries(
-              await Promise.all(
-                state.outputs.map(async (output) => [
-                  output.port_name,
-                  JSON.parse(
-                    await streamText(await blobStore.readCommitted(output.digest)),
-                  ),
-                ]),
-              ),
-            );
-          }'''
-          old = '\n'.join(line[10:] if line.startswith('          ') else line for line in old.splitlines())
-          new = '''async function readCommittedJson(
+          start = text.index('async function outputArtifacts(')
+          end = text.index('\nasync function writeJson(', start)
+          replacement = '''async function readCommittedJson(
             blobStore: FilesystemArtifactBlobStore,
             digest: string,
           ): Promise<any> {
@@ -115,10 +101,11 @@ jobs:
               ),
             );
           }'''
-          new = '\n'.join(line[10:] if line.startswith('          ') else line for line in new.splitlines())
-          if old not in text:
-              raise SystemExit('expected outputArtifacts implementation not found')
-          path.write_text(text.replace(old, new))
+          replacement = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in replacement.splitlines()
+          )
+          path.write_text(text[:start] + replacement + text[end:])
           PY
 
       - name: Set up Node.js
