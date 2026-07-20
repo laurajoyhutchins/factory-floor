@@ -46,6 +46,8 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
     async def handler(request: httpx.Request) -> httpx.Response:
         nonlocal attempts, wire_body
         attempts += 1
+        assert request.method == case["request"]["method"]
+        assert request.url.path == case["request"]["path"]
         wire_body = json.loads(request.content)
         response = case["response"]
         if response.get("transportError") and attempts <= response.get(
@@ -71,12 +73,14 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
     )
 
     try:
-        request = case.get("request", {})
+        request = case["request"]
         selectors = request.get("componentSelectors", ["verify@1"])
         if request.get("sdkInputAlias") == "capabilities":
             result = await worker.claim(capabilities=selectors)
         else:
             result = await worker.claim(selectors)
+        if expected_body := request.get("body"):
+            assert wire_body == expected_body
         if expected_wire_body := request.get("expectedWireBody"):
             assert wire_body == expected_wire_body
             assert "capabilities" not in wire_body
