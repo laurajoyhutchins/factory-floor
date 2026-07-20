@@ -69,6 +69,15 @@ const template = {
   kind: 'Template',
   metadata: { name: 'seeded', version: '1' },
   spec: {
+    parameters: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      additionalProperties: false,
+      required: ['completedSteps'],
+      properties: {
+        completedSteps: { type: 'array', items: { type: 'string' } },
+      },
+    },
     initialTopology: {
       instances: [
         {
