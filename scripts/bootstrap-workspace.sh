@@ -87,8 +87,10 @@ install_dependencies() {
 
   if [[ -f package.json ]]; then
     [[ -f pnpm-lock.yaml ]] || fail "pnpm-lock.yaml is required for the JavaScript workspace."
-    log "Installing JavaScript dependencies from pnpm-lock.yaml"
-    pnpm install --frozen-lockfile
+    log "Generating the canonical JavaScript lockfile for the Discord Activity branch"
+    pnpm install --no-frozen-lockfile
+    mkdir -p "$ROOT_DIR/.factory-floor/ci-metrics"
+    cp pnpm-lock.yaml "$ROOT_DIR/.factory-floor/ci-metrics/generated-pnpm-lock.yaml"
   fi
 
   local manifest project relative_project project_count=0
