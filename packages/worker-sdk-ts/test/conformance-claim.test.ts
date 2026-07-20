@@ -1,17 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  WorkerProtocolClient,
-  WorkerSdkError,
-} from '../src/index.js';
+import { WorkerProtocolClient, WorkerSdkError } from '../src/index.js';
 
 const rootUrl = new URL('../../../', import.meta.url);
 const corpus = JSON.parse(
   readFileSync(
-    new URL(
-      'contracts/conformance/worker-protocol-v1.cases.json',
-      rootUrl,
-    ),
+    new URL('contracts/conformance/worker-protocol-v1.cases.json', rootUrl),
     'utf8',
   ),
 ) as {
@@ -90,15 +84,16 @@ async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
   } catch (error) {
     if (!(error instanceof WorkerSdkError)) throw error;
     return {
-      classification:
-        error.kind === 'protocol' ? 'protocol_error' : error.kind,
+      classification: error.kind === 'protocol' ? 'protocol_error' : error.kind,
       retryable: error.retryable,
     };
   }
 }
 
 describe('TypeScript worker claim conformance', () => {
-  for (const testCase of corpus.cases.filter((item) => claimCaseIds.has(item.id)))
+  for (const testCase of corpus.cases.filter((item) =>
+    claimCaseIds.has(item.id),
+  ))
     it(testCase.id, async () => {
       await expect(runClaimCase(testCase)).resolves.toEqual(testCase.expected);
     });
