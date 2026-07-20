@@ -9,10 +9,5 @@
     "noEmit": true,
     "types": ["vite/client", "vitest/globals"]
   },
-  "references": [
-    {
-      "path": "../operator-client-ts"
-    }
-  ],
   "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }
