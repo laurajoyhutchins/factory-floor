@@ -285,7 +285,9 @@ describe('external action dispatch and startup recovery', () => {
   });
 
   beforeEach(async () => {
-    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    expect(
+      (await resetDatabaseForDevelopment(db, 'test')).error,
+    ).toBeUndefined();
     now = new Date();
   });
 
