@@ -115,7 +115,9 @@ describe('run-scoped template-instantiation inspection in PostgreSQL', () => {
   });
 
   it('finds the delivered topology before an execution has been created', async () => {
-    const instantiation = await new TemplateInstantiationService(db).instantiate({
+    const instantiation = await new TemplateInstantiationService(
+      db,
+    ).instantiate({
       requestId: '019bb22e-58b0-7d87-8000-000000000501',
       targetRegionId: region.id,
       template: 'seeded@1',
