@@ -6,10 +6,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from '@aws-sdk/client-s3';
-import {
-  S3ArtifactBlobStore,
-  type ArtifactBlobStore,
-} from '../src/public.js';
+import { S3ArtifactBlobStore, type ArtifactBlobStore } from '../src/public.js';
 
 export interface MinioArtifactStoreFixture {
   readonly blobStore: ArtifactBlobStore;
