@@ -46,7 +46,11 @@ vi.mock('@factory-floor/operator-ui-react', async () => {
       loadDetails: (runId: string) => Promise<unknown>;
     }) => {
       mocks.renderRunDetailsPanel(props);
-      return createElement('div', { 'data-testid': 'run-details' }, props.runId);
+      return createElement(
+        'div',
+        { 'data-testid': 'run-details' },
+        props.runId,
+      );
     },
   };
 });
