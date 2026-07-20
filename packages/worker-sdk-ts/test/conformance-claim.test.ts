@@ -54,11 +54,14 @@ function normalizeClaimSelectors(
   request: (typeof corpus.cases)[number]['request'],
 ): string[] {
   const selectors = request.componentSelectors ?? ['verify@1'];
-  const sdkInput =
+  const sdkInput: {
+    componentSelectors?: string[];
+    capabilities?: string[];
+  } =
     request.sdkInputAlias === 'capabilities'
       ? { capabilities: selectors }
       : { componentSelectors: selectors };
-  return sdkInput.componentSelectors ?? sdkInput.capabilities;
+  return sdkInput.componentSelectors ?? sdkInput.capabilities ?? [];
 }
 
 async function runClaimCase(testCase: (typeof corpus.cases)[number]) {
