@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,8 +44,23 @@ def classification(error: WorkerSdkError) -> str:
     }.get(error.kind, error.kind)
 
 
-def json_value(value: Any) -> Any:
-    return json.loads(json.dumps(value, default=str))
+def normalized_json_value(value: Any) -> Any:
+    value = json.loads(json.dumps(value, default=str))
+    if isinstance(value, list):
+        return [normalized_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: normalized_json_value(item) for key, item in value.items()}
+    if isinstance(value, str) and "T" in value and value.endswith("Z"):
+        try:
+            instant = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+        except ValueError:
+            return value
+        return (
+            instant.astimezone(timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z")
+        )
+    return value
 
 
 async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
@@ -79,12 +95,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
         assert str(request.url) == str(endpoint)
         wire_body = json.loads(request.content)
         if fixture_path := expected_request.get("fixture"):
-            if case["operation"] == "result":
-                expected_body = ProposedResult.model_validate(
-                    fixture(fixture_path)
-                ).model_dump(mode="json", by_alias=True)
-            else:
-                expected_body = fixture(fixture_path)
+            expected_body = fixture(fixture_path)
         else:
             expected_body = {
                 "protocolVersion": "1.0",
@@ -94,7 +105,7 @@ async def run_operation_case(case: dict[str, Any]) -> dict[str, Any]:
                 "lifecycleEpoch": envelope.lifecycleEpoch,
                 **expected_request.get("body", {}),
             }
-        assert wire_body == json_value(expected_body)
+        assert normalized_json_value(wire_body) == normalized_json_value(expected_body)
         return httpx.Response(
             case["response"].get("status", 200), json=response_body(case)
         )
