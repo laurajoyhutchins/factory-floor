@@ -21,7 +21,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-          cache: pnpm
       - name: Apply composition changes
         run: |
           python - <<'PY'
@@ -104,16 +103,18 @@ jobs:
 
           vitest_path = Path('vitest.config.ts')
           vitest = vitest_path.read_text()
-          vitest = vitest.replace(
-              "  'apps/console/**',\n  'packages/operator-ui-react/**',",
-              "  'apps/console/**',\n  'apps/discord-activity/**',\n  'packages/operator-ui-react/**',",
-              1,
-          )
-          vitest = vitest.replace(
-              "      'apps/console/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
-              "      'apps/console/vitest.config.ts',\n      'apps/discord-activity/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
-              1,
-          )
+          if "  'apps/discord-activity/**'," not in vitest:
+              vitest = vitest.replace(
+                  "  'apps/console/**',\n  'packages/operator-ui-react/**',",
+                  "  'apps/console/**',\n  'apps/discord-activity/**',\n  'packages/operator-ui-react/**',",
+                  1,
+              )
+          if "      'apps/discord-activity/vitest.config.ts'," not in vitest:
+              vitest = vitest.replace(
+                  "      'apps/console/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
+                  "      'apps/console/vitest.config.ts',\n      'apps/discord-activity/vitest.config.ts',\n      'packages/operator-ui-react/vitest.config.ts',",
+                  1,
+              )
           vitest_path.write_text(vitest)
 
           package_path = Path('package.json')
@@ -126,11 +127,12 @@ jobs:
 
           verify_path = Path('scripts/verify.sh')
           verify = verify_path.read_text()
-          verify = verify.replace(
-              '  pnpm --filter @factory-floor/console build\n',
-              '  pnpm --filter @factory-floor/console build\n  pnpm --filter @factory-floor/discord-activity build\n',
-              1,
-          )
+          if 'pnpm --filter @factory-floor/discord-activity build' not in verify:
+              verify = verify.replace(
+                  '  pnpm --filter @factory-floor/console build\n',
+                  '  pnpm --filter @factory-floor/console build\n  pnpm --filter @factory-floor/discord-activity build\n',
+                  1,
+              )
           verify_path.write_text(verify)
 
           env_path = Path('.env.example')
