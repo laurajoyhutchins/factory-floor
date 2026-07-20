@@ -1,6 +1,6 @@
 import type { ArtifactBlobStore } from '@factory-floor/artifact-store';
 import type { Database, Json } from '@factory-floor/db';
-import { sql, type Kysely, type Selectable } from 'kysely';
+import type { Kysely, Selectable } from 'kysely';
 import {
   OperatorAuthorizationError,
   OperatorNotFoundError,
@@ -671,8 +671,7 @@ export class RunScopedOperatorQueryService extends BaseOperatorQueryService {
           severity: 'error',
           title: 'Execution failed',
           message: failureMessage(execution.failure, 'Execution failed.'),
-          observedAt:
-            execution.failed_at ?? execution.created_at,
+          observedAt: execution.failed_at ?? execution.created_at,
           source: { kind: 'execution', id: execution.id },
           details: { failure: execution.failure },
         });
