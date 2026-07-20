@@ -38,6 +38,9 @@ describe('production operator browser smoke', () => {
     expect(runner).toContain("'vite'");
     expect(runner).toContain("'preview'");
     expect(runner).toContain('server.listen(0');
+    expect(runner).toContain("['services:up']");
+    expect(runner).toContain("['services:wait']");
+    expect(runner).toContain("['db:migrate']");
     expect(runner).toContain('pnpm db:reset');
     expect(runner).toContain('finally');
     expect(runner).toContain('SIGTERM');

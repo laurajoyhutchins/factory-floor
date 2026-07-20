@@ -212,6 +212,9 @@ const consoleUrl = `http://127.0.0.1:${consolePort}`;
 let demoOutput = '';
 
 try {
+  run('pnpm', ['services:up'], 'start browser-smoke services');
+  run('pnpm', ['services:wait'], 'wait for browser-smoke services');
+  run('pnpm', ['db:migrate'], 'migrate browser-smoke database');
   run('pnpm', ['db:reset'], 'pnpm db:reset');
 
   const demo = spawn('pnpm', ['demo:investigation'], {
