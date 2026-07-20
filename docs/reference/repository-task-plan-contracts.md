@@ -4,12 +4,12 @@ Repository-task plan version 1 turns concise authored intent into deterministic,
 
 ## Four distinct layers
 
-| Layer | Owns | Does not own |
-| --- | --- | --- |
-| Authored intent | Objective, exact repository revision, allowed paths, recipe selection and inputs, requested outputs, named verification profile, resource bounds, requested capabilities, and completion criteria | Credentials, shell commands, policy decisions, branch creation, commits, comments, pull requests, or merge authority |
-| Normalized state | Canonical ordering, normalized prose, canonical recipe inputs, declared outputs, and a stable SHA-256 plan digest | Permission to execute or mutate anything |
-| Repository/runtime policy | Supported recipe versions, path restrictions, verification-profile resolution, budgets, capabilities, and external-action approval | Reinterpretation of authored prose after normalization |
-| Execution | Side-effect-free planning first, then separately authorized patch proposal and verification stages | Durable runtime commits or direct external writes from the plan or worker payload |
+| Layer                     | Owns                                                                                                                                                                                              | Does not own                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Authored intent           | Objective, exact repository revision, allowed paths, recipe selection and inputs, requested outputs, named verification profile, resource bounds, requested capabilities, and completion criteria | Credentials, shell commands, policy decisions, branch creation, commits, comments, pull requests, or merge authority |
+| Normalized state          | Canonical ordering, normalized prose, canonical recipe inputs, declared outputs, and a stable SHA-256 plan digest                                                                                 | Permission to execute or mutate anything                                                                             |
+| Repository/runtime policy | Supported recipe versions, path restrictions, verification-profile resolution, budgets, capabilities, and external-action approval                                                                | Reinterpretation of authored prose after normalization                                                               |
+| Execution                 | Side-effect-free planning first, then separately authorized patch proposal and verification stages                                                                                                | Durable runtime commits or direct external writes from the plan or worker payload                                    |
 
 The plan describes intent and bounded inputs. It never grants authority.
 
@@ -104,18 +104,18 @@ The two authored fixtures normalize byte-for-byte to the same normalized fixture
 
 The initial diagnostic codes are:
 
-| Code | Meaning |
-| --- | --- |
-| `schema.unknown-field` | A closed contract received an undeclared field, including arbitrary verification commands, recipe commands, or credential-shaped additions. |
-| `schema.invalid` | An authored value failed structural validation, including an unsupported schema version or an oversized absolute budget. |
-| `path.unsafe` | An allowed or output path is not a concrete, unambiguous repository-relative path, or an output path contains a glob. |
-| `path.unsupported-pattern` | An allowed path uses glob syntax other than a single terminal recursive `/**`. |
-| `output.outside-allowed-paths` | A declared output path is not covered by the authored allowed path set. |
-| `output.duplicate-name` | Two declared outputs use the same stable name. |
-| `resource.max-files-exceeded` | Declared file-like outputs exceed `resourceBounds.maxFiles`. |
-| `recipe.unsupported-version` | Repository policy does not support the requested recipe version. |
-| `capability.not-allowed` | A requested capability lies outside the supplied policy boundary. |
-| `normalized.schema-invalid` | Internal normalization produced state that violates its own contract; this is an implementation defect. |
+| Code                           | Meaning                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.unknown-field`         | A closed contract received an undeclared field, including arbitrary verification commands, recipe commands, or credential-shaped additions. |
+| `schema.invalid`               | An authored value failed structural validation, including an unsupported schema version or an oversized absolute budget.                    |
+| `path.unsafe`                  | An allowed or output path is not a concrete, unambiguous repository-relative path, or an output path contains a glob.                       |
+| `path.unsupported-pattern`     | An allowed path uses glob syntax other than a single terminal recursive `/**`.                                                              |
+| `output.outside-allowed-paths` | A declared output path is not covered by the authored allowed path set.                                                                     |
+| `output.duplicate-name`        | Two declared outputs use the same stable name.                                                                                              |
+| `resource.max-files-exceeded`  | Declared file-like outputs exceed `resourceBounds.maxFiles`.                                                                                |
+| `recipe.unsupported-version`   | Repository policy does not support the requested recipe version.                                                                            |
+| `capability.not-allowed`       | A requested capability lies outside the supplied policy boundary.                                                                           |
+| `normalized.schema-invalid`    | Internal normalization produced state that violates its own contract; this is an implementation defect.                                     |
 
 Diagnostics contain a stable code, severity, JSON Pointer path, and bounded human-readable message. Callers must branch on `code`, not message text.
 
