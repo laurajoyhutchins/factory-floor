@@ -85,8 +85,7 @@ async function runOperationCase(testCase: (typeof corpus.cases)[number]) {
           JSON.stringify({
             protocolVersion: '1.0',
             stagedRef: stage.stagedRef,
-            digest:
-              testCase.request.body?.expectedDigest ?? 'a'.repeat(64),
+            digest: testCase.request.body?.expectedDigest ?? 'a'.repeat(64),
             sizeBytes: uploaded.length,
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
