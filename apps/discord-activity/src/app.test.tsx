@@ -67,7 +67,9 @@ describe('Discord Activity shell', () => {
       <DiscordActivityApp config={disabledConfig} createHost={createHost} />,
     );
 
-    expect(screen.getByText('This embedded operator is disabled.')).toBeVisible();
+    expect(
+      screen.getByText('This embedded operator is disabled.'),
+    ).toBeVisible();
     expect(createHost).not.toHaveBeenCalled();
     expect(mocks.createActivityBroker).not.toHaveBeenCalled();
   });
@@ -118,7 +120,9 @@ describe('Discord Activity shell', () => {
       <DiscordActivityApp config={enabledConfig()} createHost={createHost} />,
     );
 
-    expect(await screen.findByTestId('run-workspace')).toHaveTextContent('run-1');
+    expect(await screen.findByTestId('run-workspace')).toHaveTextContent(
+      'run-1',
+    );
     expect(createHost).toHaveBeenCalledWith('application-1');
     expect(mocks.beginActivityBootstrap).toHaveBeenCalledWith({
       host,
