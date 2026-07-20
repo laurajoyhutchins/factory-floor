@@ -96,6 +96,23 @@ A successful result contains:
 
 A retry with the same `requestId` and identical normalized request content reuses the same durable instantiation record. Reusing a `requestId` for different content produces `template_instantiation_conflict`. A different request identity may produce a distinct durable `existing` record that references the same effective topology revision.
 
+## Operator inspection
+
+The supported read-only inspection boundary derives operator-safe history directly from the authoritative durable records; it does not create a second materialized source of truth.
+
+- `GET /api/v1/inspect/instantiations?regionId=<uuid>` lists one region's history.
+- `GET /api/v1/inspect/instantiations?runId=<uuid>` lists history related to topology revisions delivered for one run.
+- `GET /api/v1/inspect/instantiations/<instantiationId>` returns complete request, template, topology, referenced-definition, causal-source, and initial-state provenance.
+- `GET /api/v1/operator/runs/<runId>/instantiations` exposes the same run-scoped model through the authenticated operator boundary.
+
+List requests accept `limit` from 1 through 100 and an opaque `cursor`. Cursors bind to the normalized region or run scope and order by `(createdAt, instantiationId)`, so a cursor cannot be reused across scopes. Responses are deterministic and bounded. A run is related through its durable deliveries, so the originating topology is visible before an execution begins.
+
+Initial-state inspection includes the owning component instance and state port, immutable schema identity, content-addressed artifact identity, inline canonical JSON value, state-version identity, and recorded provenance. It deliberately omits storage locators and database-specific rows. Opaque parameter, configuration, source, definition, value, and provenance JSON remains opaque JSON.
+
+Execution traces include the instantiations that produced their topology revision. Artifact lineage includes instantiations linked to template-seeded state artifacts. The `template-instantiation-history` projection reports aggregate history and seed-state counts; projection rebuild and process restart derive the same visible history from durable records.
+
+The CLI consumes these HTTP boundaries through `ff inspect instantiations [id] --region-id <uuid> | --run-id <uuid>`. The read-only console exposes region-scoped history and textual detail pages without administrative mutation controls.
+
 ## Errors
 
 The error schema exposes only stable domain outcomes that callers can handle without learning database or implementation details. It includes declaration validation, unavailable or retired definitions, region eligibility, topology and port/schema validation, fan-in validation, instantiation conflict, and transient internal failure.
@@ -110,4 +127,4 @@ Existing static-system application continues to use the implementation-local req
 
 ## Authority and deferred work
 
-Successful authoritative requests are recorded atomically with their topology outcome and any template-provided initial state. Projections and operator inspection remain issue #80. PostgreSQL concurrency hardening and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.
+Successful authoritative requests are recorded atomically with their topology outcome and any template-provided initial state. Supported operator inspection derives from those records without mutation authority. PostgreSQL concurrency hardening and direct consumption by the child-region boundary remain issue #74. Dynamic child construction remains issue #36.

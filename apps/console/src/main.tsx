@@ -19,6 +19,10 @@ import {
   Overview,
   Topology,
 } from './pages/pages.js';
+import {
+  TemplateInstantiationDetail,
+  TemplateInstantiations,
+} from './pages/template-instantiations.js';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -35,6 +39,7 @@ const titles: Record<string, string> = {
   topology: 'Topology',
   executions: 'Executions',
   artifacts: 'Artifacts',
+  instantiations: 'Template instantiations',
   operations: 'Operations',
 };
 
@@ -73,6 +78,11 @@ function App() {
         <Route path="/executions/:executionId" element={<ExecutionDetail />} />
         <Route path="/artifacts" element={<Artifacts />} />
         <Route path="/artifacts/:artifactId" element={<ArtifactDetail />} />
+        <Route path="/instantiations" element={<TemplateInstantiations />} />
+        <Route
+          path="/instantiations/:instantiationId"
+          element={<TemplateInstantiationDetail />}
+        />
         <Route path="/operations" element={<Operations />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

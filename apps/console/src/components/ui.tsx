@@ -119,6 +119,7 @@ export function Shell({
           <NavLink to="/topology">Topology</NavLink>
           <NavLink to="/executions">Executions</NavLink>
           <NavLink to="/artifacts">Artifacts</NavLink>
+          <NavLink to="/instantiations">Instantiations</NavLink>
           <NavLink to="/operations">Operations</NavLink>
         </nav>
         <dl className="connection-status">

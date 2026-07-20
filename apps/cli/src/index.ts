@@ -27,6 +27,7 @@ const inspectRoutes: Record<string, string> = {
   'inspect resources': '/api/v1/inspect/resources',
   'inspect policy-decisions': '/api/v1/inspect/policy-decisions',
   'inspect projections': '/api/v1/inspect/projections',
+  'inspect instantiations': '/api/v1/inspect/instantiations',
 };
 
 function human(value: any): string {
@@ -126,12 +127,20 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? `/api/v1/inspect/executions/${id}`
           : key === 'inspect artifacts' && id
             ? `/api/v1/inspect/artifacts/${id}/lineage`
-            : inspectRoute;
+            : key === 'inspect instantiations' && id
+              ? `/api/v1/inspect/instantiations/${id}`
+              : inspectRoute;
       const url = new URL(endpoint, server);
       const cursor = arg(argv, '--cursor');
       const lim = arg(argv, '--limit');
+      const regionId = arg(argv, '--region-id');
+      const runId = arg(argv, '--run-id');
       if (cursor) url.searchParams.set('cursor', cursor);
       if (lim) url.searchParams.set('limit', lim);
+      if (key === 'inspect instantiations' && !id) {
+        if (regionId) url.searchParams.set('regionId', regionId);
+        if (runId) url.searchParams.set('runId', runId);
+      }
       const response = await fetch(url, {
         headers: authorizationHeaders(operatorToken ?? adminToken),
       });
@@ -159,7 +168,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (route === undefined || file === undefined) {
     console.error(
-      'Usage: ff <schema|component|template|policy> register <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff system apply <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff command submit <file> [--server URL] [--admin-token TOKEN] [--json] [--idempotency-key KEY] [--correlation-id ID]\n       ff inspect <regions|events|deliveries|executions|attempts|artifacts|resources|policy-decisions|projections> [id] [--server URL] [--operator-token TOKEN] [--json] [--cursor CURSOR] [--limit N]',
+      'Usage: ff <schema|component|template|policy> register <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff system apply <file> [--server URL] [--admin-token TOKEN] [--json]\n       ff command submit <file> [--server URL] [--admin-token TOKEN] [--json] [--idempotency-key KEY] [--correlation-id ID]\n       ff inspect <regions|events|deliveries|executions|attempts|artifacts|resources|policy-decisions|projections|instantiations> [id] [--server URL] [--operator-token TOKEN] [--json] [--cursor CURSOR] [--limit N] [--region-id ID] [--run-id ID]',
     );
     return 2;
   }

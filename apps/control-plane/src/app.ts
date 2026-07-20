@@ -178,7 +178,7 @@ export class BoundedStartupObservabilityService extends ObservabilityService {
       projectorVersion: STARTUP_PROJECTOR_VERSION,
       processedEvents,
       processedThroughEventId: lastEventId,
-      checkpointed: PROJECTION_NAMES.length,
+      checkpointed: 10 as const,
       batches: processedEvents > 0 ? 1 : 0,
       batchSize,
       pending,

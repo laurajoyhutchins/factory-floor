@@ -12,25 +12,38 @@ function pageQuery(request: { query: unknown }) {
   };
 }
 
+function instantiationScope(request: { query: unknown }) {
+  const query = request.query as { regionId?: string; runId?: string };
+  return {
+    regionId: query.regionId,
+    runId: query.runId,
+  };
+}
+
 function inspectionError(reply: FastifyReply, error: unknown) {
   const code = error instanceof Error ? error.message : 'inspection_error';
   const statusCode = [
     'invalid_cursor',
     'invalid_limit',
+    'invalid_scope',
     'invalid_batch_size',
     'topology_region_bound_exceeded',
     'topology_component_bound_exceeded',
     'topology_connection_bound_exceeded',
   ].includes(code)
     ? 400
-    : 500;
+    : code === 'run_not_found'
+      ? 404
+      : 500;
   return reply.code(statusCode).send({
     error: {
       code,
       message:
         statusCode === 400
           ? 'The inspection request is invalid.'
-          : 'The inspection request failed.',
+          : statusCode === 404
+            ? 'The requested inspection scope was not found.'
+            : 'The inspection request failed.',
     },
   });
 }
@@ -56,6 +69,27 @@ export async function registerInspectionRoutes(
   app.get('/api/v1/inspect/topology', async (_request, reply) =>
     inspect(reply, () => service.activeTopology()),
   );
+  app.get('/api/v1/inspect/instantiations', async (request, reply) =>
+    inspect(reply, () =>
+      service.listTemplateInstantiations(
+        instantiationScope(request),
+        pageQuery(request),
+      ),
+    ),
+  );
+  app.get('/api/v1/inspect/instantiations/:id', async (request, reply) => {
+    const instantiation = await inspect(reply, () =>
+      service.templateInstantiation((request.params as { id: string }).id),
+    );
+    if (instantiation === null)
+      return reply.code(404).send({
+        error: {
+          code: 'template_instantiation_not_found',
+          message: 'Template instantiation not found.',
+        },
+      });
+    return instantiation;
+  });
   app.get('/api/v1/inspect/events', async (request, reply) =>
     inspect(reply, () => service.listEvents(pageQuery(request))),
   );

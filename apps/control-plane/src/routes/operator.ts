@@ -23,6 +23,7 @@ type OperatorQueries = Pick<
   | 'getFactoryStatus'
   | 'getRunStatus'
   | 'inspectRunTrace'
+  | 'listRunTemplateInstantiations'
   | 'listRunArtifacts'
   | 'readArtifact'
   | 'listPendingApprovals'
@@ -297,6 +298,21 @@ export async function registerOperatorRoutes(
       return handleOperatorError(request, reply, error);
     }
   });
+
+  app.get(
+    '/api/v1/operator/runs/:runId/instantiations',
+    async (request, reply) => {
+      try {
+        return await queries.listRunTemplateInstantiations(
+          operatorContext(request),
+          requiredParam(request, 'runId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
   app.get('/api/v1/operator/runs/:runId/artifacts', async (request, reply) => {
     try {
