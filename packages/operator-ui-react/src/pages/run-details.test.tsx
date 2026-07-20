@@ -107,7 +107,14 @@ describe('run details panel', () => {
     renderPanel(<RunDetailsPanel runId="run-1" loadDetails={loadDetails} />);
 
     expect(await screen.findByText('Run governance and lineage')).toBeVisible();
-    expect(screen.getByText('github.pull_request')).toBeVisible();
+    expect(
+      screen.getByText((_, element) =>
+        Boolean(
+          element?.tagName === 'TD' &&
+            element.textContent?.includes('github.pull_request'),
+        ),
+      ),
+    ).toBeVisible();
     expect(screen.getByText('42 token')).toBeVisible();
     expect(screen.getByText('external-action-policy@1')).toBeVisible();
     expect(screen.getByText('transform')).toBeVisible();
