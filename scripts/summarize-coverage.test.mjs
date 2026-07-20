@@ -146,7 +146,7 @@ describe('coverage evidence summary', () => {
     ]);
   });
 
-  it('fails closed when required totals are malformed', () => {
+  it('fails closed with complete diagnostics when required totals are malformed', () => {
     const directory = workspace();
     writeValidReports(directory);
     writeFileSync(
@@ -157,8 +157,13 @@ describe('coverage evidence summary', () => {
     const { result, summary } = summarize(directory);
 
     expect(result.status).toBe(1);
-    expect(summary.validation.errors).toEqual([
-      expect.stringContaining('typescript lines total'),
-    ]);
+    expect(summary.validation.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('typescript lines total'),
+        expect.stringContaining('typescript branches total'),
+        expect.stringContaining('typescript functions total'),
+        expect.stringContaining('typescript statements total'),
+      ]),
+    );
   });
 });
