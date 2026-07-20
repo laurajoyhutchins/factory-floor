@@ -368,10 +368,10 @@ export function factoryFloorVerificationProfiles(): RepositoryTaskVerificationPr
     'factory-floor': {
       stages: [
         {
-          id: 'install',
-          executable: 'pnpm',
-          args: ['install', '--frozen-lockfile'],
-          timeoutMs: 180_000,
+          id: 'bootstrap',
+          executable: 'bash',
+          args: ['scripts/bootstrap-workspace.sh'],
+          timeoutMs: 300_000,
         },
         {
           id: 'static',
