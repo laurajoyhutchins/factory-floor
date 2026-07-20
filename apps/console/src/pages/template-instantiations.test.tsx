@@ -7,7 +7,7 @@ import * as client from '../api/client.js';
 import {
   TemplateInstantiationDetail,
   TemplateInstantiations,
-} from './pages.js';
+} from './template-instantiations.js';
 
 function wrap(ui: React.ReactElement, path: string, route: string) {
   return render(
@@ -62,7 +62,9 @@ describe('template-instantiation console views', () => {
     wrap(<TemplateInstantiations />, '/instantiations', '/instantiations');
 
     const selector = await screen.findByRole('combobox', { name: 'Region' });
-    expect(screen.getByText('No template instantiations recorded for this region.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No template instantiations recorded for this region.'),
+    ).toBeInTheDocument();
     await user.selectOptions(selector, 'region-b');
 
     expect(await screen.findByRole('link', { name: 'inst-b' })).toHaveAttribute(
