@@ -63,7 +63,9 @@ describe('template-instantiation console views', () => {
 
     const selector = await screen.findByRole('combobox', { name: 'Region' });
     expect(
-      screen.getByText('No template instantiations recorded for this region.'),
+      await screen.findByText(
+        'No template instantiations recorded for this region.',
+      ),
     ).toBeInTheDocument();
     await user.selectOptions(selector, 'region-b');
 
