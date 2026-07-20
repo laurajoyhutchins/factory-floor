@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 22
       - run: corepack enable
-      - run: pnpm install --lockfile-only
+      - run: pnpm install --no-frozen-lockfile
       - run: >-
           pnpm exec prettier --write
           tsconfig.json
