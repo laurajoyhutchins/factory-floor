@@ -11,8 +11,9 @@
     "@factory-floor/contracts-ts": "workspace:*"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json --pretty false",
     "test": "vitest run",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "node ../../scripts/run-package-entrypoint.mjs tsx src/index.ts -- node dist/index.js"
   }
 }
