@@ -158,8 +158,9 @@ describe('repository verification wiring', () => {
     expect(runCommands).toContain('pnpm verify:services');
     expect(runCommands).toContain('pnpm verify:integration');
     expect(runCommands).toContain('pnpm verify:acceptance');
+    expect(runCommands).toContain('pnpm test:browser:smoke');
     expect(runCommands).not.toMatch(
-      /pnpm (lint|typecheck|test|test:python|format:check)\b/,
+      /pnpm (lint|typecheck|test(?!:browser:smoke)|test:python|format:check)\b/,
     );
     expect(runCommands).not.toContain('@factory-floor/console test');
     for (const stage of [
