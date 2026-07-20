@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "objective": "  Add   a deterministic utility module.  ",
   "repository": {
-    "owner": "laurajoyhutchins",
-    "name": "factory-floor",
+    "owner": "LauraJoyHutchins",
+    "name": "Factory-Floor",
     "baseRevision": "62c91dc5a033eb2b74b09df3c196d052916ec062"
   },
   "allowedPaths": [
