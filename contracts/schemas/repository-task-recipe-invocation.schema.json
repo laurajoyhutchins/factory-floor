@@ -2,13 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://factory-floor.local/contracts/repository-task-recipe-invocation.schema.json",
   "title": "RepositoryTaskRecipeInvocation",
-  "description": "A versioned deterministic recipe selection and its bounded inputs. Recipe resolution remains repository-owned.",
+  "description": "A versioned deterministic recipe selection and its bounded typed inputs. Recipe resolution remains repository-owned.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "name": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      "const": "typescript-module"
     },
     "version": {
       "type": "string",
@@ -16,8 +15,18 @@
     },
     "inputs": {
       "type": "object",
-      "additionalProperties": true,
-      "default": {}
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "type": "string",
+          "pattern": "^@[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$"
+        },
+        "moduleName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
+      },
+      "required": ["package", "moduleName"]
     }
   },
   "required": ["name", "version", "inputs"]
