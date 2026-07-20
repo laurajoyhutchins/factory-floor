@@ -11,6 +11,7 @@ import {
   type OperatorQueryService,
   type PageRequest,
   type RunCancellationRequest,
+  type RunTopologyRequest,
 } from '@factory-floor/runtime-core';
 
 type OperatorCommands = Pick<
@@ -23,9 +24,12 @@ type OperatorQueries = Pick<
   | 'getFactoryStatus'
   | 'getRunStatus'
   | 'inspectRunTrace'
+  | 'getRunTopology'
+  | 'listRunAlerts'
+  | 'listRunEvents'
   | 'listRunTemplateInstantiations'
   | 'listRunArtifacts'
-  | 'readArtifact'
+  | 'readRunArtifact'
   | 'listPendingApprovals'
 >;
 
@@ -84,27 +88,40 @@ function requiredParam(request: FastifyRequest, name: string): string {
   return value;
 }
 
+function optionalNumberQuery(
+  request: FastifyRequest,
+  name: string,
+): number | undefined {
+  const query = isRecord(request.query) ? request.query : {};
+  const value = query[name];
+  if (value === undefined) return undefined;
+  return typeof value === 'number' ? value : Number(value);
+}
+
 function pageRequest(request: FastifyRequest): PageRequest {
   const query = isRecord(request.query) ? request.query : {};
   const cursor = typeof query.cursor === 'string' ? query.cursor : undefined;
-  const limit =
-    typeof query.limit === 'string'
-      ? Number(query.limit)
-      : typeof query.limit === 'number'
-        ? query.limit
-        : undefined;
+  const limit = optionalNumberQuery(request, 'limit');
   return {
     ...(cursor ? { cursor } : {}),
     ...(limit !== undefined ? { limit } : {}),
   };
 }
 
+function topologyRequest(request: FastifyRequest): RunTopologyRequest {
+  const values: RunTopologyRequest = {
+    regionLimit: optionalNumberQuery(request, 'regionLimit'),
+    componentLimit: optionalNumberQuery(request, 'componentLimit'),
+    connectionLimit: optionalNumberQuery(request, 'connectionLimit'),
+    recordLimit: optionalNumberQuery(request, 'recordLimit'),
+  };
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined),
+  ) as RunTopologyRequest;
+}
+
 function artifactByteLimit(request: FastifyRequest): number | undefined {
-  const query = isRecord(request.query) ? request.query : {};
-  if (query.maxBytes === undefined) return undefined;
-  return typeof query.maxBytes === 'number'
-    ? query.maxBytes
-    : Number(query.maxBytes);
+  return optionalNumberQuery(request, 'maxBytes');
 }
 
 function bodyRecord(request: FastifyRequest): Record<string, unknown> {
@@ -299,6 +316,42 @@ export async function registerOperatorRoutes(
     }
   });
 
+  app.get('/api/v1/operator/runs/:runId/topology', async (request, reply) => {
+    try {
+      return await queries.getRunTopology(
+        operatorContext(request),
+        requiredParam(request, 'runId'),
+        topologyRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/runs/:runId/alerts', async (request, reply) => {
+    try {
+      return await queries.listRunAlerts(
+        operatorContext(request),
+        requiredParam(request, 'runId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/runs/:runId/events', async (request, reply) => {
+    try {
+      return await queries.listRunEvents(
+        operatorContext(request),
+        requiredParam(request, 'runId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
   app.get(
     '/api/v1/operator/runs/:runId/instantiations',
     async (request, reply) => {
@@ -326,17 +379,21 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get('/api/v1/operator/artifacts/:artifactId', async (request, reply) => {
-    try {
-      return await queries.readArtifact(
-        operatorContext(request),
-        requiredParam(request, 'artifactId'),
-        artifactByteLimit(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/runs/:runId/artifacts/:artifactId',
+    async (request, reply) => {
+      try {
+        return await queries.readRunArtifact(
+          operatorContext(request),
+          requiredParam(request, 'runId'),
+          requiredParam(request, 'artifactId'),
+          artifactByteLimit(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
   app.get('/api/v1/operator/approvals', async (request, reply) => {
     try {
