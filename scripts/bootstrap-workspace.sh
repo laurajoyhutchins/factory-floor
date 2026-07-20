@@ -107,12 +107,14 @@ install_dependencies() {
 }
 
 apply_durable_result_handoff_patch() {
-  local patcher="$ROOT_DIR/scripts/patch-durable-result-handoff.py"
-  [[ -f "$patcher" ]] || return 0
+  local patcher
+  [[ -f "$ROOT_DIR/scripts/patch-result-handoff-database.py" ]] || return 0
 
   log "Applying the branch-scoped durable result handoff patch"
   cd "$ROOT_DIR"
-  "$PYTHON_BIN" "$patcher"
+  for patcher in "$ROOT_DIR"/scripts/patch-result-handoff-*.py; do
+    "$PYTHON_BIN" "$patcher"
+  done
   pnpm exec prettier --write \
     packages/db/src/database.ts \
     packages/db/src/migrations/zzzzzzzz_20260720_worker_result_submission_commit.ts \
