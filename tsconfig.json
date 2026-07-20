@@ -33,6 +33,9 @@
     },
     {
       "path": "workers/demo-ts"
+    },
+    {
+      "path": "workers/repository-task-ts"
     }
   ]
 }
