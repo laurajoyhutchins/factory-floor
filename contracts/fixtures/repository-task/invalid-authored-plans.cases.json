@@ -9,10 +9,26 @@
       "expectedCode": "schema.unknown-field"
     },
     {
+      "id": "unsupported-schema-version",
+      "mutation": {
+        "path": "/schemaVersion",
+        "value": 2
+      },
+      "expectedCode": "schema.invalid"
+    },
+    {
       "id": "unsafe-path",
       "mutation": {
         "path": "/allowedPaths",
         "value": ["../outside/**"]
+      },
+      "expectedCode": "path.unsafe"
+    },
+    {
+      "id": "ambiguous-relative-path",
+      "mutation": {
+        "path": "/allowedPaths",
+        "value": ["./packages/example/src/**"]
       },
       "expectedCode": "path.unsafe"
     },
@@ -55,6 +71,14 @@
         "value": 1
       },
       "expectedCode": "resource.max-files-exceeded"
+    },
+    {
+      "id": "oversized-patch-budget",
+      "mutation": {
+        "path": "/resourceBounds/maxPatchBytes",
+        "value": 10485761
+      },
+      "expectedCode": "schema.invalid"
     },
     {
       "id": "unsupported-recipe-version",
