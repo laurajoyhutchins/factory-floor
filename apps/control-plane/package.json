@@ -7,7 +7,9 @@
   "main": "dist/server.js",
   "types": "dist/app.d.ts",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "build": "tsc -b tsconfig.build.json --pretty false --force",
+    "start": "node dist/server.js",
+    "dev": "node ../../scripts/run-package-entrypoint.mjs tsx watch src/server.ts -- node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --pretty false",
     "test": "vitest run --root ../.. apps/control-plane",
     "artifacts:reconcile": "tsx src/maintenance/artifacts-reconcile.ts --dry-run"

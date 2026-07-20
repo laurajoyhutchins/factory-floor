@@ -15,6 +15,7 @@ This directory contains the authoritative, reader-facing documentation for Facto
 
 - [Set up a reproducible development environment](how-to/development-environment.md)
 - [Run and inspect the investigation](how-to/run-investigation.md)
+- [Run Factory Floor headlessly](how-to/run-headless-production.md)
 - [Inspect the runtime with the operator console](how-to/inspect-with-operator-console.md)
 - [Audit the repository before public release](how-to/publication-audit.md)
 

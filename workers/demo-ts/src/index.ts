@@ -156,32 +156,148 @@ export function createDemoRegistry(): ComponentRegistry {
   return registry;
 }
 
-export async function startDemoWorkerFromEnv(): Promise<void> {
-  const baseUrl =
-    process.env.FACTORY_FLOOR_WORKER_BASE_URL ?? 'http://localhost:3000';
-  const bearerToken = process.env.FACTORY_FLOOR_WORKER_TOKEN ?? '';
-  if (bearerToken.length === 0)
-    throw new Error('FACTORY_FLOOR_WORKER_TOKEN is required');
-  const workerId = process.env.FACTORY_FLOOR_WORKER_ID ?? 'demo-ts-worker';
+export interface DemoWorkerConfig {
+  baseUrl: string;
+  bearerToken: string;
+  workerId: string;
+  concurrency: number;
+}
+
+export interface DemoWorkerSignalSource {
+  once(signal: NodeJS.Signals, listener: () => void): unknown;
+  off(signal: NodeJS.Signals, listener: () => void): unknown;
+}
+
+export interface DemoWorkerProcessOptions {
+  env?: Record<string, string | undefined>;
+  signalSource?: DemoWorkerSignalSource;
+  createClient?: (config: DemoWorkerConfig) => WorkerProtocolClient;
+  createRunner?: (options: {
+    client: WorkerProtocolClient;
+    registry: ComponentRegistry;
+    concurrency: number;
+  }) => WorkerRunner;
+}
+
+function required(
+  env: Record<string, string | undefined>,
+  name: string,
+): string {
+  const value = env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function workerBaseUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(
+      'FACTORY_FLOOR_WORKER_BASE_URL must be a valid http or https URL',
+    );
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol))
+    throw new Error(
+      'FACTORY_FLOOR_WORKER_BASE_URL must be a valid http or https URL',
+    );
+  if (parsed.username || parsed.password)
+    throw new Error(
+      'FACTORY_FLOOR_WORKER_BASE_URL must not contain credentials',
+    );
+  return parsed.href.endsWith('/') ? parsed.href.slice(0, -1) : parsed.href;
+}
+
+export function loadDemoWorkerConfig(
+  env: Record<string, string | undefined>,
+): DemoWorkerConfig {
   const concurrency = Number(
-    process.env.FACTORY_FLOOR_WORKER_CONCURRENCY ?? '1',
+    env.FACTORY_FLOOR_WORKER_CONCURRENCY?.trim() ?? '1',
   );
-  const client = new WorkerProtocolClient({
-    baseUrl,
-    bearerToken,
-    workerId,
+  if (!Number.isInteger(concurrency) || concurrency < 1)
+    throw new Error(
+      'FACTORY_FLOOR_WORKER_CONCURRENCY must be a positive integer',
+    );
+  return {
+    baseUrl: workerBaseUrl(required(env, 'FACTORY_FLOOR_WORKER_BASE_URL')),
+    bearerToken: required(env, 'FACTORY_FLOOR_WORKER_TOKEN'),
+    workerId: required(env, 'FACTORY_FLOOR_WORKER_ID'),
+    concurrency,
+  };
+}
+
+export function createShutdownFencedClient(
+  client: WorkerProtocolClient,
+  isStopping: () => boolean,
+): WorkerProtocolClient {
+  return new Proxy(client, {
+    get(target, property, receiver) {
+      if (property === 'claim')
+        return async (
+          ...args: Parameters<WorkerProtocolClient['claim']>
+        ): ReturnType<WorkerProtocolClient['claim']> => {
+          if (isStopping())
+            return {
+              protocolVersion: '1.0',
+              claimed: false,
+              retryAfterMs: 0,
+            };
+          return target.claim(...args);
+        };
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
   });
-  const runner = new WorkerRunner({
+}
+
+export async function startDemoWorkerFromEnv(
+  options: DemoWorkerProcessOptions = {},
+): Promise<void> {
+  const config = loadDemoWorkerConfig(options.env ?? process.env);
+  const signalSource = options.signalSource ?? process;
+  let stopping = false;
+  const rawClient = (
+    options.createClient ??
+    ((workerConfig) =>
+      new WorkerProtocolClient({
+        baseUrl: workerConfig.baseUrl,
+        bearerToken: workerConfig.bearerToken,
+        workerId: workerConfig.workerId,
+      }))
+  )(config);
+  const client = createShutdownFencedClient(rawClient, () => stopping);
+  const runner = (
+    options.createRunner ??
+    ((runnerOptions) =>
+      new WorkerRunner({
+        ...runnerOptions,
+        logger: (event, fields) =>
+          console.log(JSON.stringify({ event, ...fields })),
+      }))
+  )({
     client,
     registry: createDemoRegistry(),
-    concurrency,
-    logger: (event, fields) =>
-      console.log(JSON.stringify({ event, ...fields })),
+    concurrency: config.concurrency,
   });
-  runner.installSignalHandlers();
-  await runner.run();
+  const stop = () => {
+    stopping = true;
+    runner.stop();
+  };
+
+  signalSource.once('SIGINT', stop);
+  signalSource.once('SIGTERM', stop);
+  try {
+    await runner.run();
+  } finally {
+    stopping = true;
+    signalSource.off('SIGINT', stop);
+    signalSource.off('SIGTERM', stop);
+  }
 }
 
 const entrypoint = process.argv[1];
 if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href)
-  void startDemoWorkerFromEnv();
+  void startDemoWorkerFromEnv().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
