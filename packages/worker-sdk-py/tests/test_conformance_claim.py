@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -59,9 +60,7 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
             return httpx.Response(
                 response.get("status", 200), content=response["rawBody"].encode()
             )
-        return httpx.Response(
-            response.get("status", 200), json=response_body(case)
-        )
+        return httpx.Response(response.get("status", 200), json=response_body(case))
 
     worker = WorkerClient(
         WorkerClientConfig(
@@ -71,7 +70,7 @@ async def run_claim_case(case: dict[str, Any]) -> dict[str, Any]:
             transport=httpx.MockTransport(handler),
             base_url="http://conformance.local",
         ),
-        sleep=lambda _delay: None,
+        sleep=lambda _delay: asyncio.sleep(0),
         rand=lambda: 0,
     )
 
