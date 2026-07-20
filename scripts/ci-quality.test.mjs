@@ -112,7 +112,7 @@ describe('CI stage metrics', () => {
 });
 
 describe('CI metrics summary', () => {
-  it('aggregates stage metrics and JUnit totals into JSON and Markdown', () => {
+  it('aggregates stage metrics and JUnit totals by required layer', () => {
     const directory = makeTemporaryDirectory();
     const metricsDirectory = join(directory, 'metrics');
     const testsDirectory = join(directory, 'tests');
@@ -132,12 +132,16 @@ describe('CI metrics summary', () => {
       })}\n`,
     );
     writeFileSync(
-      join(testsDirectory, 'vitest.xml'),
+      join(testsDirectory, 'vitest-unit.xml'),
       '<testsuites tests="3" failures="1" errors="0" skipped="1" time="1.5"></testsuites>',
     );
     writeFileSync(
-      join(testsDirectory, 'pytest.xml'),
-      '<testsuites name="pytest tests"><testsuite tests="2" failures="0" errors="1" skipped="0" time="0.5"></testsuite></testsuites>',
+      join(testsDirectory, 'worker-sdk-py.xml'),
+      '<testsuites tests="1" failures="0" errors="1" skipped="0" time="0.25"></testsuites>',
+    );
+    writeFileSync(
+      join(testsDirectory, 'demo-py.xml'),
+      '<testsuites tests="1" failures="0" errors="0" skipped="0" time="0.25"></testsuites>',
     );
 
     const result = runNode([
@@ -152,9 +156,9 @@ describe('CI metrics summary', () => {
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('| unit | passed | 1.25 |');
-    expect(result.stdout).toContain('| Tests | 5 |');
+    expect(result.stdout).toContain('| unit-ts | 1 | 3 | 1 | 0 | 1 | 1.5 |');
     expect(JSON.parse(readFileSync(output, 'utf8'))).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       stages: [
         {
           stage: 'unit',
@@ -163,12 +167,22 @@ describe('CI metrics summary', () => {
         },
       ],
       tests: {
-        files: 2,
+        files: 3,
         tests: 5,
         failures: 1,
         errors: 1,
         skipped: 1,
         durationSeconds: 2,
+        layers: [
+          { layer: 'python-demo', files: 1, tests: 1 },
+          { layer: 'python-worker-sdk', files: 1, tests: 1 },
+          { layer: 'unit-ts', files: 1, tests: 3 },
+        ],
+      },
+      validation: {
+        duplicateTests: [],
+        missingLayers: [],
+        zeroTestLayers: [],
       },
     });
   });
