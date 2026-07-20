@@ -134,7 +134,9 @@ function invalidInput(message: string): RepositoryTaskCompilerResult {
   };
 }
 
-function payload(context: WorkerExecutionContext): RepositoryTaskPayload | null {
+function payload(
+  context: WorkerExecutionContext,
+): RepositoryTaskPayload | null {
   const input = context.envelope.inputs.find(
     (candidate) => candidate.portName === 'task',
   )?.payload;
@@ -196,7 +198,9 @@ export function createRepositoryTaskCompiler(): RepositoryTaskCompiler {
           diagnostics: parsed.diagnostics,
         };
       }
-      const normalized = modules.normalizeRepositoryTaskPlan(parsed.authoredPlan);
+      const normalized = modules.normalizeRepositoryTaskPlan(
+        parsed.authoredPlan,
+      );
       if (!normalized.normalizedPlan || normalized.diagnostics.length > 0) {
         return {
           authoredPlan: parsed.authoredPlan,
@@ -343,10 +347,7 @@ export function createRepositoryTaskRegistry(
   return registry;
 }
 
-function required(
-  env: NodeJS.ProcessEnv,
-  name: string,
-): string {
+function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
@@ -403,7 +404,8 @@ export async function startRepositoryTaskWorkerFromEnv(
       verificationProfiles: factoryFloorVerificationProfiles(),
     }),
     concurrency: positiveInteger(env.FACTORY_FLOOR_WORKER_CONCURRENCY, 1),
-    logger: (event, fields) => console.log(JSON.stringify({ event, ...fields })),
+    logger: (event, fields) =>
+      console.log(JSON.stringify({ event, ...fields })),
   });
   runner.installSignalHandlers();
   await runner.run();
