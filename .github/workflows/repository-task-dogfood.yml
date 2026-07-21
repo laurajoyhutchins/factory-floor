@@ -31,6 +31,11 @@ jobs:
       - name: Apply deterministic ordinary-source corrections
         run: python .github/scripts/runtime_finalize_repository_task.py
 
+      - name: Keep workflow scaffolding out of the product commit
+        run: |
+          git restore --source=HEAD -- .github/workflows/repository-task-dogfood.yml .github/scripts/runtime_finalize_repository_task.py
+          git status --short
+
       - name: Bootstrap workspace
         run: bash scripts/bootstrap-workspace.sh
 
@@ -44,6 +49,6 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add workers/repository-task-ts/src/index.ts workers/repository-task-ts/test/index.test.ts examples/repository-task/run-dogfood.ts
           git commit -m 'fix(repository-task): retain schema-distinct failure artifacts'
           git push origin HEAD:feat/repository-task-worker
