@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import {
@@ -22,6 +23,64 @@ import type {
   StagedArtifact,
 } from '@factory-floor/contracts-ts';
 
+const repositoryTaskSchemaKeys = [
+  'repository-task-authored-plan.v1',
+  'repository-task-normalized-plan.v1',
+  'repository-task-generation-graph.v1',
+  'repository-task-patch.v1',
+  'repository-task-evidence.v1',
+  'repository-task-diagnostics.v1',
+  'repository-task-disposition.v1',
+] as const;
+
+export type RepositoryTaskSchemaKey = (typeof repositoryTaskSchemaKeys)[number];
+
+export interface RepositoryTaskArtifactSchemaMetadata {
+  schemaId: string;
+  schemaDigest: string;
+}
+
+export type RepositoryTaskSchemaMetadata = Record<
+  RepositoryTaskSchemaKey,
+  RepositoryTaskArtifactSchemaMetadata
+>;
+
+export interface RepositoryTaskRepositoryIdentity {
+  repository: {
+    owner: string;
+    name: string;
+  };
+  baseRevision: string;
+  snapshotDigest: string;
+  dirtyStatePolicy: 'require-clean';
+}
+
+export type RepositoryTaskIdentityValidationPhase =
+  | 'before-execution'
+  | 'after-execution';
+
+export interface ValidatedRepositoryTaskIdentity
+  extends RepositoryTaskRepositoryIdentity {
+  phase: RepositoryTaskIdentityValidationPhase;
+  observedHeadRevision: string;
+  observedDirtyState: 'clean';
+}
+
+export interface RepositoryTaskIdentityValidationInput {
+  repositoryRoot: string;
+  identity: RepositoryTaskRepositoryIdentity;
+  repositorySnapshot: { files: Record<string, string> };
+  repositoryProfile: RepositoryTaskRepositoryProfile;
+  normalizedPlan: RepositoryTaskNormalizedPlan;
+  phase: RepositoryTaskIdentityValidationPhase;
+}
+
+export interface RepositoryTaskIdentityValidator {
+  validate(
+    input: RepositoryTaskIdentityValidationInput,
+  ): Promise<ValidatedRepositoryTaskIdentity>;
+}
+
 export interface RepositoryTaskDiagnostic {
   code: string;
   severity?: string;
@@ -33,6 +92,7 @@ export interface RepositoryTaskCompilerInput {
   authoredPlanMarkdown: string;
   repositoryProfile: RepositoryTaskRepositoryProfile;
   repositorySnapshot: { files: Record<string, string> };
+  repositoryIdentity: RepositoryTaskRepositoryIdentity;
 }
 
 export interface RepositoryTaskCompilerResult {
@@ -57,6 +117,8 @@ export interface RepositoryTaskExecutor {
 export interface RepositoryTaskWorkerDependencies {
   repositoryRoot: string;
   verificationProfiles: RepositoryTaskVerificationProfiles;
+  schemaMetadata: RepositoryTaskSchemaMetadata;
+  identityValidator?: RepositoryTaskIdentityValidator;
   compiler?: RepositoryTaskCompiler;
   executor?: RepositoryTaskExecutor;
 }
@@ -88,15 +150,159 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function schemaMetadata(schemaKey: string) {
-  const schemas = JSON.parse(
-    process.env.FACTORY_FLOOR_SCHEMA_DIGESTS ?? '{}',
-  ) as Record<string, { id: string; digest: string }>;
-  const schema = schemas[schemaKey];
+function required(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name];
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function isDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
+function authoritativeSchemaMetadata(
+  value: unknown,
+): RepositoryTaskSchemaMetadata {
+  if (!isObject(value)) {
+    throw new Error('FACTORY_FLOOR_SCHEMA_DIGESTS must be a JSON object');
+  }
+  const result = {} as RepositoryTaskSchemaMetadata;
+  for (const schemaKey of repositoryTaskSchemaKeys) {
+    const schema = value[schemaKey];
+    if (
+      !isObject(schema) ||
+      typeof schema.id !== 'string' ||
+      schema.id.length === 0 ||
+      !isDigest(schema.digest)
+    ) {
+      throw new Error(
+        `FACTORY_FLOOR_SCHEMA_DIGESTS is missing authoritative metadata for ${schemaKey}`,
+      );
+    }
+    result[schemaKey] = {
+      schemaId: schema.id,
+      schemaDigest: schema.digest,
+    };
+  }
+  return result;
+}
+
+function validateInjectedSchemaMetadata(
+  value: RepositoryTaskSchemaMetadata,
+): RepositoryTaskSchemaMetadata {
+  const registrationShape = Object.fromEntries(
+    repositoryTaskSchemaKeys.map((key) => [
+      key,
+      {
+        id: value[key]?.schemaId,
+        digest: value[key]?.schemaDigest,
+      },
+    ]),
+  );
+  return authoritativeSchemaMetadata(registrationShape);
+}
+
+export function repositoryTaskSchemaMetadataFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): RepositoryTaskSchemaMetadata {
+  const raw = required(env, 'FACTORY_FLOOR_SCHEMA_DIGESTS');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `FACTORY_FLOOR_SCHEMA_DIGESTS must contain valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return authoritativeSchemaMetadata(parsed);
+}
+
+export function repositoryTaskSnapshotDigest(snapshot: {
+  files: Record<string, string>;
+}): string {
+  const canonicalFiles = Object.keys(snapshot.files)
+    .sort()
+    .map((path) => [path, snapshot.files[path]] as const);
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalFiles), 'utf8')
+    .digest('hex');
+}
+
+function repositoryIdentityDiagnostic(error: unknown): RepositoryTaskDiagnostic {
   return {
-    schemaId: schema?.id ?? schemaKey,
-    schemaDigest:
-      schema?.digest ?? createHash('sha256').update(schemaKey).digest('hex'),
+    code: 'worker.repository-identity-mismatch',
+    severity: 'error',
+    path: '/inputs/task/repositoryIdentity',
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+function assertIdentityMatchesInvocation(
+  input: RepositoryTaskIdentityValidationInput,
+): void {
+  const { identity, repositoryProfile, normalizedPlan, repositorySnapshot } =
+    input;
+  if (
+    identity.repository.owner !== repositoryProfile.repository.owner ||
+    identity.repository.name !== repositoryProfile.repository.name ||
+    identity.repository.owner !== normalizedPlan.repository.owner ||
+    identity.repository.name !== normalizedPlan.repository.name
+  ) {
+    throw new Error(
+      'Repository identity does not match the repository profile and normalized plan.',
+    );
+  }
+  if (identity.baseRevision !== normalizedPlan.repository.baseRevision) {
+    throw new Error(
+      'Repository base revision does not match the normalized plan base revision.',
+    );
+  }
+  const observedSnapshotDigest = repositoryTaskSnapshotDigest(repositorySnapshot);
+  if (identity.snapshotDigest !== observedSnapshotDigest) {
+    throw new Error(
+      `Repository snapshot digest mismatch: expected ${identity.snapshotDigest}, observed ${observedSnapshotDigest}.`,
+    );
+  }
+  if (identity.dirtyStatePolicy !== 'require-clean') {
+    throw new Error('Repository dirty-state policy must require a clean worktree.');
+  }
+}
+
+export function createRepositoryTaskIdentityValidator(): RepositoryTaskIdentityValidator {
+  return {
+    async validate(input) {
+      assertIdentityMatchesInvocation(input);
+      const observedHeadRevision = execFileSync(
+        'git',
+        ['-C', input.repositoryRoot, 'rev-parse', 'HEAD'],
+        { encoding: 'utf8' },
+      ).trim();
+      if (observedHeadRevision !== input.identity.baseRevision) {
+        throw new Error(
+          `Repository HEAD mismatch: expected ${input.identity.baseRevision}, observed ${observedHeadRevision}.`,
+        );
+      }
+      const status = execFileSync(
+        'git',
+        [
+          '-C',
+          input.repositoryRoot,
+          'status',
+          '--porcelain=v1',
+          '--untracked-files=all',
+        ],
+        { encoding: 'utf8' },
+      ).trim();
+      if (status.length > 0) {
+        throw new Error('Repository worktree is not clean.');
+      }
+      return {
+        ...input.identity,
+        phase: input.phase,
+        observedHeadRevision,
+        observedDirtyState: 'clean',
+      };
+    },
   };
 }
 
@@ -134,6 +340,20 @@ function invalidInput(message: string): RepositoryTaskCompilerResult {
   };
 }
 
+function isRepositoryIdentity(
+  value: unknown,
+): value is RepositoryTaskRepositoryIdentity {
+  return (
+    isObject(value) &&
+    isObject(value.repository) &&
+    typeof value.repository.owner === 'string' &&
+    typeof value.repository.name === 'string' &&
+    typeof value.baseRevision === 'string' &&
+    isDigest(value.snapshotDigest) &&
+    value.dirtyStatePolicy === 'require-clean'
+  );
+}
+
 function payload(
   context: WorkerExecutionContext,
 ): RepositoryTaskPayload | null {
@@ -148,7 +368,8 @@ function payload(
     !isObject(input.repositorySnapshot.files) ||
     !Object.values(input.repositorySnapshot.files).every(
       (value) => typeof value === 'string',
-    )
+    ) ||
+    !isRepositoryIdentity(input.repositoryIdentity)
   ) {
     return null;
   }
@@ -232,6 +453,7 @@ export function createRepositoryTaskExecutor(): RepositoryTaskExecutor {
 
 async function stageArtifacts(
   context: WorkerExecutionContext,
+  schemaMetadata: RepositoryTaskSchemaMetadata,
   values: {
     authoredPlan: unknown;
     normalizedPlan: unknown;
@@ -262,23 +484,62 @@ async function stageArtifacts(
   const artifacts: StagedArtifact[] = [];
   for (const [portName, value, schemaKey] of entries) {
     artifacts.push(
-      await context.stageJson(portName, value, schemaMetadata(schemaKey)),
+      await context.stageJson(portName, value, schemaMetadata[schemaKey]),
     );
   }
   return artifacts;
 }
 
+async function failedResult(
+  context: WorkerExecutionContext,
+  schemaMetadata: RepositoryTaskSchemaMetadata,
+  task: RepositoryTaskPayload | null,
+  compiled: RepositoryTaskCompilerResult,
+  phase: 'compile' | 'verify',
+  diagnostics: RepositoryTaskDiagnostic[],
+  repositoryIdentity?: {
+    beforeExecution?: ValidatedRepositoryTaskIdentity;
+  },
+): Promise<ProposedResult> {
+  const disposition = {
+    status: 'failed',
+    phase,
+    ...(repositoryIdentity === undefined ? {} : { repositoryIdentity }),
+    diagnostics,
+  };
+  const artifacts = await stageArtifacts(context, schemaMetadata, {
+    authoredPlan: compiled.authoredPlan ?? {
+      markdown: task?.authoredPlanMarkdown ?? null,
+    },
+    normalizedPlan: compiled.normalizedPlan,
+    generationGraph: compiled.generationGraph,
+    patch: { patch: '', patchDigest: null },
+    evidence:
+      repositoryIdentity === undefined
+        ? null
+        : { repositoryIdentity, diagnostics },
+    diagnostics,
+    disposition,
+  });
+  return completed(context, artifacts);
+}
+
 export function createRepositoryTaskComponent(
   dependencies: RepositoryTaskWorkerDependencies,
 ): WorkerComponent {
+  const schemaMetadata = validateInjectedSchemaMetadata(
+    dependencies.schemaMetadata,
+  );
   const compiler = dependencies.compiler ?? createRepositoryTaskCompiler();
   const executor = dependencies.executor ?? createRepositoryTaskExecutor();
+  const identityValidator =
+    dependencies.identityValidator ?? createRepositoryTaskIdentityValidator();
   return async (context) => {
     const task = payload(context);
     const compiled = task
       ? await compiler.compile(task)
       : invalidInput(
-          'The task input must include authoredPlanMarkdown, repositoryProfile, and a string-valued repositorySnapshot.files map.',
+          'The task input must include authoredPlanMarkdown, repositoryProfile, repositorySnapshot.files, and a fail-closed repositoryIdentity.',
         );
     if (
       !task ||
@@ -287,23 +548,35 @@ export function createRepositoryTaskComponent(
       !compiled.normalizedPlan ||
       !compiled.generationGraph
     ) {
-      const disposition = {
-        status: 'failed',
-        phase: 'compile',
-        diagnostics: compiled.diagnostics,
-      };
-      const artifacts = await stageArtifacts(context, {
-        authoredPlan: compiled.authoredPlan ?? {
-          markdown: task?.authoredPlanMarkdown ?? null,
-        },
+      return failedResult(
+        context,
+        schemaMetadata,
+        task,
+        compiled,
+        'compile',
+        compiled.diagnostics,
+      );
+    }
+
+    let beforeExecution: ValidatedRepositoryTaskIdentity;
+    try {
+      beforeExecution = await identityValidator.validate({
+        repositoryRoot: dependencies.repositoryRoot,
+        identity: task.repositoryIdentity,
+        repositorySnapshot: task.repositorySnapshot,
+        repositoryProfile: task.repositoryProfile,
         normalizedPlan: compiled.normalizedPlan,
-        generationGraph: compiled.generationGraph,
-        patch: { patch: '', patchDigest: null },
-        evidence: null,
-        diagnostics: compiled.diagnostics,
-        disposition,
+        phase: 'before-execution',
       });
-      return completed(context, artifacts);
+    } catch (error) {
+      return failedResult(
+        context,
+        schemaMetadata,
+        task,
+        compiled,
+        'verify',
+        [repositoryIdentityDiagnostic(error)],
+      );
     }
 
     const execution = await executor.execute({
@@ -313,14 +586,43 @@ export function createRepositoryTaskComponent(
       generationGraph: compiled.generationGraph,
       verificationProfiles: dependencies.verificationProfiles,
     });
+
+    let afterExecution: ValidatedRepositoryTaskIdentity;
+    try {
+      afterExecution = await identityValidator.validate({
+        repositoryRoot: dependencies.repositoryRoot,
+        identity: task.repositoryIdentity,
+        repositorySnapshot: task.repositorySnapshot,
+        repositoryProfile: task.repositoryProfile,
+        normalizedPlan: compiled.normalizedPlan,
+        phase: 'after-execution',
+      });
+    } catch (error) {
+      return failedResult(
+        context,
+        schemaMetadata,
+        task,
+        compiled,
+        'verify',
+        [repositoryIdentityDiagnostic(error)],
+        { beforeExecution },
+      );
+    }
+
+    const repositoryIdentity = { beforeExecution, afterExecution };
+    const evidence = {
+      ...execution.evidence,
+      repositoryIdentity,
+    };
     const disposition = {
       status: execution.status,
       phase: execution.status === 'succeeded' ? 'complete' : 'verify',
       evidenceId: execution.evidence.evidenceId,
       patchDigest: execution.evidence.patchDigest,
+      repositoryIdentity,
       diagnostics: execution.evidence.diagnostics,
     };
-    const artifacts = await stageArtifacts(context, {
+    const artifacts = await stageArtifacts(context, schemaMetadata, {
       authoredPlan: compiled.authoredPlan,
       normalizedPlan: compiled.normalizedPlan,
       generationGraph: compiled.generationGraph,
@@ -328,7 +630,7 @@ export function createRepositoryTaskComponent(
         patch: execution.patch,
         patchDigest: execution.evidence.patchDigest,
       },
-      evidence: execution.evidence,
+      evidence,
       diagnostics: execution.evidence.diagnostics,
       disposition,
     });
@@ -346,12 +648,6 @@ export function createRepositoryTaskRegistry(
     createRepositoryTaskComponent(dependencies),
   );
   return registry;
-}
-
-function required(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }
 
 function positiveInteger(value: string | undefined, fallback: number): number {
@@ -403,6 +699,7 @@ export async function startRepositoryTaskWorkerFromEnv(
     registry: createRepositoryTaskRegistry({
       repositoryRoot: required(env, 'FACTORY_FLOOR_REPOSITORY_ROOT'),
       verificationProfiles: factoryFloorVerificationProfiles(),
+      schemaMetadata: repositoryTaskSchemaMetadataFromEnv(env),
     }),
     concurrency: positiveInteger(env.FACTORY_FLOOR_WORKER_CONCURRENCY, 1),
     logger: (event, fields) =>
