@@ -1,3 +1,4 @@
+# Requeued by Runtime Engineering after exact-head dogfood diagnosis.
 name: Runtime one-shot dogfood patch
 
 on:
