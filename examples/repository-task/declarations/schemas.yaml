@@ -6,7 +6,11 @@ spec:
     $schema: https://json-schema.org/draft/2020-12/schema
     type: object
     additionalProperties: false
-    required: [authoredPlanMarkdown, repositoryProfile, repositorySnapshot]
+    required:
+      - authoredPlanMarkdown
+      - repositoryProfile
+      - repositorySnapshot
+      - repositoryIdentity
     properties:
       authoredPlanMarkdown: { type: string, minLength: 1 }
       repositoryProfile: { type: object, additionalProperties: true }
@@ -18,6 +22,25 @@ spec:
           files:
             type: object
             additionalProperties: { type: string }
+      repositoryIdentity:
+        type: object
+        additionalProperties: false
+        required:
+          - repository
+          - baseRevision
+          - snapshotDigest
+          - dirtyStatePolicy
+        properties:
+          repository:
+            type: object
+            additionalProperties: false
+            required: [owner, name]
+            properties:
+              owner: { type: string, minLength: 1 }
+              name: { type: string, minLength: 1 }
+          baseRevision: { type: string, minLength: 1 }
+          snapshotDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+          dirtyStatePolicy: { const: require-clean }
 ---
 apiVersion: factory-floor.dev/v1alpha1
 kind: ArtifactSchema
