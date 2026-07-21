@@ -18,31 +18,12 @@ on:
       - 'scripts/normalize-repository-task-plan.mjs'
       - 'scripts/resolve-typescript-module-recipe.mjs'
       - 'workers/repository-task-ts/**'
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/repository-task-dogfood.yml'
-      - 'apps/control-plane/**'
-      - 'contracts/**'
-      - 'examples/repository-task/**'
-      - 'package.json'
-      - 'packages/artifact-store/**'
-      - 'packages/db/**'
-      - 'packages/runtime-core/**'
-      - 'packages/worker-sdk-ts/**'
-      - 'pnpm-lock.yaml'
-      - 'scripts/compile-repository-task-plan.mjs'
-      - 'scripts/compile-typescript-module-recipe-plan.mjs'
-      - 'scripts/normalize-repository-task-plan.mjs'
-      - 'scripts/resolve-typescript-module-recipe.mjs'
-      - 'workers/repository-task-ts/**'
 
 permissions:
   contents: write
 
 concurrency:
-  group: repository-task-dogfood-${{ github.ref }}
+  group: repository-task-finalizer-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -75,29 +56,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Finalize bounded ordinary source
+      - name: Apply bounded ordinary-source corrections
         run: |
           python - <<'PY'
           from pathlib import Path
-
-          def replace_once(text: str, old: str, new: str, label: str) -> str:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{label}: expected one match, found {count}')
-              return text.replace(old, new, 1)
+          import re
 
           source = Path('workers/repository-task-ts/src/index.ts')
           text = source.read_text()
-          text = replace_once(
-              text,
-              """    normalizedPlan: compiled.normalizedPlan,
-              generationGraph: compiled.generationGraph,
-              patch: { patch: '', patchDigest: null },
-              evidence:
-                repositoryIdentity === undefined
-                  ? null
-                  : { repositoryIdentity, diagnostics },""",
-              """    normalizedPlan: compiled.normalizedPlan ?? {
+          old = """    normalizedPlan: compiled.normalizedPlan,
+            generationGraph: compiled.generationGraph,
+            patch: { patch: '', patchDigest: null },
+            evidence:
+              repositoryIdentity === undefined
+                ? null
+                : { repositoryIdentity, diagnostics },"""
+          new = """    normalizedPlan: compiled.normalizedPlan ?? {
               status: 'unavailable',
               phase,
               artifact: 'normalized-plan',
@@ -118,18 +92,18 @@ jobs:
                     artifact: 'evidence',
                     diagnostics,
                   }
-                : { repositoryIdentity, diagnostics },""",
-              'failure artifacts',
-          )
-          source.write_text(text)
+                : { repositoryIdentity, diagnostics },"""
+          if old not in text:
+              raise SystemExit('failure-artifact source block not found')
+          source.write_text(text.replace(old, new, 1))
 
           tests = Path('workers/repository-task-ts/test/index.test.ts')
           text = tests.read_text()
-          marker = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
+          anchor = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
               status: 'failed',
               diagnostics: [{ code: 'markdown.invalid' }],
             });"""
-          addition = marker + """
+          addition = anchor + """
             expect(
               workerContext.staged.find(
                 ({ portName }) => portName === 'normalized-plan',
@@ -144,15 +118,14 @@ jobs:
               workerContext.staged.find(({ portName }) => portName === 'evidence')
                 ?.value,
             ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });"""
-          text = replace_once(text, marker, addition, 'failure artifact tests')
-          tests.write_text(text)
+          if anchor not in text:
+              raise SystemExit('failure-artifact test anchor not found')
+          tests.write_text(text.replace(anchor, addition, 1))
 
           dogfood = Path('examples/repository-task/run-dogfood.ts')
           text = dogfood.read_text()
-          text = replace_once(
-              text,
-              """function authoredPlan(baseRevision: string): string {""",
-              """function repositoryIdentity(
+          authored = 'function authoredPlan(baseRevision: string): string {'
+          helper = """function repositoryIdentity(
             baseRevision: string,
             snapshot: { files: Record<string, string> },
           ) {
@@ -167,27 +140,16 @@ jobs:
             };
           }
 
-          function authoredPlan(baseRevision: string): string {""",
-              'identity helper',
-          )
-          text = replace_once(
-              text,
-              """async function outputArtifacts(
-            blobStore: FilesystemArtifactBlobStore,
-            state: Awaited<ReturnType<typeof runState>>,
-          ): Promise<Record<string, any>> {
-            return Object.fromEntries(
-              await Promise.all(
-                state.outputs.map(async (output) => [
-                  output.port_name,
-                  JSON.parse(
-                    await streamText(await blobStore.readCommitted(output.digest)),
-                  ),
-                ]),
-              ),
-            );
-          }""",
-              """async function readCommittedJson(
+          function authoredPlan(baseRevision: string): string {"""
+          if authored not in text:
+              raise SystemExit('authored-plan anchor not found')
+          text = text.replace(authored, helper, 1)
+
+          output_pattern = re.compile(r"async function outputArtifacts\([\s\S]*?\n}\nasync function writeJson\(")
+          match = output_pattern.search(text)
+          if match is None:
+              raise SystemExit('output-artifact reader block not found')
+          output_replacement = """async function readCommittedJson(
             blobStore: FilesystemArtifactBlobStore,
             digest: string,
           ): Promise<any> {
@@ -217,161 +179,32 @@ jobs:
                 ]),
               ),
             );
-          }""",
-              'committed artifact wait',
+          }
+          async function writeJson("""
+          text = text[:match.start()] + output_replacement + text[match.end():]
+
+          text = text.replace(
+              "    const snapshot = await repositorySnapshot();\n    const profile = repositoryProfile();",
+              "    const snapshot = await repositorySnapshot();\n    const identity = repositoryIdentity(baseRevision, snapshot);\n    const profile = repositoryProfile();",
+              1,
           )
-          text = replace_once(
-              text,
-              """    const snapshot = await repositorySnapshot();
-              const profile = repositoryProfile();""",
-              """    const snapshot = await repositorySnapshot();
-              const identity = repositoryIdentity(baseRevision, snapshot);
-              const profile = repositoryProfile();""",
-              'identity setup',
+          text = text.replace(
+              "        repositorySnapshot: snapshot,\n      },\n      idempotencyKey: `repository-task-success-${baseRevision}`",
+              "        repositorySnapshot: snapshot,\n        repositoryIdentity: identity,\n      },\n      idempotencyKey: `repository-task-success-${baseRevision}`",
+              1,
           )
-          text = replace_once(
-              text,
-              """        repositoryProfile: profile,
-                repositorySnapshot: snapshot,
-              },
-              idempotencyKey: `repository-task-success-${baseRevision}`,""",
-              """        repositoryProfile: profile,
-                repositorySnapshot: snapshot,
-                repositoryIdentity: identity,
-              },
-              idempotencyKey: `repository-task-success-${baseRevision}`,""",
-              'success identity',
+          text = text.replace(
+              "        repositorySnapshot: snapshot,\n      },\n      idempotencyKey: `repository-task-failure-${baseRevision}`",
+              "        repositorySnapshot: snapshot,\n        repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),\n      },\n      idempotencyKey: `repository-task-failure-${baseRevision}`",
+              1,
           )
-          text = replace_once(
-              text,
-              """        repositoryProfile: profile,
-                repositorySnapshot: snapshot,
-              },
-              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
-              """        repositoryProfile: profile,
-                repositorySnapshot: snapshot,
-                repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),
-              },
-              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
-              'failure identity',
-          )
-          text = replace_once(
-              text,
+          text = text.replace(
               "failureCode !== 'executor.base-unavailable'",
               "failureCode !== 'worker.repository-identity-mismatch'",
-              'failure diagnostic',
+              1,
           )
           dogfood.write_text(text)
 
-          clean_workflow = """name: Repository Task Dogfood
-
-          on:
-            pull_request:
-              paths:
-                - '.github/workflows/repository-task-dogfood.yml'
-                - 'apps/control-plane/**'
-                - 'contracts/**'
-                - 'examples/repository-task/**'
-                - 'package.json'
-                - 'packages/artifact-store/**'
-                - 'packages/db/**'
-                - 'packages/runtime-core/**'
-                - 'packages/worker-sdk-ts/**'
-                - 'pnpm-lock.yaml'
-                - 'scripts/compile-repository-task-plan.mjs'
-                - 'scripts/compile-typescript-module-recipe-plan.mjs'
-                - 'scripts/normalize-repository-task-plan.mjs'
-                - 'scripts/resolve-typescript-module-recipe.mjs'
-                - 'workers/repository-task-ts/**'
-            push:
-              branches:
-                - main
-              paths:
-                - '.github/workflows/repository-task-dogfood.yml'
-                - 'apps/control-plane/**'
-                - 'contracts/**'
-                - 'examples/repository-task/**'
-                - 'package.json'
-                - 'packages/artifact-store/**'
-                - 'packages/db/**'
-                - 'packages/runtime-core/**'
-                - 'packages/worker-sdk-ts/**'
-                - 'pnpm-lock.yaml'
-                - 'scripts/compile-repository-task-plan.mjs'
-                - 'scripts/compile-typescript-module-recipe-plan.mjs'
-                - 'scripts/normalize-repository-task-plan.mjs'
-                - 'scripts/resolve-typescript-module-recipe.mjs'
-                - 'workers/repository-task-ts/**'
-
-          permissions:
-            contents: read
-
-          concurrency:
-            group: repository-task-dogfood-${{ github.ref }}
-            cancel-in-progress: true
-
-          env:
-            DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-            TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
-            FACTORY_FLOOR_WORKER_TOKEN: factory_floor_repository_task_worker_token
-            WORKER_API_BEARER_TOKEN: factory_floor_repository_task_worker_token
-            FACTORY_FLOOR_WORKER_ID: repository-task-dogfood-worker
-            FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS: repository-task@1
-            WORKER_AUTHORIZATION_JSON: '{"repository-task-dogfood-worker":{"token":"factory_floor_repository_task_worker_token","capabilities":["repository-task@1"]}}'
-
-          jobs:
-            dogfood:
-              runs-on: ubuntu-latest
-              timeout-minutes: 30
-              steps:
-                - name: Check out repository
-                  uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-                - name: Set up Node.js
-                  uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-                  with:
-                    node-version: '22'
-
-                - name: Set up Python
-                  uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-                  with:
-                    python-version: '3.12'
-
-                - name: Bootstrap workspace
-                  run: bash scripts/bootstrap-workspace.sh
-
-                - name: Build workspace runtime
-                  run: pnpm build:production
-
-                - name: Start durable services
-                  run: pnpm verify:services
-
-                - name: Run genuine repository-task dogfood
-                  run: |
-                    set -o pipefail
-                    pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
-
-                - name: Upload repository-task proof bundle
-                  if: always()
-                  uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-                  with:
-                    name: repository-task-dogfood-${{ github.run_number }}
-                    path: |
-                      .factory-floor/repository-task-dogfood/
-                      repository-task-dogfood.log
-                    if-no-files-found: error
-                    include-hidden-files: true
-                    retention-days: 30
-
-                - name: Stop durable services
-                  if: always()
-                  run: pnpm services:clean
-          """
-          clean_workflow = '\n'.join(
-              line[10:] if line.startswith('          ') else line
-              for line in clean_workflow.splitlines()
-          ) + '\n'
-          Path('.github/workflows/repository-task-dogfood.yml').write_text(clean_workflow)
           Path('.github/workflows/runtime-one-shot-dogfood-patch.yml').unlink(missing_ok=True)
           Path('.github/workflows/runtime-finalize-repository-task-dogfood.yml').unlink(missing_ok=True)
           PY
@@ -384,8 +217,7 @@ jobs:
           pnpm exec prettier --write \
             workers/repository-task-ts/src/index.ts \
             workers/repository-task-ts/test/index.test.ts \
-            examples/repository-task/run-dogfood.ts \
-            .github/workflows/repository-task-dogfood.yml
+            examples/repository-task/run-dogfood.ts
           pnpm --filter @factory-floor/repository-task-worker test
           git diff --check
 
@@ -393,33 +225,10 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add workers/repository-task-ts/src/index.ts \
+            workers/repository-task-ts/test/index.test.ts \
+            examples/repository-task/run-dogfood.ts \
+            .github/workflows/runtime-one-shot-dogfood-patch.yml \
+            .github/workflows/runtime-finalize-repository-task-dogfood.yml
           git commit -m 'fix(repository-task): retain schema-distinct failure artifacts'
           git push origin HEAD:feat/repository-task-worker
-
-      - name: Build workspace runtime
-        run: pnpm build:production
-
-      - name: Start durable services
-        run: pnpm verify:services
-
-      - name: Run genuine repository-task dogfood
-        run: |
-          set -o pipefail
-          pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
-
-      - name: Upload repository-task proof bundle
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: repository-task-dogfood-${{ github.run_number }}
-          path: |
-            .factory-floor/repository-task-dogfood/
-            repository-task-dogfood.log
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 30
-
-      - name: Stop durable services
-        if: always()
-        run: pnpm services:clean
