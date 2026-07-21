@@ -39,7 +39,7 @@ on:
       - 'workers/repository-task-ts/**'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: repository-task-dogfood-${{ github.ref }}
@@ -59,18 +59,135 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out repository
+      - name: Check out repository branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/repository-task-worker
+          fetch-depth: 0
 
-      - name: Prepare bounded committed-artifact wait candidate
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Finalize bounded ordinary source
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path('examples/repository-task/run-dogfood.ts')
-          text = path.read_text()
-          start = text.index('async function outputArtifacts(')
-          end = text.index('\nasync function writeJson(', start)
-          replacement = '''async function readCommittedJson(
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              return text.replace(old, new, 1)
+
+          source = Path('workers/repository-task-ts/src/index.ts')
+          text = source.read_text()
+          text = replace_once(
+              text,
+              """    normalizedPlan: compiled.normalizedPlan,
+              generationGraph: compiled.generationGraph,
+              patch: { patch: '', patchDigest: null },
+              evidence:
+                repositoryIdentity === undefined
+                  ? null
+                  : { repositoryIdentity, diagnostics },""",
+              """    normalizedPlan: compiled.normalizedPlan ?? {
+              status: 'unavailable',
+              phase,
+              artifact: 'normalized-plan',
+              diagnostics,
+            },
+            generationGraph: compiled.generationGraph ?? {
+              status: 'unavailable',
+              phase,
+              artifact: 'generation-graph',
+              diagnostics,
+            },
+            patch: { patch: '', patchDigest: null },
+            evidence:
+              repositoryIdentity === undefined
+                ? {
+                    status: 'unavailable',
+                    phase,
+                    artifact: 'evidence',
+                    diagnostics,
+                  }
+                : { repositoryIdentity, diagnostics },""",
+              'failure artifacts',
+          )
+          source.write_text(text)
+
+          tests = Path('workers/repository-task-ts/test/index.test.ts')
+          text = tests.read_text()
+          marker = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
+              status: 'failed',
+              diagnostics: [{ code: 'markdown.invalid' }],
+            });"""
+          addition = marker + """
+            expect(
+              workerContext.staged.find(
+                ({ portName }) => portName === 'normalized-plan',
+              )?.value,
+            ).toMatchObject({ status: 'unavailable', artifact: 'normalized-plan' });
+            expect(
+              workerContext.staged.find(
+                ({ portName }) => portName === 'generation-graph',
+              )?.value,
+            ).toMatchObject({ status: 'unavailable', artifact: 'generation-graph' });
+            expect(
+              workerContext.staged.find(({ portName }) => portName === 'evidence')
+                ?.value,
+            ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });"""
+          text = replace_once(text, marker, addition, 'failure artifact tests')
+          tests.write_text(text)
+
+          dogfood = Path('examples/repository-task/run-dogfood.ts')
+          text = dogfood.read_text()
+          text = replace_once(
+              text,
+              """function authoredPlan(baseRevision: string): string {""",
+              """function repositoryIdentity(
+            baseRevision: string,
+            snapshot: { files: Record<string, string> },
+          ) {
+            const canonicalFiles = Object.keys(snapshot.files)
+              .sort()
+              .map((path) => [path, snapshot.files[path]] as const);
+            return {
+              repository: { owner: 'laurajoyhutchins', name: 'factory-floor' },
+              baseRevision,
+              snapshotDigest: sha256(JSON.stringify(canonicalFiles)),
+              dirtyStatePolicy: 'require-clean' as const,
+            };
+          }
+
+          function authoredPlan(baseRevision: string): string {""",
+              'identity helper',
+          )
+          text = replace_once(
+              text,
+              """async function outputArtifacts(
+            blobStore: FilesystemArtifactBlobStore,
+            state: Awaited<ReturnType<typeof runState>>,
+          ): Promise<Record<string, any>> {
+            return Object.fromEntries(
+              await Promise.all(
+                state.outputs.map(async (output) => [
+                  output.port_name,
+                  JSON.parse(
+                    await streamText(await blobStore.readCommitted(output.digest)),
+                  ),
+                ]),
+              ),
+            );
+          }""",
+              """async function readCommittedJson(
             blobStore: FilesystemArtifactBlobStore,
             digest: string,
           ): Promise<any> {
@@ -100,29 +217,185 @@ jobs:
                 ]),
               ),
             );
-          }'''
-          replacement = '\n'.join(
-              line[10:] if line.startswith('          ') else line
-              for line in replacement.splitlines()
+          }""",
+              'committed artifact wait',
           )
-          path.write_text(text[:start] + replacement + text[end:])
+          text = replace_once(
+              text,
+              """    const snapshot = await repositorySnapshot();
+              const profile = repositoryProfile();""",
+              """    const snapshot = await repositorySnapshot();
+              const identity = repositoryIdentity(baseRevision, snapshot);
+              const profile = repositoryProfile();""",
+              'identity setup',
+          )
+          text = replace_once(
+              text,
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+              },
+              idempotencyKey: `repository-task-success-${baseRevision}`,""",
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+                repositoryIdentity: identity,
+              },
+              idempotencyKey: `repository-task-success-${baseRevision}`,""",
+              'success identity',
+          )
+          text = replace_once(
+              text,
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+              },
+              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+                repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),
+              },
+              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
+              'failure identity',
+          )
+          text = replace_once(
+              text,
+              "failureCode !== 'executor.base-unavailable'",
+              "failureCode !== 'worker.repository-identity-mismatch'",
+              'failure diagnostic',
+          )
+          dogfood.write_text(text)
+
+          clean_workflow = """name: Repository Task Dogfood
+
+          on:
+            pull_request:
+              paths:
+                - '.github/workflows/repository-task-dogfood.yml'
+                - 'apps/control-plane/**'
+                - 'contracts/**'
+                - 'examples/repository-task/**'
+                - 'package.json'
+                - 'packages/artifact-store/**'
+                - 'packages/db/**'
+                - 'packages/runtime-core/**'
+                - 'packages/worker-sdk-ts/**'
+                - 'pnpm-lock.yaml'
+                - 'scripts/compile-repository-task-plan.mjs'
+                - 'scripts/compile-typescript-module-recipe-plan.mjs'
+                - 'scripts/normalize-repository-task-plan.mjs'
+                - 'scripts/resolve-typescript-module-recipe.mjs'
+                - 'workers/repository-task-ts/**'
+            push:
+              branches:
+                - main
+              paths:
+                - '.github/workflows/repository-task-dogfood.yml'
+                - 'apps/control-plane/**'
+                - 'contracts/**'
+                - 'examples/repository-task/**'
+                - 'package.json'
+                - 'packages/artifact-store/**'
+                - 'packages/db/**'
+                - 'packages/runtime-core/**'
+                - 'packages/worker-sdk-ts/**'
+                - 'pnpm-lock.yaml'
+                - 'scripts/compile-repository-task-plan.mjs'
+                - 'scripts/compile-typescript-module-recipe-plan.mjs'
+                - 'scripts/normalize-repository-task-plan.mjs'
+                - 'scripts/resolve-typescript-module-recipe.mjs'
+                - 'workers/repository-task-ts/**'
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: repository-task-dogfood-${{ github.ref }}
+            cancel-in-progress: true
+
+          env:
+            DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+            TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+            FACTORY_FLOOR_WORKER_TOKEN: factory_floor_repository_task_worker_token
+            WORKER_API_BEARER_TOKEN: factory_floor_repository_task_worker_token
+            FACTORY_FLOOR_WORKER_ID: repository-task-dogfood-worker
+            FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS: repository-task@1
+            WORKER_AUTHORIZATION_JSON: '{"repository-task-dogfood-worker":{"token":"factory_floor_repository_task_worker_token","capabilities":["repository-task@1"]}}'
+
+          jobs:
+            dogfood:
+              runs-on: ubuntu-latest
+              timeout-minutes: 30
+              steps:
+                - name: Check out repository
+                  uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+                - name: Set up Node.js
+                  uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+                  with:
+                    node-version: '22'
+
+                - name: Set up Python
+                  uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+                  with:
+                    python-version: '3.12'
+
+                - name: Bootstrap workspace
+                  run: bash scripts/bootstrap-workspace.sh
+
+                - name: Build workspace runtime
+                  run: pnpm build:production
+
+                - name: Start durable services
+                  run: pnpm verify:services
+
+                - name: Run genuine repository-task dogfood
+                  run: |
+                    set -o pipefail
+                    pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
+
+                - name: Upload repository-task proof bundle
+                  if: always()
+                  uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+                  with:
+                    name: repository-task-dogfood-${{ github.run_number }}
+                    path: |
+                      .factory-floor/repository-task-dogfood/
+                      repository-task-dogfood.log
+                    if-no-files-found: error
+                    include-hidden-files: true
+                    retention-days: 30
+
+                - name: Stop durable services
+                  if: always()
+                  run: pnpm services:clean
+          """
+          clean_workflow = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in clean_workflow.splitlines()
+          ) + '\n'
+          Path('.github/workflows/repository-task-dogfood.yml').write_text(clean_workflow)
+          Path('.github/workflows/runtime-one-shot-dogfood-patch.yml').unlink(missing_ok=True)
+          Path('.github/workflows/runtime-finalize-repository-task-dogfood.yml').unlink(missing_ok=True)
           PY
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
 
       - name: Bootstrap workspace
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Format bounded wait candidate
-        run: pnpm exec prettier --write examples/repository-task/run-dogfood.ts
+      - name: Format and verify focused worker
+        run: |
+          pnpm exec prettier --write \
+            workers/repository-task-ts/src/index.ts \
+            workers/repository-task-ts/test/index.test.ts \
+            examples/repository-task/run-dogfood.ts \
+            .github/workflows/repository-task-dogfood.yml
+          pnpm --filter @factory-floor/repository-task-worker test
+          git diff --check
+
+      - name: Commit ordinary candidate
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(repository-task): retain schema-distinct failure artifacts'
+          git push origin HEAD:feat/repository-task-worker
 
       - name: Build workspace runtime
         run: pnpm build:production
@@ -142,7 +415,6 @@ jobs:
           name: repository-task-dogfood-${{ github.run_number }}
           path: |
             .factory-floor/repository-task-dogfood/
-            examples/repository-task/run-dogfood.ts
             repository-task-dogfood.log
           if-no-files-found: error
           include-hidden-files: true
