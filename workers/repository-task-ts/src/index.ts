@@ -35,10 +35,10 @@ const repositoryTaskSchemaKeys = [
 
 export type RepositoryTaskSchemaKey = (typeof repositoryTaskSchemaKeys)[number];
 
-export interface RepositoryTaskArtifactSchemaMetadata {
+export type RepositoryTaskArtifactSchemaMetadata = Record<string, unknown> & {
   schemaId: string;
   schemaDigest: string;
-}
+};
 
 export type RepositoryTaskSchemaMetadata = Record<
   RepositoryTaskSchemaKey,
