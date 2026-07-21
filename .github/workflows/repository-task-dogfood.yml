@@ -1,54 +1,104 @@
-name: Repository Task Dogfood Cleanup
+name: Repository Task Dogfood
 
 on:
   pull_request:
     paths:
       - '.github/workflows/repository-task-dogfood.yml'
-      - '.github/scripts/runtime_finalize_repository_task.py'
+      - 'apps/control-plane/**'
+      - 'contracts/**'
+      - 'examples/repository-task/**'
+      - 'package.json'
+      - 'packages/artifact-store/**'
+      - 'packages/db/**'
+      - 'packages/runtime-core/**'
+      - 'packages/worker-sdk-ts/**'
+      - 'pnpm-lock.yaml'
+      - 'scripts/compile-repository-task-plan.mjs'
+      - 'scripts/compile-typescript-module-recipe-plan.mjs'
+      - 'scripts/normalize-repository-task-plan.mjs'
+      - 'scripts/resolve-typescript-module-recipe.mjs'
+      - 'workers/repository-task-ts/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/repository-task-dogfood.yml'
+      - 'apps/control-plane/**'
+      - 'contracts/**'
+      - 'examples/repository-task/**'
+      - 'package.json'
+      - 'packages/artifact-store/**'
+      - 'packages/db/**'
+      - 'packages/runtime-core/**'
+      - 'packages/worker-sdk-ts/**'
+      - 'pnpm-lock.yaml'
+      - 'scripts/compile-repository-task-plan.mjs'
+      - 'scripts/compile-typescript-module-recipe-plan.mjs'
+      - 'scripts/normalize-repository-task-plan.mjs'
+      - 'scripts/resolve-typescript-module-recipe.mjs'
+      - 'workers/repository-task-ts/**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: repository-task-cleanup-${{ github.ref }}
+  group: repository-task-dogfood-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+  TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
+  FACTORY_FLOOR_WORKER_TOKEN: factory_floor_repository_task_worker_token
+  WORKER_API_BEARER_TOKEN: factory_floor_repository_task_worker_token
+  FACTORY_FLOOR_WORKER_ID: repository-task-dogfood-worker
+  FACTORY_FLOOR_WORKER_COMPONENT_SELECTORS: repository-task@1
+  WORKER_AUTHORIZATION_JSON: '{"repository-task-dogfood-worker":{"token":"factory_floor_repository_task_worker_token","capabilities":["repository-task@1"]}}'
+
 jobs:
-  cleanup:
+  dogfood:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Check out repository branch
+      - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: feat/repository-task-worker
-          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
-      - name: Apply deterministic ordinary-source corrections
-        run: python .github/scripts/runtime_finalize_repository_task.py
-
-      - name: Keep workflow scaffolding out of the product commit
-        run: |
-          git restore --source=HEAD -- .github/workflows/repository-task-dogfood.yml .github/scripts/runtime_finalize_repository_task.py
-          git status --short
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
 
       - name: Bootstrap workspace
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Format and test focused worker
-        run: |
-          pnpm exec prettier --write workers/repository-task-ts/src/index.ts workers/repository-task-ts/test/index.test.ts examples/repository-task/run-dogfood.ts
-          pnpm --filter @factory-floor/repository-task-worker test
-          git diff --check
+      - name: Build workspace runtime
+        run: pnpm build:production
 
-      - name: Commit ordinary candidate
+      - name: Start durable services
+        run: pnpm verify:services
+
+      - name: Run genuine repository-task dogfood
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add workers/repository-task-ts/src/index.ts workers/repository-task-ts/test/index.test.ts examples/repository-task/run-dogfood.ts
-          git commit -m 'fix(repository-task): retain schema-distinct failure artifacts'
-          git push origin HEAD:feat/repository-task-worker
+          set -o pipefail
+          pnpm demo:repository-task 2>&1 | tee repository-task-dogfood.log
+
+      - name: Upload repository-task proof bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: repository-task-dogfood-${{ github.run_number }}
+          path: |
+            .factory-floor/repository-task-dogfood/
+            examples/repository-task/run-dogfood.ts
+            repository-task-dogfood.log
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+
+      - name: Stop durable services
+        if: always()
+        run: pnpm services:clean
