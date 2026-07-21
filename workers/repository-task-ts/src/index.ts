@@ -56,11 +56,9 @@ export interface RepositoryTaskRepositoryIdentity {
 }
 
 export type RepositoryTaskIdentityValidationPhase =
-  | 'before-execution'
-  | 'after-execution';
+  'before-execution' | 'after-execution';
 
-export interface ValidatedRepositoryTaskIdentity
-  extends RepositoryTaskRepositoryIdentity {
+export interface ValidatedRepositoryTaskIdentity extends RepositoryTaskRepositoryIdentity {
   phase: RepositoryTaskIdentityValidationPhase;
   observedHeadRevision: string;
   observedDirtyState: 'clean';
@@ -228,7 +226,9 @@ export function repositoryTaskSnapshotDigest(snapshot: {
     .digest('hex');
 }
 
-function repositoryIdentityDiagnostic(error: unknown): RepositoryTaskDiagnostic {
+function repositoryIdentityDiagnostic(
+  error: unknown,
+): RepositoryTaskDiagnostic {
   return {
     code: 'worker.repository-identity-mismatch',
     severity: 'error',
@@ -257,14 +257,17 @@ function assertIdentityMatchesInvocation(
       'Repository base revision does not match the normalized plan base revision.',
     );
   }
-  const observedSnapshotDigest = repositoryTaskSnapshotDigest(repositorySnapshot);
+  const observedSnapshotDigest =
+    repositoryTaskSnapshotDigest(repositorySnapshot);
   if (identity.snapshotDigest !== observedSnapshotDigest) {
     throw new Error(
       `Repository snapshot digest mismatch: expected ${identity.snapshotDigest}, observed ${observedSnapshotDigest}.`,
     );
   }
   if (identity.dirtyStatePolicy !== 'require-clean') {
-    throw new Error('Repository dirty-state policy must require a clean worktree.');
+    throw new Error(
+      'Repository dirty-state policy must require a clean worktree.',
+    );
   }
 }
 
@@ -569,14 +572,9 @@ export function createRepositoryTaskComponent(
         phase: 'before-execution',
       });
     } catch (error) {
-      return failedResult(
-        context,
-        schemaMetadata,
-        task,
-        compiled,
-        'verify',
-        [repositoryIdentityDiagnostic(error)],
-      );
+      return failedResult(context, schemaMetadata, task, compiled, 'verify', [
+        repositoryIdentityDiagnostic(error),
+      ]);
     }
 
     const execution = await executor.execute({

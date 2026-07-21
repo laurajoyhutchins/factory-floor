@@ -327,8 +327,9 @@ describe('repository-task worker', () => {
     const result = await component(workerContext.value);
 
     expect(result).toMatchObject({ status: 'completed' });
-    expect(workerContext.staged.find(({ portName }) => portName === 'patch'))
-      .toMatchObject({ value: { patch: '', patchDigest: null } });
+    expect(
+      workerContext.staged.find(({ portName }) => portName === 'patch'),
+    ).toMatchObject({ value: { patch: '', patchDigest: null } });
     expect(workerContext.staged.at(-1)?.value).toMatchObject({
       status: 'failed',
       phase: 'verify',
