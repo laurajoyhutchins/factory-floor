@@ -31,8 +31,11 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
 
           def replace_once(text: str, old: str, new: str, label: str) -> str:
+              old = dedent(old)
+              new = dedent(new)
               count = text.count(old)
               if count != 1:
                   raise SystemExit(f'{label}: expected one match, found {count}')
@@ -77,11 +80,11 @@ jobs:
 
           tests = Path('workers/repository-task-ts/test/index.test.ts')
           text = tests.read_text()
-          marker = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
+          marker = dedent("""    expect(workerContext.staged.at(-1)?.value).toMatchObject({
               status: 'failed',
               diagnostics: [{ code: 'markdown.invalid' }],
-            });"""
-          addition = marker + """
+            });""")
+          addition = marker + dedent("""
             expect(
               workerContext.staged.find(
                 ({ portName }) => portName === 'normalized-plan',
@@ -95,7 +98,7 @@ jobs:
             expect(
               workerContext.staged.find(({ portName }) => portName === 'evidence')
                 ?.value,
-            ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });"""
+            ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });""")
           text = replace_once(text, marker, addition, 'failure artifact tests')
           tests.write_text(text)
 
