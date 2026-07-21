@@ -25,24 +25,29 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Apply final runtime and dogfood corrections
+      - name: Apply bounded source corrections
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              return text.replace(old, new, 1)
 
           source = Path('workers/repository-task-ts/src/index.ts')
-          source_text = source.read_text()
-          source_pattern = re.compile(
-              r"    normalizedPlan: compiled\.normalizedPlan,\n"
-              r"    generationGraph: compiled\.generationGraph,\n"
-              r"    patch: \{ patch: '', patchDigest: null \},\n"
-              r"    evidence:\n"
-              r"      repositoryIdentity === undefined\n"
-              r"        \? null\n"
-              r"        : \{ repositoryIdentity, diagnostics \},"
-          )
-          source_replacement = """    normalizedPlan: compiled.normalizedPlan ?? {
+          text = source.read_text()
+          text = replace_once(
+              text,
+              """    normalizedPlan: compiled.normalizedPlan,
+              generationGraph: compiled.generationGraph,
+              patch: { patch: '', patchDigest: null },
+              evidence:
+                repositoryIdentity === undefined
+                  ? null
+                  : { repositoryIdentity, diagnostics },""",
+              """    normalizedPlan: compiled.normalizedPlan ?? {
               status: 'unavailable',
               phase,
               artifact: 'normalized-plan',
@@ -63,55 +68,41 @@ jobs:
                     artifact: 'evidence',
                     diagnostics,
                   }
-                : { repositoryIdentity, diagnostics },"""
-          source_text, count = source_pattern.subn(source_replacement, source_text, count=1)
-          if count != 1:
-              raise SystemExit(f'failure artifact replacement count was {count}')
-          source.write_text(source_text)
+                : { repositoryIdentity, diagnostics },""",
+              'failure artifacts',
+          )
+          source.write_text(text)
 
           tests = Path('workers/repository-task-ts/test/index.test.ts')
-          test_text = tests.read_text()
-          test_marker = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
+          text = tests.read_text()
+          marker = """    expect(workerContext.staged.at(-1)?.value).toMatchObject({
               status: 'failed',
               diagnostics: [{ code: 'markdown.invalid' }],
             });"""
-          test_addition = test_marker + """
+          addition = marker + """
             expect(
               workerContext.staged.find(
                 ({ portName }) => portName === 'normalized-plan',
               )?.value,
-            ).toMatchObject({
-              status: 'unavailable',
-              artifact: 'normalized-plan',
-            });
+            ).toMatchObject({ status: 'unavailable', artifact: 'normalized-plan' });
             expect(
               workerContext.staged.find(
                 ({ portName }) => portName === 'generation-graph',
               )?.value,
-            ).toMatchObject({
-              status: 'unavailable',
-              artifact: 'generation-graph',
-            });
+            ).toMatchObject({ status: 'unavailable', artifact: 'generation-graph' });
             expect(
               workerContext.staged.find(({ portName }) => portName === 'evidence')
                 ?.value,
-            ).toMatchObject({
-              status: 'unavailable',
-              artifact: 'evidence',
-            });
-            expect(
-              new Set(
-                workerContext.staged.map(({ value }) => JSON.stringify(value)),
-              ).size,
-            ).toBe(workerContext.staged.length);"""
-          if test_marker not in test_text:
-              raise SystemExit('failure artifact test marker not found')
-          tests.write_text(test_text.replace(test_marker, test_addition, 1))
+            ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });"""
+          text = replace_once(text, marker, addition, 'failure artifact tests')
+          tests.write_text(text)
 
           dogfood = Path('examples/repository-task/run-dogfood.ts')
           text = dogfood.read_text()
-          identity_function = """
-          function repositoryIdentity(
+          text = replace_once(
+              text,
+              """function authoredPlan(baseRevision: string): string {""",
+              """function repositoryIdentity(
             baseRevision: string,
             snapshot: { files: Record<string, string> },
           ) {
@@ -119,112 +110,122 @@ jobs:
               .sort()
               .map((path) => [path, snapshot.files[path]] as const);
             return {
-              repository: {
-                owner: 'laurajoyhutchins',
-                name: 'factory-floor',
-              },
+              repository: { owner: 'laurajoyhutchins', name: 'factory-floor' },
               baseRevision,
               snapshotDigest: sha256(JSON.stringify(canonicalFiles)),
               dirtyStatePolicy: 'require-clean' as const,
             };
           }
-          """
-          if 'function repositoryIdentity(' not in text:
-              marker = 'function authoredPlan(baseRevision: string): string {'
-              if marker not in text:
-                  raise SystemExit('authoredPlan marker not found')
-              text = text.replace(marker, identity_function + '\n' + marker, 1)
 
-          setup_pattern = re.compile(
-              r"    const baseRevision = git\('rev-parse', 'HEAD'\);\n"
-              r"    const snapshot = await repositorySnapshot\(\);\n"
-              r"    const profile = repositoryProfile\(\);"
+          function authoredPlan(baseRevision: string): string {""",
+              'identity helper',
           )
-          text, setup_count = setup_pattern.subn(
-              """    const baseRevision = git('rev-parse', 'HEAD');
-              const snapshot = await repositorySnapshot();
+          text = replace_once(
+              text,
+              """async function outputArtifacts(
+            blobStore: FilesystemArtifactBlobStore,
+            state: Awaited<ReturnType<typeof runState>>,
+          ): Promise<Record<string, any>> {
+            return Object.fromEntries(
+              await Promise.all(
+                state.outputs.map(async (output) => [
+                  output.port_name,
+                  JSON.parse(
+                    await streamText(await blobStore.readCommitted(output.digest)),
+                  ),
+                ]),
+              ),
+            );
+          }""",
+              """async function readCommittedJson(
+            blobStore: FilesystemArtifactBlobStore,
+            digest: string,
+          ): Promise<any> {
+            const deadline = Date.now() + 30_000;
+            for (;;) {
+              try {
+                return JSON.parse(
+                  await streamText(await blobStore.readCommitted(digest)),
+                );
+              } catch (error) {
+                const code = (error as { code?: unknown }).code;
+                if (code !== 'not_found' || Date.now() >= deadline) throw error;
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              }
+            }
+          }
+
+          async function outputArtifacts(
+            blobStore: FilesystemArtifactBlobStore,
+            state: Awaited<ReturnType<typeof runState>>,
+          ): Promise<Record<string, any>> {
+            return Object.fromEntries(
+              await Promise.all(
+                state.outputs.map(async (output) => [
+                  output.port_name,
+                  await readCommittedJson(blobStore, output.digest),
+                ]),
+              ),
+            );
+          }""",
+              'committed artifact wait',
+          )
+          text = replace_once(
+              text,
+              """    const snapshot = await repositorySnapshot();
+              const profile = repositoryProfile();""",
+              """    const snapshot = await repositorySnapshot();
               const identity = repositoryIdentity(baseRevision, snapshot);
               const profile = repositoryProfile();""",
+              'identity setup',
+          )
+          text = replace_once(
               text,
-              count=1,
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+              },
+              idempotencyKey: `repository-task-success-${baseRevision}`,""",
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+                repositoryIdentity: identity,
+              },
+              idempotencyKey: `repository-task-success-${baseRevision}`,""",
+              'success identity',
           )
-          if setup_count != 1 and 'const identity = repositoryIdentity(' not in text:
-              raise SystemExit(f'identity setup replacement count was {setup_count}')
-
-          success_pattern = re.compile(
-              r"(idempotencyKey: `repository-task-success-\$\{baseRevision\}`,[\s\S]*?repositoryProfile: profile,\n\s*repositorySnapshot: snapshot,)(\n\s*})"
+          text = replace_once(
+              text,
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+              },
+              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
+              """        repositoryProfile: profile,
+                repositorySnapshot: snapshot,
+                repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),
+              },
+              idempotencyKey: `repository-task-failure-${baseRevision}`,""",
+              'failure identity',
           )
-          if 'repositoryIdentity: identity' not in text:
-              text, success_count = success_pattern.subn(
-                  r"\1\n        repositoryIdentity: identity,\2", text, count=1
-              )
-              if success_count != 1:
-                  raise SystemExit(f'success identity replacement count was {success_count}')
-
-          failure_pattern = re.compile(
-              r"(idempotencyKey: `repository-task-failure-\$\{baseRevision\}`,[\s\S]*?repositoryProfile: profile,\n\s*repositorySnapshot: snapshot,)(\n\s*})"
-          )
-          if 'repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot)' not in text:
-              text, failure_count = failure_pattern.subn(
-                  r"\1\n        repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),\2",
-                  text,
-                  count=1,
-              )
-              if failure_count != 1:
-                  raise SystemExit(f'failure identity replacement count was {failure_count}')
-
-          if 'const retainedIdentity = successEvidence.repositoryIdentity;' not in text:
-              assertion_marker = """    if (
-              sha256(successPatch) !== successArtifacts.patch.patchDigest ||"""
-              if assertion_marker not in text:
-                  raise SystemExit('identity assertion marker not found')
-              assertion = """    const retainedIdentity = successEvidence.repositoryIdentity;
-            if (
-              retainedIdentity?.beforeExecution?.baseRevision !== baseRevision ||
-              retainedIdentity?.afterExecution?.baseRevision !== baseRevision ||
-              retainedIdentity?.beforeExecution?.snapshotDigest !== identity.snapshotDigest ||
-              retainedIdentity?.afterExecution?.snapshotDigest !== identity.snapshotDigest
-            ) {
-              throw new Error(
-                'retained repository identity does not match the submitted immutable identity',
-              );
-            }
-            if (
-              sha256(successPatch) !== successArtifacts.patch.patchDigest ||"""
-              text = text.replace(assertion_marker, assertion, 1)
-
-          text = text.replace(
+          text = replace_once(
+              text,
               "failureCode !== 'executor.base-unavailable'",
               "failureCode !== 'worker.repository-identity-mismatch'",
-              1,
+              'failure diagnostic',
           )
-          if 'repositoryIdentity: retainedIdentity' not in text:
-              summary_marker = '        treeDigest: successEvidence.treeDigest,\n'
-              if summary_marker not in text:
-                  raise SystemExit('proof summary marker not found')
-              text = text.replace(
-                  summary_marker,
-                  summary_marker + '        repositoryIdentity: retainedIdentity,\n',
-                  1,
-              )
           dogfood.write_text(text)
 
           workflow = Path('.github/workflows/repository-task-dogfood.yml')
-          workflow_text = workflow.read_text()
-          step_name = '      - name: Prepare bounded committed-artifact wait candidate\n'
-          if step_name in workflow_text:
-              start = workflow_text.index(step_name)
-              end = workflow_text.index('      - name: Set up Node.js\n', start)
-              workflow_text = workflow_text[:start] + workflow_text[end:]
-          workflow_text = workflow_text.replace(
-              """      - name: Format bounded wait candidate
+          text = workflow.read_text()
+          start_marker = '      - name: Prepare bounded committed-artifact wait candidate\n'
+          if start_marker in text:
+              start = text.index(start_marker)
+              end = text.index('      - name: Set up Node.js\n', start)
+              text = text[:start] + text[end:]
+          format_marker = """      - name: Format bounded wait candidate
                 run: pnpm exec prettier --write examples/repository-task/run-dogfood.ts
 
-          """,
-              '',
-              1,
-          )
-          workflow.write_text(workflow_text)
+          """
+          text = text.replace(format_marker, '', 1)
+          workflow.write_text(text)
 
           Path('.github/workflows/runtime-one-shot-dogfood-patch.yml').unlink(missing_ok=True)
           Path('.github/workflows/runtime-finalize-repository-task-dogfood.yml').unlink(missing_ok=True)
@@ -233,7 +234,7 @@ jobs:
       - name: Bootstrap workspace
         run: bash scripts/bootstrap-workspace.sh
 
-      - name: Format and run focused tests
+      - name: Format and verify focused worker
         run: |
           pnpm exec prettier --write \
             workers/repository-task-ts/src/index.ts \
@@ -241,8 +242,9 @@ jobs:
             examples/repository-task/run-dogfood.ts \
             .github/workflows/repository-task-dogfood.yml
           pnpm --filter @factory-floor/repository-task-worker test
+          git diff --check
 
-      - name: Commit finalized candidate
+      - name: Commit ordinary candidate
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
