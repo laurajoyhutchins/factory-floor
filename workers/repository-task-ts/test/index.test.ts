@@ -302,6 +302,20 @@ describe('repository-task worker', () => {
       status: 'failed',
       diagnostics: [{ code: 'markdown.invalid' }],
     });
+    expect(
+      workerContext.staged.find(
+        ({ portName }) => portName === 'normalized-plan',
+      )?.value,
+    ).toMatchObject({ status: 'unavailable', artifact: 'normalized-plan' });
+    expect(
+      workerContext.staged.find(
+        ({ portName }) => portName === 'generation-graph',
+      )?.value,
+    ).toMatchObject({ status: 'unavailable', artifact: 'generation-graph' });
+    expect(
+      workerContext.staged.find(({ portName }) => portName === 'evidence')
+        ?.value,
+    ).toMatchObject({ status: 'unavailable', artifact: 'evidence' });
   });
 
   it('fails closed when repository identity changes after execution', async () => {

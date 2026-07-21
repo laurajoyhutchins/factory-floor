@@ -149,6 +149,21 @@ async function repositorySnapshot(): Promise<{
   };
 }
 
+function repositoryIdentity(
+  baseRevision: string,
+  snapshot: { files: Record<string, string> },
+) {
+  const canonicalFiles = Object.keys(snapshot.files)
+    .sort()
+    .map((path) => [path, snapshot.files[path]] as const);
+  return {
+    repository: { owner: 'laurajoyhutchins', name: 'factory-floor' },
+    baseRevision,
+    snapshotDigest: sha256(JSON.stringify(canonicalFiles)),
+    dirtyStatePolicy: 'require-clean' as const,
+  };
+}
+
 function authoredPlan(baseRevision: string): string {
   return `---
 schemaVersion: 1
@@ -355,6 +370,24 @@ async function waitForRun(
   }
 }
 
+async function readCommittedJson(
+  blobStore: FilesystemArtifactBlobStore,
+  digest: string,
+): Promise<any> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    try {
+      return JSON.parse(
+        await streamText(await blobStore.readCommitted(digest)),
+      );
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      if (code !== 'not_found' || Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+}
+
 async function outputArtifacts(
   blobStore: FilesystemArtifactBlobStore,
   state: Awaited<ReturnType<typeof runState>>,
@@ -363,9 +396,7 @@ async function outputArtifacts(
     await Promise.all(
       state.outputs.map(async (output) => [
         output.port_name,
-        JSON.parse(
-          await streamText(await blobStore.readCommitted(output.digest)),
-        ),
+        await readCommittedJson(blobStore, output.digest),
       ]),
     ),
   );
@@ -485,6 +516,7 @@ async function main(): Promise<void> {
 
     const baseRevision = git('rev-parse', 'HEAD');
     const snapshot = await repositorySnapshot();
+    const identity = repositoryIdentity(baseRevision, snapshot);
     const profile = repositoryProfile();
     const commandService = new CommandService(db);
     const successCommand = await commandService.submit({
@@ -495,6 +527,7 @@ async function main(): Promise<void> {
         authoredPlanMarkdown: authoredPlan(baseRevision),
         repositoryProfile: profile,
         repositorySnapshot: snapshot,
+        repositoryIdentity: identity,
       },
       idempotencyKey: `repository-task-success-${baseRevision}`,
     });
@@ -522,6 +555,16 @@ async function main(): Promise<void> {
       successArtifacts.patch.patchDigest !== successEvidence.patchDigest
     ) {
       throw new Error('retained patch digest does not match retained evidence');
+    }
+    if (
+      successEvidence.repositoryIdentity?.beforeExecution?.baseRevision !==
+        baseRevision ||
+      successEvidence.repositoryIdentity?.afterExecution?.baseRevision !==
+        baseRevision
+    ) {
+      throw new Error(
+        'retained evidence does not match submitted repository identity',
+      );
     }
     if (
       !Array.isArray(successEvidence.verification) ||
@@ -570,6 +613,7 @@ async function main(): Promise<void> {
         authoredPlanMarkdown: authoredPlan(unavailableRevision),
         repositoryProfile: profile,
         repositorySnapshot: snapshot,
+        repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),
       },
       idempotencyKey: `repository-task-failure-${baseRevision}`,
     });
@@ -585,7 +629,7 @@ async function main(): Promise<void> {
       failureArtifacts.evidence?.diagnostics?.[0]?.code;
     if (
       failureArtifacts.disposition?.status !== 'failed' ||
-      failureCode !== 'executor.base-unavailable'
+      failureCode !== 'worker.repository-identity-mismatch'
     ) {
       throw new Error(
         `deliberate failure was not retained correctly: ${JSON.stringify(failureArtifacts.disposition)}`,

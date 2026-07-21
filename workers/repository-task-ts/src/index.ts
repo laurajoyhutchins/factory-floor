@@ -514,12 +514,27 @@ async function failedResult(
     authoredPlan: compiled.authoredPlan ?? {
       markdown: task?.authoredPlanMarkdown ?? null,
     },
-    normalizedPlan: compiled.normalizedPlan,
-    generationGraph: compiled.generationGraph,
+    normalizedPlan: compiled.normalizedPlan ?? {
+      status: 'unavailable',
+      phase,
+      artifact: 'normalized-plan',
+      diagnostics,
+    },
+    generationGraph: compiled.generationGraph ?? {
+      status: 'unavailable',
+      phase,
+      artifact: 'generation-graph',
+      diagnostics,
+    },
     patch: { patch: '', patchDigest: null },
     evidence:
       repositoryIdentity === undefined
-        ? null
+        ? {
+            status: 'unavailable',
+            phase,
+            artifact: 'evidence',
+            diagnostics,
+          }
         : { repositoryIdentity, diagnostics },
     diagnostics,
     disposition,
