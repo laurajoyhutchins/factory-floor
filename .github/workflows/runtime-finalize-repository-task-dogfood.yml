@@ -1,0 +1,109 @@
+name: Runtime finalize repository-task dogfood
+
+on:
+  push:
+    branches:
+      - feat/repository-task-worker
+    paths:
+      - '.github/workflows/runtime-finalize-repository-task-dogfood.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/repository-task-worker
+          fetch-depth: 0
+
+      - name: Apply final dogfood corrections and remove temporary workflows
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dogfood = Path('examples/repository-task/run-dogfood.ts')
+          text = dogfood.read_text()
+
+          if 'function repositoryIdentity(' not in text:
+              marker = """  };\n}\n\nfunction authoredPlan(baseRevision: string): string {"""
+              replacement = """  };\n}\n\nfunction repositoryIdentity(\n  baseRevision: string,\n  snapshot: { files: Record<string, string> },\n) {\n  const canonicalFiles = Object.keys(snapshot.files)\n    .sort()\n    .map((path) => [path, snapshot.files[path]] as const);\n  return {\n    repository: {\n      owner: 'laurajoyhutchins',\n      name: 'factory-floor',\n    },\n    baseRevision,\n    snapshotDigest: sha256(JSON.stringify(canonicalFiles)),\n    dirtyStatePolicy: 'require-clean' as const,\n  };\n}\n\nfunction authoredPlan(baseRevision: string): string {"""
+              if marker not in text:
+                  raise SystemExit('repository identity insertion marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          setup = """    const baseRevision = git('rev-parse', 'HEAD');\n    const snapshot = await repositorySnapshot();\n    const profile = repositoryProfile();"""
+          if setup in text:
+              text = text.replace(
+                  setup,
+                  """    const baseRevision = git('rev-parse', 'HEAD');\n    const snapshot = await repositorySnapshot();\n    const identity = repositoryIdentity(baseRevision, snapshot);\n    const profile = repositoryProfile();""",
+                  1,
+              )
+
+          success = """        repositoryProfile: profile,\n        repositorySnapshot: snapshot,\n      },\n      idempotencyKey: `repository-task-success-${baseRevision}`,"""
+          if success in text:
+              text = text.replace(
+                  success,
+                  """        repositoryProfile: profile,\n        repositorySnapshot: snapshot,\n        repositoryIdentity: identity,\n      },\n      idempotencyKey: `repository-task-success-${baseRevision}`,""",
+                  1,
+              )
+
+          failure = """        repositoryProfile: profile,\n        repositorySnapshot: snapshot,\n      },\n      idempotencyKey: `repository-task-failure-${baseRevision}`,"""
+          if failure in text:
+              text = text.replace(
+                  failure,
+                  """        repositoryProfile: profile,\n        repositorySnapshot: snapshot,\n        repositoryIdentity: repositoryIdentity(unavailableRevision, snapshot),\n      },\n      idempotencyKey: `repository-task-failure-${baseRevision}`,""",
+                  1,
+              )
+
+          if 'const retainedIdentity = successEvidence.repositoryIdentity;' not in text:
+              marker = """    if (\n      sha256(successPatch) !== successArtifacts.patch.patchDigest ||"""
+              replacement = """    const retainedIdentity = successEvidence.repositoryIdentity;\n    if (\n      retainedIdentity?.beforeExecution?.baseRevision !== baseRevision ||\n      retainedIdentity?.afterExecution?.baseRevision !== baseRevision ||\n      retainedIdentity?.beforeExecution?.snapshotDigest !==\n        identity.snapshotDigest ||\n      retainedIdentity?.afterExecution?.snapshotDigest !== identity.snapshotDigest\n    ) {\n      throw new Error(\n        'retained repository identity does not match the submitted immutable identity',\n      );\n    }\n    if (\n      sha256(successPatch) !== successArtifacts.patch.patchDigest ||"""
+              if marker not in text:
+                  raise SystemExit('identity assertion marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          text = text.replace(
+              "failureCode !== 'executor.base-unavailable'",
+              "failureCode !== 'worker.repository-identity-mismatch'",
+              1,
+          )
+
+          summary = """        treeDigest: successEvidence.treeDigest,\n        mutationPaths: successEvidence.mutations.map("""
+          if summary in text:
+              text = text.replace(
+                  summary,
+                  """        treeDigest: successEvidence.treeDigest,\n        repositoryIdentity: retainedIdentity,\n        mutationPaths: successEvidence.mutations.map(""",
+                  1,
+              )
+
+          dogfood.write_text(text)
+
+          workflow = Path('.github/workflows/repository-task-dogfood.yml')
+          workflow_text = workflow.read_text()
+          step_name = '      - name: Prepare bounded committed-artifact wait candidate\n'
+          if step_name in workflow_text:
+              start = workflow_text.index(step_name)
+              end = workflow_text.index('      - name: Set up Node.js\n', start)
+              workflow_text = workflow_text[:start] + workflow_text[end:]
+          format_step = """      - name: Format bounded wait candidate\n        run: pnpm exec prettier --write examples/repository-task/run-dogfood.ts\n\n"""
+          workflow_text = workflow_text.replace(format_step, '', 1)
+          workflow.write_text(workflow_text)
+
+          Path('.github/workflows/runtime-one-shot-dogfood-patch.yml').unlink(missing_ok=True)
+          Path('.github/workflows/runtime-finalize-repository-task-dogfood.yml').unlink(missing_ok=True)
+          PY
+
+      - name: Format final files
+        run: npx --yes prettier@3.8.4 --write examples/repository-task/run-dogfood.ts .github/workflows/repository-task-dogfood.yml
+
+      - name: Commit finalized candidate
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'test(repository-task): dogfood immutable invocation identity'
+          git push origin HEAD:feat/repository-task-worker
