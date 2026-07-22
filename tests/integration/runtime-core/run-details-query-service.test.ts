@@ -156,7 +156,7 @@ async function seedRunDetails(
       normalized_inputs: { ordinal },
       outcome: 'require_approval',
       reason: `Approval required for run ${ordinal}.`,
-      modifications: [],
+      modifications: {},
     })
     .execute();
   await db
@@ -411,20 +411,23 @@ describe('run details query service', () => {
     expect(details.derivations.map((item) => item.id)).toEqual([
       first.derivationId,
     ]);
-    expect(details.projectionFreshness.items).toEqual([
-      expect.objectContaining({ projectionName: 'run_status', stale: true }),
-    ]);
+    expect(details.projectionFreshness.scope).toBe('control_plane_global');
+    expect(details.projectionFreshness.items).toHaveLength(1);
+    expect(details.projectionFreshness.items[0]).toMatchObject({
+      projectionName: 'run_status',
+      stale: true,
+    });
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty('id');
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty('streamKey');
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty('lastEventId');
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty(
+      'lastSequenceNumber',
+    );
 
-    const serialized = JSON.stringify(details);
-    for (const foreignId of [
-      second.approvalId,
-      second.policyDecisionId,
-      second.resourceId,
-      second.derivationId,
-      second.actionId,
-      second.sourceArtifactId,
-      second.resultArtifactId,
-    ])
-      expect(serialized).not.toContain(foreignId);
+    expect(JSON.stringify(details)).not.toContain(second.approvalId);
+    expect(JSON.stringify(details)).not.toContain(second.policyDecisionId);
+    expect(JSON.stringify(details)).not.toContain(second.resourceId);
+    expect(JSON.stringify(details)).not.toContain(second.derivationId);
+    expect(JSON.stringify(details)).not.toContain(secondRun.runId);
   });
 });
