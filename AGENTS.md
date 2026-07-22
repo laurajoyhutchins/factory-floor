@@ -61,6 +61,27 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 - Resolve ordinary implementation details autonomously in favor of deterministic, strict, and testable behavior.
 - Record design changes as ADRs.
 
+## Deciduous pilot
+
+The Deciduous integration is a nonblocking development-history pilot. GitHub issues, ADRs, pull requests, and commits remain authoritative. Deciduous records only useful options, decisions, observations, pivots, and outcomes.
+
+For a substantial pilot task, use the repository wrapper at three checkpoints:
+
+```bash
+bash scripts/deciduous-pilot.sh start "Goal tied to the issue or PR"
+bash scripts/deciduous-pilot.sh decision "Chosen approach" "Why this approach was selected"
+bash scripts/deciduous-pilot.sh observe "A discovery that changed or clarified the work"
+bash scripts/deciduous-pilot.sh finish "Verified outcome" HEAD
+bash scripts/deciduous-pilot.sh export "descriptive-graph-snapshot.json"
+```
+
+- Run `bash scripts/deciduous-pilot.sh recover` when resuming work after context loss.
+- Record consequential reasoning, not routine edits, formatting, or repeated test commands.
+- Never record secrets, credentials, private environment values, or hidden chain-of-thought.
+- Do not run upstream `deciduous init` or `deciduous update`; they install generated assistant integrations outside this pilot's boundary.
+- Do not block edits or commits when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
+- See `tools/deciduous/README.md` and issue #57 for installation, snapshot persistence, evaluation, and rollback.
+
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
 ## ChatGPT–GitHub operating protocol

@@ -30,6 +30,13 @@ artifacts/
 data/
 .minio/
 
+# Deciduous pilot local state
+.deciduous/*
+!.deciduous/exports/
+.deciduous/exports/*
+!.deciduous/exports/.gitkeep
+!.deciduous/exports/*.json
+
 # Editors and operating systems
 .vscode/*
 !.vscode/extensions.json
