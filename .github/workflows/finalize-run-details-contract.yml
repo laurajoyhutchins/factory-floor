@@ -6,6 +6,7 @@ on:
       - feat/discord-activity-run-details
     paths:
       - scripts/finalize-run-details-contract.py
+      - .github/workflows/finalize-run-details-contract.yml
 
 permissions:
   contents: write
