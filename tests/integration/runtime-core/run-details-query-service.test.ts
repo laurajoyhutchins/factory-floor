@@ -247,7 +247,7 @@ async function seedRunDetails(
       id: actionId,
       execution_id: run.executionId,
       attempt_id: run.attemptId,
-      proposal_id: `proposal-${ordinal}`,
+      proposal_id: createUuidV7(),
       capability_grant_id: capabilityGrantId,
       outbound_request_artifact_id: resultArtifactId,
       policy_decision_id: policyDecisionId,
