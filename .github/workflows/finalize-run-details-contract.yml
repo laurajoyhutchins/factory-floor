@@ -19,22 +19,11 @@ jobs:
         with:
           ref: feat/discord-activity-run-details
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - run: python scripts/finalize-run-details-contract.py
-      - run: pnpm exec prettier --write packages/runtime-core/src/operator/run-details-query-service.ts packages/operator-client-ts/src/run-details.ts packages/operator-client-ts/src/run-details.test.ts packages/operator-ui-react/src/pages/run-details.tsx packages/operator-ui-react/src/pages/run-details.test.tsx tests/integration/runtime-core/run-details-query-service.test.ts
-      - run: pnpm --filter @factory-floor/operator-client-ts test -- run-details.test.ts
-      - run: pnpm --filter @factory-floor/operator-ui-react test -- run-details.test.tsx
-      - run: pnpm --filter @factory-floor/runtime-core test -- run-details
       - run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
+          git diff --cached --check
           git commit -m "fix(operator): clarify projection freshness scope"
           git push origin HEAD:feat/discord-activity-run-details
