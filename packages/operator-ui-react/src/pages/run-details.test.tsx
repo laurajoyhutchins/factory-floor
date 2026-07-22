@@ -53,7 +53,7 @@ describe('run details panel', () => {
           normalizedInputs: {},
           outcome: 'require_approval',
           reason: 'Human review required.',
-          modifications: [],
+          modifications: {},
           createdAt: '2026-07-20T00:00:00.000Z',
           actionId: 'action-1',
           actionType: 'github.pull_request',
@@ -87,15 +87,12 @@ describe('run details panel', () => {
         },
       ],
       projectionFreshness: {
+        scope: 'control_plane_global' as const,
         staleAfterMs: 60000,
         generatedAt: '2026-07-20T00:02:00.000Z',
         items: [
           {
-            id: 'checkpoint-1',
             projectionName: 'run_status',
-            streamKey: 'global',
-            lastEventId: null,
-            lastSequenceNumber: '12',
             updatedAt: '2026-07-20T00:00:00.000Z',
             stalenessMs: 120000,
             stale: true,
@@ -122,6 +119,9 @@ describe('run details panel', () => {
     expect(screen.getByText('transform')).toBeVisible();
     expect(screen.getByText('run_status')).toBeVisible();
     expect(screen.getByText('stale')).toBeVisible();
+    expect(
+      screen.getByText('Control-plane projection freshness'),
+    ).toBeVisible();
     expect(loadDetails).toHaveBeenCalledWith('run-1');
   });
 });
