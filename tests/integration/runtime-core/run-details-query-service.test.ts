@@ -206,16 +206,18 @@ async function seedRunDetails(
       },
     ])
     .execute();
+  const executionInput = await db
+    .selectFrom('execution_inputs')
+    .select('id')
+    .where('execution_id', '=', run.executionId)
+    .where('port_name', '=', 'objective')
+    .where('delivery_id', '=', run.deliveryId)
+    .executeTakeFirst();
+  if (!executionInput) throw new Error('expected claimed execution input');
   await db
-    .insertInto('execution_inputs')
-    .values({
-      id: createUuidV7(),
-      execution_id: run.executionId,
-      port_name: 'objective',
-      artifact_id: sourceArtifactId,
-      delivery_id: run.deliveryId,
-      payload: null,
-    })
+    .updateTable('execution_inputs')
+    .set({ artifact_id: sourceArtifactId })
+    .where('id', '=', executionInput.id)
     .execute();
   await db
     .insertInto('execution_outputs')
