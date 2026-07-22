@@ -65,11 +65,7 @@ export interface RunArtifactDerivationDetail {
 }
 
 export interface RunProjectionFreshnessDetail {
-  id: string;
   projectionName: string;
-  streamKey: string;
-  lastEventId: string | null;
-  lastSequenceNumber: string;
   updatedAt: string;
   stalenessMs: number;
   stale: boolean;
@@ -83,6 +79,7 @@ export interface RunDetailsPage {
   resources: RunResourceDetail[];
   derivations: RunArtifactDerivationDetail[];
   projectionFreshness: {
+    scope: 'control_plane_global';
     staleAfterMs: number;
     generatedAt: string;
     items: RunProjectionFreshnessDetail[];
@@ -148,6 +145,7 @@ function assertRunDetails(value: unknown): RunDetailsPage {
     !Array.isArray(value.resources) ||
     !Array.isArray(value.derivations) ||
     !isRecord(value.projectionFreshness) ||
+    value.projectionFreshness.scope !== 'control_plane_global' ||
     !Array.isArray(value.projectionFreshness.items)
   )
     throw new OperatorClientError(
