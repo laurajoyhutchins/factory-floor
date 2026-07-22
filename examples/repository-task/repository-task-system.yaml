@@ -1,0 +1,95 @@
+apiVersion: factoryfloor.dev/v1alpha1
+kind: System
+metadata:
+  name: repository-task-dogfood
+  version: '0.1.0'
+spec:
+  rootRegion:
+    id: repository-task-root
+    stable: true
+    budgets:
+      maximumConcurrentRegions: 2
+      maximumConcurrentExecutions: 2
+      dailyMonetaryCostUsd: 0
+  regions:
+    - id: repository-task
+      stable: true
+      template: repository-task-run@1
+  connections: []
+  policies: []
+---
+apiVersion: factoryfloor.dev/v1alpha1
+kind: Template
+metadata:
+  name: repository-task-run
+  version: '1'
+spec:
+  inputs:
+    - port: task
+      schema: repository-task-input.v1
+  allowedComponents:
+    - repository-task@1
+  initialTopology:
+    instances:
+      - name: execute
+        component: repository-task@1
+    ingress:
+      commands:
+        repository-task.execute:
+          targets:
+            - component: execute
+              port: task
+    connections:
+      - from: region.task
+        to: execute.task
+      - from: execute.authored-plan
+        to: region.authored-plan
+      - from: execute.normalized-plan
+        to: region.normalized-plan
+      - from: execute.generation-graph
+        to: region.generation-graph
+      - from: execute.patch
+        to: region.patch
+      - from: execute.evidence
+        to: region.evidence
+      - from: execute.diagnostics
+        to: region.diagnostics
+      - from: execute.disposition
+        to: region.disposition
+  fanIn: []
+  capabilities: []
+  constraints:
+    maximumDepth: 0
+    maximumComponents: 1
+    maximumChildren: 0
+    maximumParallelism: 1
+    lifetimeSeconds: 900
+  budgets:
+    monetaryCostUsd: 0
+    modelTokens: 0
+    networkRequests: 0
+    humanAttentionMinutes: 0
+  outputs:
+    - port: authored-plan
+      schema: repository-task-authored-plan.v1
+      required: true
+    - port: normalized-plan
+      schema: repository-task-normalized-plan.v1
+      required: true
+    - port: generation-graph
+      schema: repository-task-generation-graph.v1
+      required: true
+    - port: patch
+      schema: repository-task-patch.v1
+      required: true
+    - port: evidence
+      schema: repository-task-evidence.v1
+      required: true
+    - port: diagnostics
+      schema: repository-task-diagnostics.v1
+      required: true
+    - port: disposition
+      schema: repository-task-disposition.v1
+      required: true
+  completion:
+    type: all-required-outputs
