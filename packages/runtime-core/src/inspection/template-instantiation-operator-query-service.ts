@@ -16,19 +16,15 @@ import { TemplateInstantiationInspectionService } from './template-instantiation
 
 type RunDetails = Awaited<ReturnType<RunDetailsQueryService['getRunDetails']>>;
 
-export function projectRunSafeFreshness(
-  runId: string,
+export function projectControlPlaneGlobalFreshness(
   freshness: RunDetails['projectionFreshness'],
 ): RunDetails['projectionFreshness'] {
   return {
+    scope: 'control_plane_global',
     staleAfterMs: freshness.staleAfterMs,
     generatedAt: freshness.generatedAt,
     items: freshness.items.map((item) => ({
-      id: `${runId}:${item.projectionName}`,
       projectionName: item.projectionName,
-      streamKey: runId,
-      lastEventId: null,
-      lastSequenceNumber: '0',
       updatedAt: item.updatedAt,
       stalenessMs: item.stalenessMs,
       stale: item.stale,
@@ -56,8 +52,7 @@ export class OperatorQueryService extends RunScopedOperatorQueryService {
     const details = await this.details.getRunDetails(context, runId, request);
     return {
       ...details,
-      projectionFreshness: projectRunSafeFreshness(
-        runId,
+      projectionFreshness: projectControlPlaneGlobalFreshness(
         details.projectionFreshness,
       ),
     };
