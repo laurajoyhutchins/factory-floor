@@ -13,6 +13,12 @@ export default defineConfig({
       '@factory-floor/runtime-core': fileURLToPath(
         new URL('./packages/runtime-core/src/index.ts', import.meta.url),
       ),
+      kysely: fileURLToPath(
+        new URL(
+          './packages/db/node_modules/kysely/dist/esm/index.js',
+          import.meta.url,
+        ),
+      ),
     },
   },
   test: {
