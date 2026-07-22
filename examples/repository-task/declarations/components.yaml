@@ -1,0 +1,37 @@
+apiVersion: factory-floor.dev/v1alpha1
+kind: ComponentDefinition
+metadata: { name: repository-task, version: '1' }
+spec:
+  ports:
+    - name: task
+      direction: input
+      required: true
+      schema: { name: repository-task-input, version: v1 }
+    - name: authored-plan
+      direction: output
+      required: true
+      schema: { name: repository-task-authored-plan, version: v1 }
+    - name: normalized-plan
+      direction: output
+      required: true
+      schema: { name: repository-task-normalized-plan, version: v1 }
+    - name: generation-graph
+      direction: output
+      required: true
+      schema: { name: repository-task-generation-graph, version: v1 }
+    - name: patch
+      direction: output
+      required: true
+      schema: { name: repository-task-patch, version: v1 }
+    - name: evidence
+      direction: output
+      required: true
+      schema: { name: repository-task-evidence, version: v1 }
+    - name: diagnostics
+      direction: output
+      required: true
+      schema: { name: repository-task-diagnostics, version: v1 }
+    - name: disposition
+      direction: output
+      required: true
+      schema: { name: repository-task-disposition, version: v1 }
