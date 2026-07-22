@@ -156,7 +156,7 @@ async function seedRunDetails(
       normalized_inputs: { ordinal },
       outcome: 'require_approval',
       reason: `Approval required for run ${ordinal}.`,
-      modifications: {},
+      modifications: [],
     })
     .execute();
   await db
