@@ -1,0 +1,45 @@
+name: Format run details
+
+on:
+  push:
+    branches:
+      - feat/discord-activity-run-details
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format flagged files
+        run: >-
+          pnpm exec prettier --write
+          packages/operator-ui-react/src/pages/run-details.tsx
+          packages/runtime-core/src/operator/run-details-query-service.ts
+          tests/integration/runtime-core/run-details-query-service.test.ts
+      - name: Remove temporary formatter workflow
+        run: rm .github/workflows/format-run-details.yml
+      - name: Commit formatted sources
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/operator-ui-react/src/pages/run-details.tsx \
+            packages/runtime-core/src/operator/run-details-query-service.ts \
+            tests/integration/runtime-core/run-details-query-service.test.ts \
+            .github/workflows/format-run-details.yml
+          git diff --cached --quiet && exit 1
+          git commit -m "chore: format run details files"
+          git push origin HEAD:feat/discord-activity-run-details
