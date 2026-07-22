@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   finalize:
-    if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
