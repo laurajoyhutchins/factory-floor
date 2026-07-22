@@ -15,7 +15,10 @@ import {
 } from '../../packages/db/src/index.js';
 import {
   CommandService,
+  ExecutionLeaseService,
+  OperatorCommandService,
   RegistrationService,
+  StartupRecoveryService,
   SystemApplicationService,
 } from '../../packages/runtime-core/src/index.js';
 
@@ -604,6 +607,171 @@ async function main(): Promise<void> {
       throw new Error('worker restart changed retained successful outputs');
     }
 
+    const retryCommand = await commandService.submit({
+      region: 'repository-task',
+      commandType: 'repository-task.execute',
+      source: { kind: 'dogfood' } as any,
+      payload: {
+        authoredPlanMarkdown: authoredPlan(baseRevision),
+        repositoryProfile: profile,
+        repositorySnapshot: snapshot,
+        repositoryIdentity: identity,
+      },
+      idempotencyKey: `repository-task-retry-${baseRevision}`,
+    });
+    if (retryCommand.disposition !== 'accepted') {
+      throw new Error(
+        `retry command was not accepted: ${retryCommand.disposition}`,
+      );
+    }
+    await stop([worker]);
+    children.splice(children.indexOf(worker), 1);
+    const retryLease = await new ExecutionLeaseService(db).leaseNextAttempt({
+      workerId: 'repository-task-retry-injector',
+      leaseDurationMs: 1_000,
+      componentSelectors: ['repository-task@1'],
+    });
+    if (!retryLease || retryLease.attemptNumber !== 1) {
+      throw new Error(
+        `failed to lease first retry attempt: ${JSON.stringify(retryLease)}`,
+      );
+    }
+    const recoveryAt = new Date(Date.now() + 2_000);
+    await db
+      .updateTable('execution_attempts')
+      .set({ lease_expires_at: new Date(recoveryAt.getTime() - 1) })
+      .where('id', '=', retryLease.attemptId)
+      .executeTakeFirstOrThrow();
+    const recovery = await new StartupRecoveryService(db, { blobStore }).run({
+      now: recoveryAt,
+    });
+    if (
+      recovery.expiredAttemptsAbandoned < 1 ||
+      recovery.replacementAttemptsCreated < 1 ||
+      recovery.retryableDeliveriesExposed < 1
+    ) {
+      throw new Error(
+        `retry recovery did not create a replacement: ${JSON.stringify(recovery)}`,
+      );
+    }
+    worker = startWorker();
+    children.push(worker);
+    const retryState = await waitForRun(db, retryCommand.correlationId);
+    const retryArtifacts = await outputArtifacts(blobStore, retryState);
+    const retryAttempts = [...retryState.attempts].sort(
+      (left, right) => left.attempt_number - right.attempt_number,
+    );
+    if (
+      retryAttempts.length !== 2 ||
+      retryAttempts[0]?.attempt_number !== 1 ||
+      retryAttempts[0]?.status !== 'abandoned' ||
+      retryAttempts[1]?.attempt_number !== 2 ||
+      retryAttempts[1]?.status !== 'completed'
+    ) {
+      throw new Error(
+        `actual retry cycle was not retained: ${JSON.stringify(retryAttempts)}`,
+      );
+    }
+    const duplicateRetryOutputs = duplicateKeys(
+      retryState.outputs as unknown as Record<string, unknown>[],
+      (row) => `${String(row.execution_id)}:${String(row.port_name)}`,
+    );
+    if (duplicateRetryOutputs.length > 0) {
+      throw new Error(
+        `duplicate retry outputs: ${duplicateRetryOutputs.join(',')}`,
+      );
+    }
+    const retryExecutionId = retryState.executions[0]?.id;
+    const retryExternalActions = retryExecutionId
+      ? await db
+          .selectFrom('external_actions')
+          .select('id')
+          .where('execution_id', '=', retryExecutionId)
+          .execute()
+      : [];
+    if (retryExternalActions.length > 0) {
+      throw new Error(
+        'retry created duplicate or unexpected external-action requests',
+      );
+    }
+    await retainRun('retry', retryState, retryArtifacts);
+
+    const cancellationCommand = await commandService.submit({
+      region: 'repository-task',
+      commandType: 'repository-task.execute',
+      source: { kind: 'dogfood' } as any,
+      payload: {
+        authoredPlanMarkdown: authoredPlan(baseRevision),
+        repositoryProfile: profile,
+        repositorySnapshot: snapshot,
+        repositoryIdentity: identity,
+      },
+      idempotencyKey: `repository-task-cancellation-${baseRevision}`,
+    });
+    if (cancellationCommand.disposition !== 'accepted') {
+      throw new Error(
+        `cancellation command was not accepted: ${cancellationCommand.disposition}`,
+      );
+    }
+    await stop([worker]);
+    children.splice(children.indexOf(worker), 1);
+    const cancellationLease = await new ExecutionLeaseService(
+      db,
+    ).leaseNextAttempt({
+      workerId: 'repository-task-cancellation-injector',
+      leaseDurationMs: 30_000,
+      componentSelectors: ['repository-task@1'],
+    });
+    if (!cancellationLease || cancellationLease.attemptNumber !== 1) {
+      throw new Error(
+        `failed to lease cancellation attempt: ${JSON.stringify(cancellationLease)}`,
+      );
+    }
+    const cancellationReceipt = await new OperatorCommandService(db).cancelRun(
+      {
+        principal: {
+          id: 'repository-task-dogfood-operator',
+          roles: ['operator'],
+        },
+        adapter: 'repository-task-dogfood',
+      },
+      cancellationCommand.commandId,
+      {
+        clientRequestId: `repository-task-cancel-${baseRevision}`,
+        reason:
+          'Prove repository-task cancellation preserves inspectable partial evidence.',
+      },
+    );
+    const cancellationState = await runState(
+      db,
+      cancellationCommand.correlationId,
+    );
+    const cancellationExecution = cancellationState.executions[0];
+    const cancellationAttempt = cancellationState.attempts[0];
+    if (
+      cancellationReceipt.cancelledExecutions !== 1 ||
+      cancellationReceipt.cancelledAttempts !== 1 ||
+      cancellationExecution?.status !== 'failed' ||
+      (cancellationExecution.failure as any)?.code !== 'operator_cancelled' ||
+      cancellationAttempt?.status !== 'cancelled' ||
+      !cancellationState.deliveries.every(
+        (delivery) => delivery.status === 'cancelled',
+      )
+    ) {
+      throw new Error(
+        `cancellation did not retain terminal partial evidence: ${JSON.stringify({ cancellationReceipt, cancellationState })}`,
+      );
+    }
+    await writeJson('cancellation/state.json', {
+      receipt: cancellationReceipt,
+      executions: cancellationState.executions,
+      attempts: cancellationState.attempts,
+      deliveries: cancellationState.deliveries,
+      outputs: cancellationState.outputs,
+    });
+    worker = startWorker();
+    children.push(worker);
+
     const unavailableRevision = 'f'.repeat(40);
     const failureCommand = await commandService.submit({
       region: 'repository-task',
@@ -672,6 +840,29 @@ async function main(): Promise<void> {
       restart: {
         preservedOutputIdentity: true,
         outputIdentity: outputIdentityAfterRestart,
+      },
+      retry: {
+        commandId: retryCommand.commandId,
+        correlationId: retryCommand.correlationId,
+        executionId: retryState.executions[0]?.id,
+        attempts: retryAttempts.map((attempt) => ({
+          id: attempt.id,
+          attemptNumber: attempt.attempt_number,
+          status: attempt.status,
+        })),
+        duplicateOutputs: duplicateRetryOutputs,
+        externalActionRequests: retryExternalActions.length,
+      },
+      cancellation: {
+        commandId: cancellationCommand.commandId,
+        correlationId: cancellationCommand.correlationId,
+        executionId: cancellationExecution?.id,
+        attemptId: cancellationAttempt?.id,
+        attemptStatus: cancellationAttempt?.status,
+        executionStatus: cancellationExecution?.status,
+        failure: cancellationExecution?.failure,
+        receipt: cancellationReceipt,
+        retainedPartialEvidence: true,
       },
       deliberateFailure: {
         commandId: failureCommand.commandId,
