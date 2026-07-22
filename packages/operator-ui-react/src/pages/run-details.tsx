@@ -29,7 +29,7 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <h3 id="run-details-heading">Run governance and lineage</h3>
               <p className="muted">
                 Run-isolated approvals, policy outcomes, resource usage,
-                artifact derivations, and projection freshness.
+                artifact derivations, and aggregate control-plane projection freshness.
               </p>
             </div>
             <span className="badge">Bound {details.limits.records}</span>
@@ -104,19 +104,11 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
           />
 
           <DetailTable
-            title="Projection freshness"
-            empty="No projection checkpoints are available."
-            headers={[
-              'Projection',
-              'Checkpoint',
-              'Sequence',
-              'Freshness',
-              'Updated',
-            ]}
+            title="Control-plane projection freshness"
+            empty="No control-plane projection checkpoints are available."
+            headers={['Projection', 'Freshness', 'Updated']}
             rows={details.projectionFreshness.items.map((projection) => [
               <span key="projection">{projection.projectionName}</span>,
-              <CopyId key="checkpoint" value={projection.id} />,
-              <span key="sequence">{projection.lastSequenceNumber}</span>,
               <StatusBadge
                 key="freshness"
                 value={projection.stale ? 'stale' : 'fresh'}
