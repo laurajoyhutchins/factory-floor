@@ -14,6 +14,28 @@ import { RunScopedOperatorQueryService } from '../operator/run-scoped-operator-q
 import type { OperatorContext, PageRequest } from '../operator/types.js';
 import { TemplateInstantiationInspectionService } from './template-instantiation-inspection-service.js';
 
+type RunDetails = Awaited<ReturnType<RunDetailsQueryService['getRunDetails']>>;
+
+export function projectRunSafeFreshness(
+  runId: string,
+  freshness: RunDetails['projectionFreshness'],
+): RunDetails['projectionFreshness'] {
+  return {
+    staleAfterMs: freshness.staleAfterMs,
+    generatedAt: freshness.generatedAt,
+    items: freshness.items.map((item) => ({
+      id: `${runId}:${item.projectionName}`,
+      projectionName: item.projectionName,
+      streamKey: runId,
+      lastEventId: null,
+      lastSequenceNumber: '0',
+      updatedAt: item.updatedAt,
+      stalenessMs: item.stalenessMs,
+      stale: item.stale,
+    })),
+  };
+}
+
 export class OperatorQueryService extends RunScopedOperatorQueryService {
   private readonly instantiations: TemplateInstantiationInspectionService;
   private readonly details: RunDetailsQueryService;
@@ -26,12 +48,19 @@ export class OperatorQueryService extends RunScopedOperatorQueryService {
     this.details = new RunDetailsQueryService(inspectionDb);
   }
 
-  getRunDetails(
+  async getRunDetails(
     context: OperatorContext,
     runId: string,
     request: RunDetailsRequest = {},
   ) {
-    return this.details.getRunDetails(context, runId, request);
+    const details = await this.details.getRunDetails(context, runId, request);
+    return {
+      ...details,
+      projectionFreshness: projectRunSafeFreshness(
+        runId,
+        details.projectionFreshness,
+      ),
+    };
   }
 
   async listRunTemplateInstantiations(
