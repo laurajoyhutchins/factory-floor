@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { sql } from 'kysely';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -11,6 +10,7 @@ import {
 import {
   OperatorCommandService,
   OperatorQueryService,
+  PolicyDecisionService,
   WorkerProtocolService,
 } from '../../../packages/runtime-core/src/index.js';
 
@@ -135,45 +135,48 @@ async function seedRunDetails(
   capabilityGrantId: string,
   ordinal: number,
 ) {
-  const policyDecisionId = createUuidV7();
-  const approvalId = createUuidV7();
   const sourceArtifactId = createUuidV7();
   const resultArtifactId = createUuidV7();
   const actionId = createUuidV7();
   const derivationId = createUuidV7();
   const resourceId = createUuidV7();
+  const policyName = `approval-policy-${ordinal}`;
+  const policyReason = `Approval required for run ${ordinal}.`;
 
   await db
-    .insertInto('policy_decisions')
+    .insertInto('policies')
     .values({
-      id: policyDecisionId,
-      policy_id: null,
-      policy_name: `approval-policy-${ordinal}`,
-      policy_version: '1',
-      evaluator_version: 'test-evaluator/1',
-      subject_kind: 'external_action',
-      subject_id: actionId,
-      input_artifact_id: null,
-      normalized_inputs: { ordinal },
-      outcome: 'require_approval',
-      reason: `Approval required for run ${ordinal}.`,
-      modifications: sql`'[]'::jsonb`,
+      id: createUuidV7(),
+      name: policyName,
+      version: '1',
+      content_digest: (ordinal + 200).toString(16).padStart(64, '0'),
+      retired_at: null,
+      policy: {
+        spec: {
+          outcome: 'require_approval',
+          reason: policyReason,
+          modifications: [],
+        },
+      },
     })
     .execute();
-  await db
-    .insertInto('approvals')
-    .values({
-      id: approvalId,
-      policy_decision_id: policyDecisionId,
-      status: 'requested',
-      requested_at: new Date(),
-      decided_at: null,
-      decided_by: null,
-      decision_reason: null,
-      decision_client_request_id: null,
-      decision_request_digest: null,
-    })
-    .execute();
+
+  const decision = await new PolicyDecisionService(
+    db,
+    'test-evaluator/1',
+  ).evaluate({
+    policyName,
+    policyVersion: '1',
+    subjectKind: 'external_action',
+    subjectId: actionId,
+    inputArtifactId: null,
+    normalizedInputs: { ordinal },
+  });
+  if (!decision.approvalId)
+    throw new Error('expected require_approval policy to create an approval');
+  const policyDecisionId = decision.decisionId;
+  const approvalId = decision.approvalId;
+
   await db
     .insertInto('artifacts')
     .values([
