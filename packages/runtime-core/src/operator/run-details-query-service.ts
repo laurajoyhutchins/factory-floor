@@ -274,14 +274,7 @@ export class RunDetailsQueryService {
 
     const checkpoints = await this.db
       .selectFrom('projection_checkpoints')
-      .select([
-        'id',
-        'projection_name',
-        'stream_key',
-        'last_event_id',
-        'last_sequence_number',
-        'updated_at',
-      ])
+      .select(['projection_name', 'updated_at'])
       .where('stream_key', '=', 'global')
       .orderBy('projection_name')
       .limit(limit + 1)
@@ -301,6 +294,7 @@ export class RunDetailsQueryService {
       resources,
       derivations,
       projectionFreshness: {
+        scope: 'control_plane_global' as const,
         staleAfterMs: PROJECTION_STALE_AFTER_MS,
         generatedAt: generatedAt.toISOString(),
         items: checkpoints.map((checkpoint) => {
@@ -310,11 +304,7 @@ export class RunDetailsQueryService {
             generatedAt.getTime() - updatedAt.getTime(),
           );
           return {
-            id: checkpoint.id,
             projectionName: checkpoint.projection_name,
-            streamKey: checkpoint.stream_key,
-            lastEventId: checkpoint.last_event_id,
-            lastSequenceNumber: checkpoint.last_sequence_number,
             updatedAt: checkpoint.updated_at,
             stalenessMs,
             stale:
