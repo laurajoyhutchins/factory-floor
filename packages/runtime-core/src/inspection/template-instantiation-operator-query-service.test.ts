@@ -3,6 +3,7 @@ import { projectRunSafeFreshness } from './template-instantiation-operator-query
 
 describe('run-safe projection freshness', () => {
   it('preserves aggregate freshness without exposing global checkpoint identity or progress', () => {
+    const updatedAt = new Date('2026-07-21T19:58:00.000Z');
     const result = projectRunSafeFreshness('run-1', {
       staleAfterMs: 60_000,
       generatedAt: '2026-07-21T20:00:00.000Z',
@@ -13,7 +14,7 @@ describe('run-safe projection freshness', () => {
           streamKey: 'global',
           lastEventId: 'global-event-id',
           lastSequenceNumber: '42',
-          updatedAt: '2026-07-21T19:58:00.000Z',
+          updatedAt,
           stalenessMs: 120_000,
           stale: true,
         },
@@ -27,7 +28,7 @@ describe('run-safe projection freshness', () => {
         streamKey: 'run-1',
         lastEventId: null,
         lastSequenceNumber: '0',
-        updatedAt: '2026-07-21T19:58:00.000Z',
+        updatedAt,
         stalenessMs: 120_000,
         stale: true,
       },
