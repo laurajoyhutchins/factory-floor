@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -156,7 +157,7 @@ async function seedRunDetails(
       normalized_inputs: { ordinal },
       outcome: 'require_approval',
       reason: `Approval required for run ${ordinal}.`,
-      modifications: [],
+      modifications: sql`'[]'::jsonb`,
     })
     .execute();
   await db
