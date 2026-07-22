@@ -418,8 +418,12 @@ describe('run details query service', () => {
       stale: true,
     });
     expect(details.projectionFreshness.items[0]).not.toHaveProperty('id');
-    expect(details.projectionFreshness.items[0]).not.toHaveProperty('streamKey');
-    expect(details.projectionFreshness.items[0]).not.toHaveProperty('lastEventId');
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty(
+      'streamKey',
+    );
+    expect(details.projectionFreshness.items[0]).not.toHaveProperty(
+      'lastEventId',
+    );
     expect(details.projectionFreshness.items[0]).not.toHaveProperty(
       'lastSequenceNumber',
     );

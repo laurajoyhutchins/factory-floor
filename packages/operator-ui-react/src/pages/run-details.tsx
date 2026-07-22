@@ -29,7 +29,8 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <h3 id="run-details-heading">Run governance and lineage</h3>
               <p className="muted">
                 Run-isolated approvals, policy outcomes, resource usage,
-                artifact derivations, and aggregate control-plane projection freshness.
+                artifact derivations, and aggregate control-plane projection
+                freshness.
               </p>
             </div>
             <span className="badge">Bound {details.limits.records}</span>
