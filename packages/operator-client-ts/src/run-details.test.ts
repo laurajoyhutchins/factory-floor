@@ -24,6 +24,7 @@ describe('run details client', () => {
         resources: [],
         derivations: [],
         projection_freshness: {
+          scope: 'control_plane_global',
           stale_after_ms: 60000,
           generated_at: '2026-07-20T00:00:00.000Z',
           items: [],
@@ -45,7 +46,10 @@ describe('run details client', () => {
       actionId: 'action-1',
       requestedAt: '2026-07-20T00:00:00.000Z',
     });
-    expect(result.projectionFreshness.staleAfterMs).toBe(60000);
+    expect(result.projectionFreshness).toMatchObject({
+      scope: 'control_plane_global',
+      staleAfterMs: 60000,
+    });
     expect(fetch).toHaveBeenCalledWith(
       'https://factory.example/api/v1/operator/runs/run-1/details?limit=25',
       expect.objectContaining({
