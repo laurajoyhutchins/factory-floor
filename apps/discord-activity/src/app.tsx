@@ -3,7 +3,11 @@ import {
   configureDefaultOperatorClient,
   createOperatorClient,
 } from '@factory-floor/operator-client-ts';
-import { RunOperatorWorkspace } from '@factory-floor/operator-ui-react';
+import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
+import {
+  RunDetailsPanel,
+  RunOperatorWorkspace,
+} from '@factory-floor/operator-ui-react';
 import { useEffect, useRef, useState } from 'react';
 import { beginActivityBootstrap } from './bootstrap.js';
 import {
@@ -189,6 +193,19 @@ export function DiscordActivityApp({
     setState({ kind: 'expired' });
   };
 
+  const loadDetails = (runId: string) => {
+    const sessionToken = controller.current?.current().sessionToken;
+    if (!sessionToken)
+      return Promise.reject(new Error('activity_session_invalid'));
+    return createRunDetailsClient({
+      baseUrl: config.controlPlaneUrl,
+      token: sessionToken,
+      principalId: state.context.principalId,
+      adapter: state.context.adapter,
+      retry: { maxAttempts: 2, baseDelayMs: 250 },
+    }).getRunDetails(runId);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="activity-shell">
@@ -209,6 +226,10 @@ export function DiscordActivityApp({
         </header>
         <main>
           <RunOperatorWorkspace runId={state.context.runId} />
+          <RunDetailsPanel
+            runId={state.context.runId}
+            loadDetails={loadDetails}
+          />
         </main>
       </div>
     </QueryClientProvider>

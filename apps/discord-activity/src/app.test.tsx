@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   revokeActivitySession: vi.fn(),
   createOperatorClient: vi.fn(),
   configureDefaultOperatorClient: vi.fn(),
+  createRunDetailsClient: vi.fn(),
+  getRunDetails: vi.fn(),
+  renderRunDetailsPanel: vi.fn(),
 }));
 
 vi.mock('./bootstrap.js', () => ({
@@ -29,11 +32,26 @@ vi.mock('@factory-floor/operator-client-ts', () => ({
   configureDefaultOperatorClient: mocks.configureDefaultOperatorClient,
 }));
 
+vi.mock('@factory-floor/operator-client-ts/run-details', () => ({
+  createRunDetailsClient: mocks.createRunDetailsClient,
+}));
+
 vi.mock('@factory-floor/operator-ui-react', async () => {
   const { createElement } = await import('react');
   return {
     RunOperatorWorkspace: ({ runId }: { runId: string }) =>
       createElement('div', { 'data-testid': 'run-workspace' }, runId),
+    RunDetailsPanel: (props: {
+      runId: string;
+      loadDetails: (runId: string) => Promise<unknown>;
+    }) => {
+      mocks.renderRunDetailsPanel(props);
+      return createElement(
+        'div',
+        { 'data-testid': 'run-details' },
+        props.runId,
+      );
+    },
   };
 });
 
@@ -58,6 +76,10 @@ function enabledConfig(): DiscordActivityConfig {
 describe('Discord Activity shell', () => {
   beforeEach(() => {
     for (const mock of Object.values(mocks)) mock.mockReset();
+    mocks.createRunDetailsClient.mockReturnValue({
+      getRunDetails: mocks.getRunDetails,
+    });
+    mocks.getRunDetails.mockResolvedValue({ runId: 'run-1' });
   });
 
   it('stays disabled without initializing the Discord host', () => {
@@ -72,6 +94,7 @@ describe('Discord Activity shell', () => {
     ).toBeVisible();
     expect(createHost).not.toHaveBeenCalled();
     expect(mocks.createActivityBroker).not.toHaveBeenCalled();
+    expect(mocks.createRunDetailsClient).not.toHaveBeenCalled();
   });
 
   it('renders only the verified bound run and scrubs its in-memory client after revocation', async () => {
@@ -123,6 +146,7 @@ describe('Discord Activity shell', () => {
     expect(await screen.findByTestId('run-workspace')).toHaveTextContent(
       'run-1',
     );
+    expect(await screen.findByTestId('run-details')).toHaveTextContent('run-1');
     expect(createHost).toHaveBeenCalledWith('application-1');
     expect(mocks.beginActivityBootstrap).toHaveBeenCalledWith({
       host,
@@ -141,6 +165,17 @@ describe('Discord Activity shell', () => {
         adapter: 'discord-agent',
       }),
     );
+
+    const detailsProps = mocks.renderRunDetailsPanel.mock.calls.at(-1)?.[0];
+    await detailsProps.loadDetails('run-1');
+    expect(mocks.createRunDetailsClient).toHaveBeenCalledWith({
+      baseUrl: 'https://factory-floor.example',
+      token: 'session-token',
+      principalId: 'discord:user-1',
+      adapter: 'discord-agent',
+      retry: { maxAttempts: 2, baseDelayMs: 250 },
+    });
+    expect(mocks.getRunDetails).toHaveBeenCalledWith('run-1');
 
     fireEvent.click(screen.getByRole('button', { name: 'End session' }));
     await waitFor(() =>
