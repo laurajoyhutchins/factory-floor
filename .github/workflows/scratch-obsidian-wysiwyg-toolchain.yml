@@ -1,0 +1,31 @@
+name: Scratch Obsidian WYSIWYG toolchain
+
+on:
+  push:
+    branches:
+      - scratch/obsidian-wysiwyg-toolchain
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch locked esbuild binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSLo esbuild.tgz 'https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz'
+          echo 'baa64c4cbaffcd1fde7788c81a7c122e468798f8ce8c9be79ba4d5562b406b4f122d2f59d1533cc08471ee059b241e7f279e18b883089c3aae5b262f40b66483  esbuild.tgz' | sha512sum --check --strict
+          tar -xzf esbuild.tgz
+          chmod +x package/bin/esbuild
+          test "$(package/bin/esbuild --version)" = '0.25.12'
+
+      - name: Upload locked binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: esbuild-linux-x64-0.25.12
+          path: package/bin/esbuild
+          if-no-files-found: error
+          retention-days: 1
