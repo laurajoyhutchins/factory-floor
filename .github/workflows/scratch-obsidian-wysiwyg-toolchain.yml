@@ -1,9 +1,11 @@
 name: Scratch Obsidian WYSIWYG toolchain
 
 on:
-  push:
+  pull_request:
     branches:
-      - scratch/obsidian-wysiwyg-toolchain
+      - main
+    paths:
+      - .github/workflows/scratch-obsidian-wysiwyg-toolchain.yml
 
 permissions:
   contents: read
