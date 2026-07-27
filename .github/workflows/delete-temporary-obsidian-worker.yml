@@ -1,0 +1,30 @@
+name: Delete temporary Obsidian worker
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/delete-temporary-obsidian-worker.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cleanup:
+    if: github.head_ref == 'scratch/obsidian-wysiwyg-toolchain'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close temporary pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh pr close "$PR_NUMBER" --repo "$REPOSITORY"
+
+      - name: Delete temporary branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/scratch/obsidian-wysiwyg-toolchain"
