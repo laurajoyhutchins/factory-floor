@@ -1,0 +1,99 @@
+name: Scratch Obsidian lock diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/scratch-obsidian-lock-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate historical lock candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p workspace/template
+          cat > workspace/template/package.json <<'JSON'
+          {
+            "name": "wysiwyg-editor",
+            "version": "1.0.0",
+            "private": true,
+            "license": "MIT",
+            "description": "Obsidian plugin that renders markdown formatting as styled output in Live Preview.",
+            "main": "main.js",
+            "keywords": [
+              "obsidian",
+              "plugin",
+              "markdown",
+              "wysiwyg",
+              "codemirror"
+            ],
+            "scripts": {
+              "build": "node esbuild.config.mjs",
+              "dev": "node esbuild.config.mjs watch",
+              "test": "vitest run",
+              "test:real-parser": "npm ci --prefix integration/real-parser && node integration/real-parser/use-root-lezer.mjs && npm test --prefix integration/real-parser",
+              "verify": "npm test && npm run test:real-parser && npm run typecheck && npm run build",
+              "typecheck": "tsc --noEmit"
+            },
+            "devDependencies": {
+              "@codemirror/language": "^6.11.2",
+              "@codemirror/state": "6.5.0",
+              "@codemirror/view": "6.38.6",
+              "@lezer/common": "^1.2.3",
+              "@types/node": "^22.15.29",
+              "esbuild": "^0.25.5",
+              "jsdom": "^26.1.0",
+              "obsidian": "^1.8.7",
+              "typescript": "^5.8.3",
+              "vitest": "^2.1.9"
+            }
+          }
+          JSON
+
+          : > workspace/candidate-hashes.txt
+          for cutoff in \
+            2026-07-20T00:00:00Z \
+            2026-07-21T00:00:00Z \
+            2026-07-22T00:00:00Z \
+            2026-07-23T00:00:00Z \
+            2026-07-24T00:00:00Z \
+            2026-07-25T00:00:00Z \
+            2026-07-26T00:00:00Z \
+            2026-07-26T06:00:00Z \
+            2026-07-26T12:00:00Z \
+            2026-07-26T18:00:00Z \
+            2026-07-26T21:00:00Z \
+            2026-07-26T23:00:00Z \
+            2026-07-26T23:59:59Z \
+            2026-07-27T01:00:00Z \
+            2026-07-27T02:00:00Z
+          do
+            rm -rf workspace/candidate
+            mkdir workspace/candidate
+            cp workspace/template/package.json workspace/candidate/package.json
+            (
+              cd workspace/candidate
+              npm install --package-lock-only --before="$cutoff" --cache "$GITHUB_WORKSPACE/workspace/npm-cache" >/dev/null
+              printf '%s %s\n' "$cutoff" "$(git hash-object package-lock.json)" >> ../candidate-hashes.txt
+            )
+          done
+          cat workspace/candidate-hashes.txt
+
+      - name: Upload candidate hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-wysiwyg-lock-candidate-hashes
+          path: workspace/candidate-hashes.txt
+          if-no-files-found: error
+          retention-days: 1
