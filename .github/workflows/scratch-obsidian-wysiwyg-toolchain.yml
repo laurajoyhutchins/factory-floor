@@ -19,13 +19,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Reconstruct dependency lock and cache
+      - name: Recover exact historical dependency lock
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p workspace/integration/real-parser
+          mkdir -p workspace/template workspace/integration/real-parser
 
-          cat > workspace/package.json <<'JSON'
+          cat > workspace/template/package.json <<'JSON'
           {
             "name": "wysiwyg-editor",
             "version": "1.0.0",
@@ -33,7 +33,13 @@ jobs:
             "license": "MIT",
             "description": "Obsidian plugin that renders markdown formatting as styled output in Live Preview.",
             "main": "main.js",
-            "keywords": ["obsidian", "plugin", "markdown", "wysiwyg", "codemirror"],
+            "keywords": [
+              "obsidian",
+              "plugin",
+              "markdown",
+              "wysiwyg",
+              "codemirror"
+            ],
             "scripts": {
               "build": "node esbuild.config.mjs",
               "dev": "node esbuild.config.mjs watch",
@@ -66,9 +72,7 @@ jobs:
             "scripts": {
               "test": "npm exec --prefix ../.. -- vitest run --config integration/real-parser/vitest.config.ts"
             },
-            "devDependencies": {
-              "@lezer/markdown": "1.6.3"
-            }
+            "devDependencies": {"@lezer/markdown": "1.6.3"}
           }
           JSON
 
@@ -114,22 +118,58 @@ jobs:
           }
           JSON
 
-          cd workspace
-          npm install --package-lock-only --cache "$PWD/npm-cache"
-          {
-            echo 'expected=f8b3f25a123496cc3c35de56e4e5d37e1d7a1a41'
-            echo "actual=$(git hash-object package-lock.json)"
-            node --version
-            npm --version
-          } | tee lock-hashes.txt
-          npm ci --cache "$PWD/npm-cache"
-          npm ci --prefix integration/real-parser --cache "$PWD/npm-cache"
-          tar -czf dependency-cache.tgz npm-cache package-lock.json lock-hashes.txt
+          expected='f8b3f25a123496cc3c35de56e4e5d37e1d7a1a41'
+          : > workspace/candidate-hashes.txt
+          found=''
+          for cutoff in \
+            2026-07-25T00:00:00Z \
+            2026-07-26T00:00:00Z \
+            2026-07-26T06:00:00Z \
+            2026-07-26T12:00:00Z \
+            2026-07-26T18:00:00Z \
+            2026-07-26T20:00:00Z \
+            2026-07-26T21:00:00Z \
+            2026-07-26T22:00:00Z \
+            2026-07-26T23:00:00Z \
+            2026-07-26T23:30:00Z \
+            2026-07-26T23:45:00Z \
+            2026-07-26T23:59:59Z \
+            2026-07-27T00:30:00Z \
+            2026-07-27T01:00:00Z \
+            2026-07-27T02:00:00Z
+          do
+            rm -rf workspace/candidate
+            mkdir workspace/candidate
+            cp workspace/template/package.json workspace/candidate/package.json
+            (
+              cd workspace/candidate
+              npm install --package-lock-only --before="$cutoff" --cache "$GITHUB_WORKSPACE/workspace/npm-cache" >/dev/null
+              actual="$(git hash-object package-lock.json)"
+              echo "$cutoff $actual" | tee -a ../candidate-hashes.txt
+              if [ "$actual" = "$expected" ]; then
+                cp package-lock.json ../package-lock.json
+              fi
+            )
+            if [ -f workspace/package-lock.json ]; then
+              found="$cutoff"
+              break
+            fi
+          done
 
-      - name: Upload dependency reconstruction
+          test -n "$found"
+          echo "matched_cutoff=$found" | tee workspace/match.txt
+          cp workspace/template/package.json workspace/package.json
+          (
+            cd workspace
+            npm ci --cache "$PWD/npm-cache"
+            npm ci --prefix integration/real-parser --cache "$PWD/npm-cache"
+          )
+          tar -C workspace -czf workspace/exact-dependency-cache.tgz npm-cache package-lock.json candidate-hashes.txt match.txt
+
+      - name: Upload exact dependency reconstruction
         uses: actions/upload-artifact@v4
         with:
-          name: obsidian-wysiwyg-npm-reconstruction
-          path: workspace/dependency-cache.tgz
+          name: obsidian-wysiwyg-exact-npm-reconstruction
+          path: workspace/exact-dependency-cache.tgz
           if-no-files-found: error
           retention-days: 1
