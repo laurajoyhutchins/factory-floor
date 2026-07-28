@@ -6,18 +6,56 @@ import {
   OperatorNotFoundError,
   OperatorValidationError,
 } from '../operator/errors.js';
+import {
+  RunDetailsQueryService,
+  type RunDetailsRequest,
+} from '../operator/run-details-query-service.js';
 import { RunScopedOperatorQueryService } from '../operator/run-scoped-operator-query-service.js';
 import type { OperatorContext, PageRequest } from '../operator/types.js';
 import { TemplateInstantiationInspectionService } from './template-instantiation-inspection-service.js';
 
+type RunDetails = Awaited<ReturnType<RunDetailsQueryService['getRunDetails']>>;
+
+export function projectControlPlaneGlobalFreshness(
+  freshness: RunDetails['projectionFreshness'],
+): RunDetails['projectionFreshness'] {
+  return {
+    scope: 'control_plane_global',
+    staleAfterMs: freshness.staleAfterMs,
+    generatedAt: freshness.generatedAt,
+    items: freshness.items.map((item) => ({
+      projectionName: item.projectionName,
+      updatedAt: item.updatedAt,
+      stalenessMs: item.stalenessMs,
+      stale: item.stale,
+    })),
+  };
+}
+
 export class OperatorQueryService extends RunScopedOperatorQueryService {
   private readonly instantiations: TemplateInstantiationInspectionService;
+  private readonly details: RunDetailsQueryService;
 
   constructor(inspectionDb: Kysely<Database>, blobs?: ArtifactBlobStore) {
     super(inspectionDb, blobs);
     this.instantiations = new TemplateInstantiationInspectionService(
       inspectionDb,
     );
+    this.details = new RunDetailsQueryService(inspectionDb);
+  }
+
+  async getRunDetails(
+    context: OperatorContext,
+    runId: string,
+    request: RunDetailsRequest = {},
+  ) {
+    const details = await this.details.getRunDetails(context, runId, request);
+    return {
+      ...details,
+      projectionFreshness: projectControlPlaneGlobalFreshness(
+        details.projectionFreshness,
+      ),
+    };
   }
 
   async listRunTemplateInstantiations(

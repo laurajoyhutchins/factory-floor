@@ -23,6 +23,7 @@ type OperatorQueries = Pick<
   OperatorQueryService,
   | 'getFactoryStatus'
   | 'getRunStatus'
+  | 'getRunDetails'
   | 'inspectRunTrace'
   | 'getRunTopology'
   | 'listRunAlerts'
@@ -299,6 +300,19 @@ export async function registerOperatorRoutes(
       return await queries.getRunStatus(
         operatorContext(request),
         requiredParam(request, 'runId'),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/runs/:runId/details', async (request, reply) => {
+    try {
+      const limit = optionalNumberQuery(request, 'limit');
+      return await queries.getRunDetails(
+        operatorContext(request),
+        requiredParam(request, 'runId'),
+        limit === undefined ? {} : { limit },
       );
     } catch (error) {
       return handleOperatorError(request, reply, error);

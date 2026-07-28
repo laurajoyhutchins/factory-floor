@@ -1,6 +1,7 @@
 export * from './components/ui.js';
 export * from './hooks/liveEvents.js';
 export * from './pages/pages.js';
+export * from './pages/run-details.js';
 export * from './pages/run-operator.js';
 export * from './pages/template-instantiations.js';
 export {
