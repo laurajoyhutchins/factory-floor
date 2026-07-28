@@ -1,0 +1,18 @@
+{
+  "name": "@factory-floor/repository-task-worker",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@factory-floor/contracts-ts": "workspace:*",
+    "@factory-floor/runtime-core": "workspace:*",
+    "@factory-floor/worker-sdk-ts": "workspace:*"
+  }
+}

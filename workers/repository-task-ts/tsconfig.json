@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/contracts-ts"
+    },
+    {
+      "path": "../../packages/runtime-core"
+    },
+    {
+      "path": "../../packages/worker-sdk-ts"
+    }
+  ]
+}
