@@ -255,7 +255,7 @@ try {
   });
   assertNoPrivilegedCredentialsInBundle();
 
-  const controlPlane = spawnTracked(
+  spawnTracked(
     process.execPath,
     ['--import', 'tsx', 'apps/control-plane/src/server.ts'],
     {
