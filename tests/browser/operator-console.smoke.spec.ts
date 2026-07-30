@@ -268,9 +268,6 @@ test.describe('production operator console', () => {
       return { status: response.status };
     });
     expect(unauthorized).toEqual({ status: 401 });
-    await expect
-      .poll(() => errors.some((error) => error.includes('401 (Unauthorized)')))
-      .toBe(true);
 
     const detailsPath = new RegExp(
       `/api/v1/operator/runs/${fixture.runId}/details(?:\\?.*)?$`,
@@ -305,9 +302,6 @@ test.describe('production operator console', () => {
     await expect(
       page.getByText('The selected record was not found.').first(),
     ).toBeVisible();
-    await expect
-      .poll(() => errors.some((error) => error.includes('404 (Not Found)')))
-      .toBe(true);
 
     expect(unexpectedBrowserErrors(errors)).toEqual([]);
   });

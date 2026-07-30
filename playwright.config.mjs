@@ -1,10 +1,13 @@
 import process from 'node:process';
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.FACTORY_FLOOR_BROWSER_BASE_URL;
 if (!baseURL) {
   throw new Error('FACTORY_FLOOR_BROWSER_BASE_URL is required');
 }
+
+const desktopViewport = { width: 1440, height: 900 };
+const mobileViewport = { width: 390, height: 844 };
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -31,7 +34,6 @@ export default defineConfig({
   ],
   use: {
     baseURL,
-    browserName: 'chromium',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -39,14 +41,37 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium-desktop',
-      use: { viewport: { width: 1440, height: 900 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: desktopViewport,
+      },
+    },
+    {
+      name: 'firefox-desktop',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: desktopViewport,
+      },
+    },
+    {
+      name: 'webkit-desktop',
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: desktopViewport,
+      },
     },
     {
       name: 'chromium-mobile',
       use: {
-        viewport: { width: 390, height: 844 },
-        hasTouch: true,
-        isMobile: true,
+        ...devices['Pixel 5'],
+        viewport: mobileViewport,
+      },
+    },
+    {
+      name: 'webkit-mobile',
+      use: {
+        ...devices['iPhone 13'],
+        viewport: mobileViewport,
       },
     },
   ],

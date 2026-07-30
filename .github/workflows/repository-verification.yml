@@ -126,7 +126,7 @@ jobs:
     name: Docker-backed repository verification
     needs: fast-verification
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
       TEST_DATABASE_URL: postgres://factory_floor:factory_floor_dev_password@127.0.0.1:5432/factory_floor
@@ -154,9 +154,9 @@ jobs:
           set -o pipefail
           bash scripts/bootstrap-workspace.sh 2>&1 | tee bootstrap.log
 
-      - name: Install Chromium for browser smoke
+      - name: Install cross-browser matrix
         id: browser-install
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       - name: Start services and run migrations
         id: services
@@ -216,7 +216,7 @@ jobs:
           AGENT_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           AGENT_CI_JOB_STATUS: ${{ job.status == 'success' && steps.evidence-upload.outcome == 'success' && 'success' || 'failure' }}
           AGENT_CI_FAILURE_STEP: ${{ steps.setup-node.outcome == 'failure' && 'setup-node' || steps.setup-python.outcome == 'failure' && 'setup-python' || steps.bootstrap.outcome == 'failure' && 'bootstrap' || steps.browser-install.outcome == 'failure' && 'browser-install' || steps.browser-smoke.outcome == 'failure' && 'browser-smoke' || steps.cleanup.outcome == 'failure' && 'cleanup' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary' || steps.evidence-upload.outcome == 'failure' && 'artifact-upload' || '' }}
-          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.browser-install.outcome == 'failure' && 'pnpm exec playwright install --with-deps chromium' || steps.browser-smoke.outcome == 'failure' && 'pnpm test:browser:smoke' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
+          AGENT_CI_FAILURE_COMMAND: ${{ steps.setup-node.outcome == 'failure' && 'rerun Repository Verification' || steps.setup-python.outcome == 'failure' && 'rerun Repository Verification' || steps.bootstrap.outcome == 'failure' && 'bash scripts/bootstrap-workspace.sh' || steps.browser-install.outcome == 'failure' && 'pnpm exec playwright install --with-deps chromium firefox webkit' || steps.browser-smoke.outcome == 'failure' && 'pnpm test:browser:smoke' || steps.cleanup.outcome == 'failure' && 'pnpm services:clean' || steps.metrics-summary.outcome == 'failure' && 'node scripts/summarize-ci-metrics.mjs' || steps.evidence-upload.outcome == 'failure' && 'rerun Repository Verification artifact upload' || '' }}
           AGENT_CI_FAILURE_LOG: ${{ steps.bootstrap.outcome == 'failure' && 'bootstrap.log' || steps.browser-smoke.outcome == 'failure' && 'browser-smoke.log' || steps.cleanup.outcome == 'failure' && 'cleanup.log' || steps.metrics-summary.outcome == 'failure' && 'metrics-summary.log' || '' }}
         run: node scripts/write-agent-ci-summary.mjs --manifest .github/agent-ci-manifest.json --output .factory-floor/ci-metrics/agent-ci-summary.json --job service-verification --artifact service-verification-${{ github.run_number }} >> "$GITHUB_STEP_SUMMARY"
 
