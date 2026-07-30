@@ -21,10 +21,11 @@ describe('production operator browser smoke', () => {
     expect(packageJson.scripts['test:browser:smoke']).toBe(
       'node scripts/run-operator-browser-smoke.mjs',
     );
-    expect(existsSync(join(root, 'playwright.config.ts'))).toBe(true);
+    expect(existsSync(join(root, 'playwright.config.mjs'))).toBe(true);
+    expect(existsSync(join(root, 'playwright.config.ts'))).toBe(false);
     expect(existsSync(join(root, 'tests/browser/tsconfig.json'))).toBe(true);
 
-    const config = read('playwright.config.ts');
+    const config = read('playwright.config.mjs');
     expect(config).toContain("tsconfig: './tests/browser/tsconfig.json'");
     expect(config).toContain("name: 'chromium-desktop'");
     expect(config).toContain("name: 'chromium-mobile'");
@@ -42,6 +43,7 @@ describe('production operator browser smoke', () => {
     expect(runner).toContain("spawnTracked('pnpm', ['demo:investigation']");
     expect(runner).toContain("'apps/control-plane/src/server.ts'");
     expect(runner).toContain("'vite'");
+    expect(runner).toContain("'playwright.config.mjs'");
     expect(runner).toContain("['services:up']");
     expect(runner).toContain("['services:wait']");
     expect(runner).toContain("['db:migrate']");
