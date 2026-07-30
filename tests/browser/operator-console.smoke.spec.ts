@@ -186,7 +186,9 @@ test.describe('production operator console', () => {
     await expect(topologyLink).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/topology$/);
-    await expect(page.getByRole('heading', { name: 'Topology' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Topology', exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('Text alternative')).toBeVisible();
 
     expect(errors).toEqual([]);
