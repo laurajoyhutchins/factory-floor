@@ -158,7 +158,9 @@ test.describe('production operator console', () => {
       });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect(liveStreamStatus(page).getByText('disconnected')).toBeVisible();
+    await expect(
+      liveStreamStatus(page).getByText('disconnected'),
+    ).toBeVisible();
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', {
         configurable: true,
@@ -187,9 +189,7 @@ test.describe('production operator console', () => {
     const runStatusGate = new Promise<void>((resolve) => {
       releaseRunStatus = resolve;
     });
-    const runStatusPath = new RegExp(
-      `/api/v1/operator/runs/${fixture.runId}$`,
-    );
+    const runStatusPath = new RegExp(`/api/v1/operator/runs/${fixture.runId}$`);
     await page.route(runStatusPath, async (route) => {
       await runStatusGate;
       await route.continue();
@@ -292,7 +292,9 @@ test.describe('production operator console', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Primary' }),
+    ).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(
