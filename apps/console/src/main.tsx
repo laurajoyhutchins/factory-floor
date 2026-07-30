@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
   ArtifactDetail,
   Artifacts,
@@ -13,6 +14,7 @@ import {
   Operations,
   Overview,
   PendingApprovals,
+  RunDetailsPanel,
   RunOperatorWorkspace,
   Shell,
   TemplateInstantiationDetail,
@@ -42,6 +44,13 @@ const queryClient = new QueryClient({
   },
 });
 
+const runDetailsClient = createRunDetailsClient({
+  token: import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim(),
+  baseUrl: import.meta.env.VITE_FACTORY_FLOOR_CONTROL_PLANE_URL?.trim(),
+  principalId: 'standalone-console',
+  adapter: 'standalone-console',
+});
+
 const titles: Record<string, string> = {
   topology: 'Topology',
   executions: 'Executions',
@@ -54,7 +63,15 @@ const titles: Record<string, string> = {
 
 function RunRoute() {
   const { runId = '' } = useParams();
-  return <RunOperatorWorkspace runId={runId} />;
+  return (
+    <>
+      <RunOperatorWorkspace runId={runId} />
+      <RunDetailsPanel
+        runId={runId}
+        loadDetails={(id) => runDetailsClient.getRunDetails(id)}
+      />
+    </>
+  );
 }
 
 function App() {
