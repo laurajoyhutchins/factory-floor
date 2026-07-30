@@ -18,6 +18,7 @@ const layerByFilename = new Map([
   ['demo-py.xml', 'python-demo'],
   ['vitest-integration.xml', 'integration'],
   ['vitest-acceptance.xml', 'acceptance'],
+  ['playwright-browser.xml', 'browser-smoke'],
 ]);
 
 const readOption = (name) => {
@@ -170,6 +171,7 @@ if (!metricsDirectory || !testsDirectory || !output) {
     requiredLayers.add('integration');
   }
   if (stageNames.has('acceptance')) requiredLayers.add('acceptance');
+  if (stageNames.has('browser-smoke')) requiredLayers.add('browser-smoke');
 
   const duplicateTests = [...identityFiles]
     .filter(([, files]) => files.size > 1)
