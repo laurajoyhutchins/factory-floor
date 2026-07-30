@@ -22,8 +22,10 @@ describe('production operator browser smoke', () => {
       'node scripts/run-operator-browser-smoke.mjs',
     );
     expect(existsSync(join(root, 'playwright.config.ts'))).toBe(true);
+    expect(existsSync(join(root, 'tests/browser/tsconfig.json'))).toBe(true);
 
     const config = read('playwright.config.ts');
+    expect(config).toContain("tsconfig: './tests/browser/tsconfig.json'");
     expect(config).toContain("name: 'chromium-desktop'");
     expect(config).toContain("name: 'chromium-mobile'");
     expect(config).toContain(
