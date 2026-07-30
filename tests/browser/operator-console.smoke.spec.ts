@@ -92,9 +92,7 @@ test.describe('production operator console', () => {
       page.getByRole('heading', { name: 'Factory Floor' }),
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
-    await expect(
-      page.getByText('ok', { exact: true }).first(),
-    ).toBeVisible();
+    await expect(page.getByText('ok', { exact: true }).first()).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Projection freshness' }),
     ).toBeVisible();
