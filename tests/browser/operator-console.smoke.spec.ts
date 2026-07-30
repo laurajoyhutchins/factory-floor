@@ -93,7 +93,7 @@ test.describe('production operator console', () => {
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(
-      page.getByText('healthy', { exact: true }).first(),
+      page.getByText('ok', { exact: true }).first(),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Projection freshness' }),
@@ -190,15 +190,18 @@ test.describe('production operator console', () => {
       releaseRunStatus = resolve;
     });
     const runStatusPath = new RegExp(`/api/v1/operator/runs/${fixture.runId}$`);
-    await page.route(runStatusPath, async (route) => {
-      await runStatusGate;
-      await route.continue();
-    });
+    await page.route(
+      runStatusPath,
+      async (route) => {
+        await runStatusGate;
+        await route.continue();
+      },
+      { times: 1 },
+    );
 
     await page.goto(`/runs/${fixture.runId}`);
     await expect(page.getByText('Loading…').first()).toBeVisible();
     releaseRunStatus();
-    await page.unroute(runStatusPath);
 
     await expect(
       page.getByRole('heading', { name: 'Run status' }),
