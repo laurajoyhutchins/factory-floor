@@ -80,7 +80,9 @@ test.describe('production operator console', () => {
       if (!response.url().includes('/api/v1/inspect/stream')) return;
       void response
         .text()
-        .then((text) => streamBatches.push(parseStreamBatch(response.url(), text)))
+        .then((text) =>
+          streamBatches.push(parseStreamBatch(response.url(), text)),
+        )
         .catch(() => undefined);
     });
 
@@ -181,7 +183,7 @@ test.describe('production operator console', () => {
     page,
   }) => {
     const errors = browserErrors(page);
-    let releaseRunStatus = () => undefined;
+    let releaseRunStatus: () => void = () => {};
     const runStatusGate = new Promise<void>((resolve) => {
       releaseRunStatus = resolve;
     });
@@ -216,7 +218,9 @@ test.describe('production operator console', () => {
     await expect(
       page.getByRole('heading', { name: 'Run governance and lineage' }),
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Artifact derivations' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Artifact derivations' }),
+    ).toBeVisible();
 
     const finiteEvents = page
       .getByRole('heading', { name: 'Finite run event stream' })
@@ -226,8 +230,8 @@ test.describe('production operator console', () => {
     if ((await loadMore.count()) === 1) {
       await expect(loadMore).toBeEnabled();
       const resumeCursor = finiteEvents
-        .getByText('Resume cursor:', { exact: true })
-        .locator('button.copy');
+        .getByText(/Resume cursor:/)
+        .getByRole('button');
       await expect(resumeCursor).toHaveAttribute('title', /.+/);
       await loadMore.click();
       await expect
