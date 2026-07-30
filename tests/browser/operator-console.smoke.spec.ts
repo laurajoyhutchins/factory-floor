@@ -14,6 +14,9 @@ type StreamBatch = {
   ids: string[];
 };
 
+const expectedProbeError =
+  /^Failed to load resource: the server responded with a status of (401 \(Unauthorized\)|404 \(Not Found\))$/;
+
 function parseStreamBatch(url: string, text: string): StreamBatch {
   const ids: string[] = [];
   let cursor: string | null = null;
@@ -55,6 +58,10 @@ function browserErrors(page: Page) {
   });
   page.on('pageerror', (error) => errors.push(error.message));
   return errors;
+}
+
+function unexpectedBrowserErrors(errors: string[]) {
+  return errors.filter((error) => !expectedProbeError.test(error));
 }
 
 function recentRuntimeEvents(page: Page) {
@@ -101,7 +108,7 @@ test.describe('production operator console', () => {
       .poll(
         () =>
           streamBatches.findIndex((batch, index) => {
-            if (index === 0 || batch.ids.length === 0) return false;
+            if (index === 0) return false;
             const previous = streamBatches[index - 1];
             return (
               previous.ids.length > 0 &&
@@ -114,7 +121,7 @@ test.describe('production operator console', () => {
       .toBeGreaterThan(0);
 
     const continuationIndex = streamBatches.findIndex((batch, index) => {
-      if (index === 0 || batch.ids.length === 0) return false;
+      if (index === 0) return false;
       const previous = streamBatches[index - 1];
       return (
         previous.ids.length > 0 &&
@@ -126,8 +133,14 @@ test.describe('production operator console', () => {
       continuationIndex - 1,
       continuationIndex + 1,
     );
-    const expectedIds = [...new Set(continued.flatMap((batch) => batch.ids))];
-    expect(expectedIds.length).toBeGreaterThan(continued[0].ids.length);
+    expect(continued).toHaveLength(2);
+    expect(continued[0].ids.length).toBeGreaterThan(0);
+    expect(new URL(continued[1].url).searchParams.get('cursor')).toBe(
+      continued[0].cursor,
+    );
+    const continuedIds = continued.flatMap((batch) => batch.ids);
+    const expectedIds = [...new Set(continuedIds)];
+    expect(expectedIds).toHaveLength(continuedIds.length);
 
     const renderedIds = recentRuntimeEvents(page).locator(
       'tbody tr td:first-child button.copy',
@@ -251,6 +264,9 @@ test.describe('production operator console', () => {
       return { status: response.status };
     });
     expect(unauthorized).toEqual({ status: 401 });
+    await expect
+      .poll(() => errors.some((error) => error.includes('401 (Unauthorized)')))
+      .toBe(true);
 
     const detailsPath = new RegExp(
       `/api/v1/operator/runs/${fixture.runId}/details(?:\\?.*)?$`,
@@ -285,8 +301,11 @@ test.describe('production operator console', () => {
     await expect(
       page.getByText('The selected record was not found.').first(),
     ).toBeVisible();
+    await expect
+      .poll(() => errors.some((error) => error.includes('404 (Not Found)')))
+      .toBe(true);
 
-    expect(errors).toEqual([]);
+    expect(unexpectedBrowserErrors(errors)).toEqual([]);
   });
 
   test('keeps the production shell inside representative viewports', async ({
