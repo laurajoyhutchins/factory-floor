@@ -98,6 +98,13 @@ describe('production operator browser smoke', () => {
     expect(spec).toContain("getByText('Loading…')");
     expect(spec).toContain("getByText('disconnected')");
     expect(spec).toContain('status: 401');
+    expect(spec).toContain('unexpectedBrowserErrors(errors)');
+    expect(spec).not.toContain(
+      "errors.some((error) => error.includes('401 (Unauthorized)'))",
+    );
+    expect(spec).not.toContain(
+      "errors.some((error) => error.includes('404 (Not Found)'))",
+    );
     expect(spec).toContain(
       'No artifact derivations are associated with this run.',
     );
