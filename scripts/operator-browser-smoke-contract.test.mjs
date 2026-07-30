@@ -83,6 +83,7 @@ describe('production operator browser smoke', () => {
       'No artifact derivations are associated with this run.',
     );
     expect(spec).toContain('The selected record was not found.');
+    expect(spec).toContain("name: 'Text topology'");
     expect(spec).toContain('document.documentElement.scrollWidth');
     expect(spec).toContain('keyboard.press');
     expect(spec).toContain('page.goto(`/runs/${fixture.runId}`)');
