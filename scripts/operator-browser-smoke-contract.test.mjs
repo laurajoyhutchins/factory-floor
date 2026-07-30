@@ -44,6 +44,8 @@ describe('production operator browser smoke', () => {
     expect(runner).toContain("'apps/control-plane/src/server.ts'");
     expect(runner).toContain("'vite'");
     expect(runner).toContain("'playwright.config.mjs'");
+    expect(runner).toContain("'--tsconfig'");
+    expect(runner).toContain("'tests/browser/tsconfig.json'");
     expect(runner).toContain("['services:up']");
     expect(runner).toContain("['services:wait']");
     expect(runner).toContain("['db:migrate']");
