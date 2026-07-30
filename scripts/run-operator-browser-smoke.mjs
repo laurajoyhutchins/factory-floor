@@ -319,7 +319,7 @@ try {
 
   await run(
     'pnpm',
-    ['exec', 'playwright', 'test', '--config', 'playwright.config.ts'],
+    ['exec', 'playwright', 'test', '--config', 'playwright.config.mjs'],
     'run Playwright operator smoke',
     { FACTORY_FLOOR_BROWSER_BASE_URL: consoleUrl },
   );
