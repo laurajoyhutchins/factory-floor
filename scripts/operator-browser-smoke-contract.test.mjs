@@ -15,7 +15,7 @@ const workflow = YAML.parse(
 );
 
 describe('production operator browser smoke', () => {
-  it('uses a pinned project-level Playwright runner', () => {
+  it('uses a pinned five-project Playwright matrix', () => {
     expect(packageJson.devDependencies['@playwright/test']).toBeDefined();
     expect(lockfile).toContain("'@playwright/test':");
     expect(packageJson.scripts['test:browser:smoke']).toBe(
@@ -26,9 +26,22 @@ describe('production operator browser smoke', () => {
     expect(existsSync(join(root, 'tests/browser/tsconfig.json'))).toBe(true);
 
     const config = read('playwright.config.mjs');
+    expect(config).toContain("import { defineConfig, devices } from '@playwright/test'");
     expect(config).toContain("tsconfig: './tests/browser/tsconfig.json'");
     expect(config).toContain("name: 'chromium-desktop'");
+    expect(config).toContain("name: 'firefox-desktop'");
+    expect(config).toContain("name: 'webkit-desktop'");
     expect(config).toContain("name: 'chromium-mobile'");
+    expect(config).toContain("name: 'webkit-mobile'");
+    expect(config).toContain("devices['Desktop Chrome']");
+    expect(config).toContain("devices['Desktop Firefox']");
+    expect(config).toContain("devices['Desktop Safari']");
+    expect(config).toContain("devices['Pixel 5']");
+    expect(config).toContain("devices['iPhone 13']");
+    expect(config).toContain('const desktopViewport = { width: 1440, height: 900 }');
+    expect(config).toContain('const mobileViewport = { width: 390, height: 844 }');
+    expect(config).not.toContain("browserName: 'chromium'");
+    expect(config).toContain('workers: 1');
     expect(config).toContain(
       "outputDir: '.factory-floor/browser-smoke/test-results'",
     );
@@ -91,7 +104,7 @@ describe('production operator browser smoke', () => {
     expect(consoleMain).toContain('createRunDetailsClient');
   });
 
-  it('makes the browser smoke required and retains actionable failure evidence', () => {
+  it('makes the cross-browser smoke required and retains actionable failure evidence', () => {
     const service = workflow.jobs['service-verification'];
     const commands = service.steps.map((step) => step.run ?? '').join('\n');
     const artifactPaths = service.steps
@@ -99,8 +112,9 @@ describe('production operator browser smoke', () => {
       .map((step) => step.with?.path ?? '')
       .join('\n');
 
+    expect(service['timeout-minutes']).toBe(50);
     expect(commands).toContain(
-      'pnpm exec playwright install --with-deps chromium',
+      'pnpm exec playwright install --with-deps chromium firefox webkit',
     );
     expect(commands).toContain(
       'node scripts/run-ci-stage.mjs --stage browser-smoke',
