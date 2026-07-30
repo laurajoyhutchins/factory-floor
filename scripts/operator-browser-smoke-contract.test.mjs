@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(root, path), 'utf8');
 const json = (path) => JSON.parse(read(path));
 
 const packageJson = json('package.json');
+const lockfile = read('pnpm-lock.yaml');
 const workflow = YAML.parse(
   read('.github/workflows/repository-verification.yml'),
 );
@@ -16,6 +17,7 @@ const workflow = YAML.parse(
 describe('production operator browser smoke', () => {
   it('uses a pinned project-level Playwright runner', () => {
     expect(packageJson.devDependencies['@playwright/test']).toBeDefined();
+    expect(lockfile).toContain("'@playwright/test':");
     expect(packageJson.scripts['test:browser:smoke']).toBe(
       'node scripts/run-operator-browser-smoke.mjs',
     );
@@ -65,13 +67,15 @@ describe('production operator browser smoke', () => {
   it('proves cursor continuity, canonical states, lineage, and responsive views', () => {
     const spec = read('tests/browser/operator-console.smoke.spec.ts');
     const consoleMain = read('apps/console/src/main.tsx');
-    expect(spec).toContain('new URL(batch.url).searchParams.get(\'cursor\')');
+    expect(spec).toContain("new URL(batch.url).searchParams.get('cursor')");
     expect(spec).toContain('expectedIds.every');
     expect(spec).toContain('new Set(ids).size');
     expect(spec).toContain("getByText('Loading…')");
     expect(spec).toContain("getByText('disconnected')");
     expect(spec).toContain('status: 401');
-    expect(spec).toContain('No artifact derivations are associated with this run.');
+    expect(spec).toContain(
+      'No artifact derivations are associated with this run.',
+    );
     expect(spec).toContain('The selected record was not found.');
     expect(spec).toContain('document.documentElement.scrollWidth');
     expect(spec).toContain('keyboard.press');
