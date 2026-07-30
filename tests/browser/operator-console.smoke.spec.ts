@@ -189,7 +189,9 @@ test.describe('production operator console', () => {
     await expect(
       page.getByRole('heading', { name: 'Topology', exact: true }),
     ).toBeVisible();
-    await expect(page.getByText('Text alternative')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Text topology', exact: true }),
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });
