@@ -26,7 +26,9 @@ describe('production operator browser smoke', () => {
     expect(existsSync(join(root, 'tests/browser/tsconfig.json'))).toBe(true);
 
     const config = read('playwright.config.mjs');
-    expect(config).toContain("import { defineConfig, devices } from '@playwright/test'");
+    expect(config).toContain(
+      "import { defineConfig, devices } from '@playwright/test'",
+    );
     expect(config).toContain("tsconfig: './tests/browser/tsconfig.json'");
     expect(config).toContain("name: 'chromium-desktop'");
     expect(config).toContain("name: 'firefox-desktop'");
@@ -38,8 +40,12 @@ describe('production operator browser smoke', () => {
     expect(config).toContain("devices['Desktop Safari']");
     expect(config).toContain("devices['Pixel 5']");
     expect(config).toContain("devices['iPhone 13']");
-    expect(config).toContain('const desktopViewport = { width: 1440, height: 900 }');
-    expect(config).toContain('const mobileViewport = { width: 390, height: 844 }');
+    expect(config).toContain(
+      'const desktopViewport = { width: 1440, height: 900 }',
+    );
+    expect(config).toContain(
+      'const mobileViewport = { width: 390, height: 844 }',
+    );
     expect(config).not.toContain("browserName: 'chromium'");
     expect(config).toContain('workers: 1');
     expect(config).toContain(
