@@ -7,6 +7,7 @@ if (!baseURL) {
 
 export default defineConfig({
   testDir: './tests/browser',
+  tsconfig: './tests/browser/tsconfig.json',
   outputDir: '.factory-floor/browser-smoke/test-results',
   fullyParallel: false,
   workers: 1,
