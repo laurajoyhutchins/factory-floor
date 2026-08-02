@@ -53,7 +53,8 @@ const runDetailsClient = createRunDetailsClient({
   adapter: 'standalone-console',
 });
 
-const portfolioBaseUrl = import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
+const portfolioBaseUrl =
+  import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
 const portfolioClient = portfolioBaseUrl
   ? createPortfolioClient({
       baseUrl: portfolioBaseUrl,
@@ -115,7 +116,10 @@ function App() {
             />
           }
         />
-        <Route path="/portfolio" element={<Portfolio client={portfolioClient} />} />
+        <Route
+          path="/portfolio"
+          element={<Portfolio client={portfolioClient} />}
+        />
         <Route path="/topology" element={<Topology />} />
         <Route path="/executions" element={<Executions />} />
         <Route path="/executions/:executionId" element={<ExecutionDetail />} />
