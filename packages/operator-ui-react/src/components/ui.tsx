@@ -116,6 +116,7 @@ export function Shell({
         <p className="eyebrow">Read-only operator console</p>
         <nav aria-label="Primary">
           <NavLink to="/">Overview</NavLink>
+          <NavLink to="/portfolio">Portfolio</NavLink>
           <NavLink to="/topology">Topology</NavLink>
           <NavLink to="/executions">Executions</NavLink>
           <NavLink to="/artifacts">Artifacts</NavLink>
