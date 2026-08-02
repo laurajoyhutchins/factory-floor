@@ -65,10 +65,10 @@ describe('portfolio read client', () => {
     await expect(
       client.search({ query: 'failure evidence', route: 'hecate', limit: 25 }),
     ).resolves.toEqual({ items: [projection] });
-    const [url] = fetch.mock.calls[0] ?? [];
-    expect(String(url)).toContain('q=failure+evidence');
-    expect(String(url)).toContain('route=hecate');
-    expect(String(url)).toContain('limit=25');
+    const calls = fetch.mock.calls as unknown as [string, RequestInit][];
+    expect(String(calls[0]?.[0])).toContain('query=failure+evidence');
+    expect(String(calls[0]?.[0])).toContain('route=hecate');
+    expect(String(calls[0]?.[0])).toContain('limit=25');
   });
 
   it('retries transient reads and rejects malformed JSON', async () => {
