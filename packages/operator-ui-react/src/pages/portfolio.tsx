@@ -11,9 +11,9 @@ const rec = (value: unknown): PortfolioRecord =>
     : {};
 const arr = (value: unknown): PortfolioRecord[] =>
   Array.isArray(value) ? value.map(rec) : [];
-const text = (value: unknown, fallback = '—') =>
+const text = (value: unknown, fallback: unknown = '—') =>
   value === null || value === undefined || value === ''
-    ? fallback
+    ? String(fallback ?? '—')
     : String(value);
 const count = (value: unknown) =>
   Number.isFinite(Number(value)) ? String(Number(value)) : '0';
