@@ -118,7 +118,9 @@ function ConnectedPortfolio({ client }: { client: PortfolioClient }) {
         <p>Unable to load portfolio state.</p>
         <button
           type="button"
-          onClick={() => void Promise.all(queries.map((query) => query.refetch()))}
+          onClick={() =>
+            void Promise.all(queries.map((query) => query.refetch()))
+          }
         >
           Retry safe reads
         </button>
@@ -130,7 +132,9 @@ function ConnectedPortfolio({ client }: { client: PortfolioClient }) {
   const selected = rec(nextData.work);
   const decisionItems = ownerDecisions.data?.items ?? [];
   const entityItems = entities.data?.items ?? [];
-  const executable = entityItems.filter((item) => item.executable === true).length;
+  const executable = entityItems.filter(
+    (item) => item.executable === true,
+  ).length;
   const blocked = entityItems.filter(
     (item) => arr(item.blockers).length > 0,
   ).length;
@@ -147,7 +151,10 @@ function ConnectedPortfolio({ client }: { client: PortfolioClient }) {
           title="Observations"
           value={count(statusData.observation_count)}
         />
-        <Metric title="Projections" value={count(statusData.projection_count)} />
+        <Metric
+          title="Projections"
+          value={count(statusData.projection_count)}
+        />
         <Metric title="Executable" value={String(executable)} />
         <Metric title="Blocked" value={String(blocked)} />
         <Metric
@@ -199,7 +206,9 @@ function ConnectedPortfolio({ client }: { client: PortfolioClient }) {
                     <h4>{text(portfolio.title, portfolio.semantic_key)}</h4>
                     <div>
                       <StatusBadge value={portfolio.route} />{' '}
-                      <StatusBadge value={portfolio.state ?? entity.lifecycle} />
+                      <StatusBadge
+                        value={portfolio.state ?? entity.lifecycle}
+                      />
                     </div>
                   </div>
                   <p>{text(portfolio.objective, entity.next_action)}</p>
