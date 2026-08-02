@@ -75,7 +75,9 @@ describe('portfolio read client', () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(json({ error: 'busy' }, { status: 503 }))
-      .mockResolvedValueOnce(json({ schema: 'portfolio-next-work-v1', work: null }));
+      .mockResolvedValueOnce(
+        json({ schema: 'portfolio-next-work-v1', work: null }),
+      );
     const client = createPortfolioClient({
       fetch,
       retry: { maxAttempts: 2, sleep: async () => undefined },
