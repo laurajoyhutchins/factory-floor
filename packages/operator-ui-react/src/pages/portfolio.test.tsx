@@ -82,8 +82,8 @@ describe('Portfolio page', () => {
       await screen.findByRole('heading', { name: 'Next eligible work' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Retain attributable CI failure evidence'),
-    ).toBeInTheDocument();
+      screen.getAllByText('Retain attributable CI failure evidence'),
+    ).toHaveLength(2);
     expect(screen.getByText('41')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('hecate')).toBeInTheDocument();
