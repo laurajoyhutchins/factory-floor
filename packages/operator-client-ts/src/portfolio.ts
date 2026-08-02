@@ -34,11 +34,7 @@ export type PortfolioNextWork = PortfolioRecord & {
 };
 
 export type PortfolioClientFailureKind =
-  | 'transport'
-  | 'http'
-  | 'malformed-response'
-  | 'not-found'
-  | 'aborted';
+  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
 
 export class PortfolioClientError extends Error {
   constructor(
