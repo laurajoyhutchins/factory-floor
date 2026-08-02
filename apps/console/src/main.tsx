@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
   ArtifactDetail,
@@ -14,6 +15,7 @@ import {
   Operations,
   Overview,
   PendingApprovals,
+  Portfolio,
   RunDetailsPanel,
   RunOperatorWorkspace,
   Shell,
@@ -51,7 +53,16 @@ const runDetailsClient = createRunDetailsClient({
   adapter: 'standalone-console',
 });
 
+const portfolioBaseUrl = import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
+const portfolioClient = portfolioBaseUrl
+  ? createPortfolioClient({
+      baseUrl: portfolioBaseUrl,
+      token: import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_TOKEN?.trim(),
+    })
+  : undefined;
+
 const titles: Record<string, string> = {
+  portfolio: 'Portfolio',
   topology: 'Topology',
   executions: 'Executions',
   artifacts: 'Artifacts',
@@ -104,6 +115,7 @@ function App() {
             />
           }
         />
+        <Route path="/portfolio" element={<Portfolio client={portfolioClient} />} />
         <Route path="/topology" element={<Topology />} />
         <Route path="/executions" element={<Executions />} />
         <Route path="/executions/:executionId" element={<ExecutionDetail />} />
