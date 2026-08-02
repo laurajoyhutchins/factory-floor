@@ -86,8 +86,8 @@ describe('Portfolio page', () => {
     ).toHaveLength(2);
     expect(screen.getByText('41')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('hecate')).toBeInTheDocument();
-    expect(screen.getByText(/linear:LJH-126@revision/)).toBeInTheDocument();
+    expect(screen.getAllByText('hecate')).toHaveLength(2);
+    expect(screen.getAllByText(/linear:LJH-126@revision/)).toHaveLength(2);
     const ownerSection = screen
       .getByRole('heading', { name: 'Owner decisions' })
       .closest('section');
