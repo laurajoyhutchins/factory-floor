@@ -92,7 +92,9 @@ describe('Portfolio page', () => {
       .getByRole('heading', { name: 'Owner decisions' })
       .closest('section');
     if (!ownerSection) throw new Error('Owner decisions section missing');
-    expect(within(ownerSection).getByText('No owner decisions.')).toBeInTheDocument();
+    expect(
+      within(ownerSection).getByText('No owner decisions.'),
+    ).toBeInTheDocument();
   });
 
   it('shows explicit no-work and disconnected states', async () => {
