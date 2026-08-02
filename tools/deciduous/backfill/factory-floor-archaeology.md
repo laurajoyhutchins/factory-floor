@@ -223,7 +223,7 @@ The committed snapshot contains:
 - canonical Deciduous node types: `goal`, `decision`, `option`, `action`, `outcome`, `observation`, and `revisit`;
 - canonical statuses and edge types only;
 - stable `change_id` values;
-- source descriptions and commit metadata for implementation actions;
+- commit references embedded in implementation action titles and a detailed evidence ledger;
 - no dangling edge endpoints;
 - no directed cycles.
 
