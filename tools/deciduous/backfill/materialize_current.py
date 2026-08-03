@@ -27,8 +27,9 @@ def normalize_base_edge(edge: dict, nodes_by_numeric_id: dict[int, str]) -> dict
     edge_type = edge.get("edge_type", edge.get("relation", edge.get("type")))
     if not source or not target or not edge_type:
         raise ValueError(f"cannot normalize base edge: {edge}")
+    edge_id = edge.get("id")
     return {
-        "id": edge.get("id") or f"{source}--{edge_type}--{target}",
+        "id": str(edge_id) if edge_id is not None else f"{source}--{edge_type}--{target}",
         "from_change_id": source,
         "to_change_id": target,
         "edge_type": edge_type,
@@ -80,10 +81,11 @@ def materialize() -> dict:
             nodes.append(item)
         for edge in patch.get("edges", []):
             item = dict(edge)
+            item["id"] = str(item["id"])
             item["source"] = path.relative_to(ROOT).as_posix()
             edges.append(item)
     nodes.sort(key=lambda item: item["change_id"])
-    edges.sort(key=lambda item: item["id"])
+    edges.sort(key=lambda item: str(item["id"]))
     return {
         "schema": "factory-floor-archaeology-current-v1",
         "repository": "laurajoyhutchins/factory-floor",
