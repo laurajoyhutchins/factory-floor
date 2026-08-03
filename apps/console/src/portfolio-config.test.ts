@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('standalone Portfolio configuration', () => {
   it('does not ingest a bearer token from the build-time Vite environment', async () => {
     const source = await readFile(
-      new URL('./main.tsx', import.meta.url),
+      join(process.cwd(), 'apps/console/src/main.tsx'),
       'utf8',
     );
 
