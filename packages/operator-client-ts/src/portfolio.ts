@@ -102,13 +102,30 @@ function normalizeBaseUrl(value?: string): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
 
+  if (trimmed.startsWith('/')) {
+    if (trimmed.startsWith('//'))
+      throw new PortfolioClientError(
+        'invalid-config',
+        'Portfolio Control Plane baseUrl must not be protocol-relative.',
+      );
+    const parsed = new URL(trimmed, 'http://portfolio.local');
+    if (parsed.search || parsed.hash)
+      throw new PortfolioClientError(
+        'invalid-config',
+        'Portfolio Control Plane baseUrl must not contain a query or fragment.',
+      );
+    return parsed.pathname.endsWith('/')
+      ? parsed.pathname
+      : `${parsed.pathname}/`;
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
   } catch {
     throw new PortfolioClientError(
       'invalid-config',
-      'Portfolio Control Plane baseUrl must be a valid http or https URL.',
+      'Portfolio Control Plane baseUrl must be an absolute http(s) URL or an origin-relative path.',
     );
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
@@ -125,7 +142,11 @@ function normalizeBaseUrl(value?: string): string | undefined {
 }
 
 function targetUrl(baseUrl: string | undefined, path: string): string {
-  return baseUrl ? new URL(path.replace(/^\//, ''), baseUrl).toString() : path;
+  if (!baseUrl) return path;
+  const suffix = path.replace(/^\//, '');
+  return baseUrl.startsWith('/')
+    ? `${baseUrl}${suffix}`
+    : new URL(suffix, baseUrl).toString();
 }
 
 function withQuery(
