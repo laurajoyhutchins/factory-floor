@@ -1,0 +1,48 @@
+name: Validate archaeology
+
+on:
+  pull_request:
+    paths:
+      - '.deciduous/exports/factory-floor-archaeology.json'
+      - 'tools/deciduous/backfill/**'
+      - '.github/workflows/validate-archaeology.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Compile materializer and validator
+        run: |
+          python -m py_compile \
+            tools/deciduous/backfill/materialize_current.py \
+            tools/deciduous/backfill/validate_current.py
+      - name: Validate current base-plus-patch graph
+        run: python tools/deciduous/backfill/validate_current.py
+      - name: Prove deterministic materialization
+        run: |
+          first="$(mktemp)"
+          second="$(mktemp)"
+          python tools/deciduous/backfill/materialize_current.py --output "$first"
+          python tools/deciduous/backfill/materialize_current.py --output "$second"
+          cmp "$first" "$second"
+          python - "$first" <<'PY'
+          import json, sys
+          graph = json.load(open(sys.argv[1], encoding='utf-8'))
+          assert graph['node_count'] == 56
+          assert graph['edge_count'] == 56
+          assert len(graph['patches']) == 1
+          print('deterministic current graph: 56 nodes / 56 edges / 1 patch')
+          PY
