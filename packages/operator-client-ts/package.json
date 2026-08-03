@@ -8,6 +8,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./portfolio": "./src/portfolio.ts",
     "./run-details": "./src/run-details.ts"
   },
   "scripts": {
