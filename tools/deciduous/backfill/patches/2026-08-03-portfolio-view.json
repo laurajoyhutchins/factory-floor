@@ -1,0 +1,121 @@
+{
+  "schema": "factory-floor-archaeology-patch-v1",
+  "base_export": ".deciduous/exports/factory-floor-archaeology.json",
+  "base_node_count": 52,
+  "base_edge_count": 52,
+  "repository_head": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+  "nodes": [
+    {
+      "change_id": "25d95921-f117-598a-bab8-d868e41b6386",
+      "semantic_id": "observation.operator.portfolio-read-surface-needed",
+      "node_type": "observation",
+      "status": "completed",
+      "lifecycle_status": "completed",
+      "title": "Operators needed a source-neutral portfolio read surface without moving portfolio authority into Factory Floor",
+      "description": "The existing operator packages covered Factory Floor runtime state. A separate read-only client was needed to display Portfolio Control Plane projections while preserving their source-neutral and opaque semantics.",
+      "created_at": "2026-08-03T18:00:00Z",
+      "current": false,
+      "evidence": [
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "docs/reference/operator-packages.md"
+        }
+      ]
+    },
+    {
+      "change_id": "43fa9478-4fb4-5b73-bbb9-c33e61c387cd",
+      "semantic_id": "decision.operator.portfolio-control-plane-read-only",
+      "node_type": "decision",
+      "status": "active",
+      "lifecycle_status": "active",
+      "title": "Consume Portfolio Control Plane through a separate bounded read-only client",
+      "description": "The client exposes bounded GET operations, preserves opaque projection records, and provides no claim, outcome, reconciliation, execution, or owner-decision mutation method.",
+      "created_at": "2026-08-03T18:00:00Z",
+      "current": true,
+      "evidence": [
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "packages/operator-client-ts/src/portfolio.ts"
+        }
+      ]
+    },
+    {
+      "change_id": "2f4d0ee5-a6df-5a25-a545-098299ae6df4",
+      "semantic_id": "action.operator.add-portfolio-client-view",
+      "node_type": "action",
+      "status": "completed",
+      "lifecycle_status": "completed",
+      "title": "Add the portfolio client, reusable React view, and optional standalone route",
+      "description": "Factory Floor added a separate client export and read-only Portfolio view. The standalone console enables it only when a Portfolio Control Plane URL is configured.",
+      "created_at": "2026-08-03T18:00:00Z",
+      "current": false,
+      "evidence": [
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "packages/operator-ui-react/src/pages/portfolio.tsx"
+        },
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "apps/console/src/main.tsx"
+        }
+      ]
+    },
+    {
+      "change_id": "3d9ba0e2-66bd-5979-b2db-8af45881b929",
+      "semantic_id": "outcome.operator.portfolio-view-preserves-authority",
+      "node_type": "outcome",
+      "status": "active",
+      "lifecycle_status": "active",
+      "title": "Factory Floor can present portfolio projections without owning portfolio intent",
+      "description": "The Portfolio Control Plane remains authoritative for source-neutral coordination projections. Factory Floor remains authoritative for its own runtime and event state. This commit establishes a tested read surface, not a universal portfolio-to-execution integration.",
+      "created_at": "2026-08-03T18:00:00Z",
+      "current": true,
+      "evidence": [
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "docs/reference/operator-packages.md"
+        },
+        {
+          "kind": "commit",
+          "revision": "c377a86f0a1c4bec04e6e5c4f0f0578995d9f46b",
+          "path": "packages/operator-client-ts/src/portfolio.test.ts"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "08e12cfe-7f23-503c-874b-3cd8c48614dc--leads_to--25d95921-f117-598a-bab8-d868e41b6386",
+      "from_change_id": "08e12cfe-7f23-503c-874b-3cd8c48614dc",
+      "to_change_id": "25d95921-f117-598a-bab8-d868e41b6386",
+      "edge_type": "leads_to",
+      "rationale": "Reusable run-scoped operator packages created the boundary where another authority's read model could be presented without sharing state ownership."
+    },
+    {
+      "id": "25d95921-f117-598a-bab8-d868e41b6386--leads_to--43fa9478-4fb4-5b73-bbb9-c33e61c387cd",
+      "from_change_id": "25d95921-f117-598a-bab8-d868e41b6386",
+      "to_change_id": "43fa9478-4fb4-5b73-bbb9-c33e61c387cd",
+      "edge_type": "leads_to",
+      "rationale": "The authority boundary required a separate client with read-only methods and opaque responses."
+    },
+    {
+      "id": "43fa9478-4fb4-5b73-bbb9-c33e61c387cd--leads_to--2f4d0ee5-a6df-5a25-a545-098299ae6df4",
+      "from_change_id": "43fa9478-4fb4-5b73-bbb9-c33e61c387cd",
+      "to_change_id": "2f4d0ee5-a6df-5a25-a545-098299ae6df4",
+      "edge_type": "leads_to",
+      "rationale": "The bounded client decision was implemented in reusable client, view, and console packages."
+    },
+    {
+      "id": "2f4d0ee5-a6df-5a25-a545-098299ae6df4--leads_to--3d9ba0e2-66bd-5979-b2db-8af45881b929",
+      "from_change_id": "2f4d0ee5-a6df-5a25-a545-098299ae6df4",
+      "to_change_id": "3d9ba0e2-66bd-5979-b2db-8af45881b929",
+      "edge_type": "leads_to",
+      "rationale": "The tested read-only surface preserves the distinction between presentation and portfolio authority."
+    }
+  ]
+}
