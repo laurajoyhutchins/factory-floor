@@ -49,6 +49,23 @@ describe('portfolio read client', () => {
     ]);
   });
 
+  it.each([
+    'ftp://portfolio.example',
+    'file:///tmp/portfolio-control-plane',
+    'https://reader:secret@portfolio.example',
+    'https://portfolio.example?access_token=secret',
+    'https://portfolio.example/#credential-fragment',
+  ])('rejects unsafe configured base URL %s', (baseUrl) => {
+    try {
+      createPortfolioClient({ baseUrl });
+      throw new Error('Expected unsafe Portfolio base URL to be rejected.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PortfolioClientError);
+      if (!(error instanceof PortfolioClientError)) throw error;
+      expect(error.kind).toBe('invalid-config');
+    }
+  });
+
   it('preserves opaque projections and encodes bounded filters', async () => {
     const projection = {
       entity_key: 'work:release.ci.failure-evidence',
@@ -96,5 +113,32 @@ describe('portfolio read client', () => {
       }),
     );
     await expect(client.status()).rejects.toBeInstanceOf(PortfolioClientError);
+  });
+
+  it('classifies unknown transport failures without assuming an Error object', async () => {
+    const fetch = vi.fn(async () => Promise.reject(null));
+    const client = createPortfolioClient({
+      fetch,
+      retry: { maxAttempts: 1 },
+    });
+
+    await expect(client.status()).rejects.toMatchObject({
+      kind: 'transport',
+    });
+  });
+
+  it('does not retry an aborted request', async () => {
+    const sleep = vi.fn(async () => undefined);
+    const fetch = vi.fn(async () =>
+      Promise.reject({ name: 'AbortError' } as const),
+    );
+    const client = createPortfolioClient({
+      fetch,
+      retry: { maxAttempts: 3, sleep },
+    });
+
+    await expect(client.status()).rejects.toMatchObject({ kind: 'aborted' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
   });
 });
