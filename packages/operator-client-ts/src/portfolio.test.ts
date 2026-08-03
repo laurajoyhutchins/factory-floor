@@ -49,9 +49,31 @@ describe('portfolio read client', () => {
     ]);
   });
 
+  it('supports an origin-relative authenticated read proxy', async () => {
+    const fetch = vi.fn(async () =>
+      json({ schema: 'portfolio-reconciler-status-v1', mode: 'shadow' }),
+    );
+    const client = createPortfolioClient({
+      baseUrl: '/portfolio',
+      fetch,
+      retry: { maxAttempts: 1 },
+    });
+
+    await client.status();
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/portfolio/api/status',
+      expect.objectContaining({
+        method: 'GET',
+        credentials: 'include',
+      }),
+    );
+  });
+
   it.each([
     'ftp://portfolio.example',
     'file:///tmp/portfolio-control-plane',
+    '//portfolio.example',
     'https://reader:secret@portfolio.example',
     'https://portfolio.example?access_token=secret',
     'https://portfolio.example/#credential-fragment',
