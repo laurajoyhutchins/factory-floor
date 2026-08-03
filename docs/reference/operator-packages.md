@@ -41,7 +41,7 @@ const portfolio = createPortfolioClient({
 });
 ```
 
-The configured base URL must use HTTP or HTTPS and must not contain credentials, a query, or a fragment. Hosts may omit `token` when authentication is provided by an HTTP-only session cookie or a same-origin authenticated read proxy.
+The configured base URL must be an absolute HTTP(S) URL or an origin-relative path. It must not contain credentials, a query, or a fragment, and protocol-relative URLs are rejected. Hosts may omit `token` when authentication is provided by an HTTP-only session cookie or a same-origin authenticated read proxy.
 
 The portfolio client has no outcome, owner-decision request, ingestion, reconciliation, execution, or other mutation method. It retries transient reads only.
 
