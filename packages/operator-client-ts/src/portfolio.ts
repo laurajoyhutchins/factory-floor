@@ -34,7 +34,12 @@ export type PortfolioNextWork = PortfolioRecord & {
 };
 
 export type PortfolioClientFailureKind =
-  'transport' | 'http' | 'malformed-response' | 'not-found' | 'aborted';
+  | 'invalid-config'
+  | 'transport'
+  | 'http'
+  | 'malformed-response'
+  | 'not-found'
+  | 'aborted';
 
 export class PortfolioClientError extends Error {
   constructor(
@@ -96,11 +101,52 @@ function recordArray(value: unknown, description: string): PortfolioRecord[] {
 function normalizeBaseUrl(value?: string): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
-  return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+
+  if (trimmed.startsWith('/')) {
+    if (trimmed.startsWith('//'))
+      throw new PortfolioClientError(
+        'invalid-config',
+        'Portfolio Control Plane baseUrl must not be protocol-relative.',
+      );
+    const parsed = new URL(trimmed, 'http://portfolio.local');
+    if (parsed.search || parsed.hash)
+      throw new PortfolioClientError(
+        'invalid-config',
+        'Portfolio Control Plane baseUrl must not contain a query or fragment.',
+      );
+    return parsed.pathname.endsWith('/')
+      ? parsed.pathname
+      : `${parsed.pathname}/`;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new PortfolioClientError(
+      'invalid-config',
+      'Portfolio Control Plane baseUrl must be an absolute http(s) URL or an origin-relative path.',
+    );
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    throw new PortfolioClientError(
+      'invalid-config',
+      'Portfolio Control Plane baseUrl must use http or https.',
+    );
+  if (parsed.username || parsed.password || parsed.search || parsed.hash)
+    throw new PortfolioClientError(
+      'invalid-config',
+      'Portfolio Control Plane baseUrl must not contain credentials, a query, or a fragment.',
+    );
+  return parsed.href.endsWith('/') ? parsed.href : `${parsed.href}/`;
 }
 
 function targetUrl(baseUrl: string | undefined, path: string): string {
-  return baseUrl ? new URL(path.replace(/^\//, ''), baseUrl).toString() : path;
+  if (!baseUrl) return path;
+  const suffix = path.replace(/^\//, '');
+  return baseUrl.startsWith('/')
+    ? `${baseUrl}${suffix}`
+    : new URL(suffix, baseUrl).toString();
 }
 
 function withQuery(
@@ -124,17 +170,22 @@ function transientStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+function isAbortError(value: unknown): boolean {
+  return recordLike(value) && value.name === 'AbortError';
+}
+
+function recordLike(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function errorDetails(value: unknown): { code?: string; message?: string } {
-  if (value === null || typeof value !== 'object' || Array.isArray(value))
-    return {};
-  const error = (value as PortfolioRecord).error;
-  if (error && typeof error === 'object' && !Array.isArray(error)) {
-    const item = error as PortfolioRecord;
+  if (!recordLike(value)) return {};
+  const error = value.error;
+  if (recordLike(error))
     return {
-      code: typeof item.code === 'string' ? item.code : undefined,
-      message: typeof item.message === 'string' ? item.message : undefined,
+      code: typeof error.code === 'string' ? error.code : undefined,
+      message: typeof error.message === 'string' ? error.message : undefined,
     };
-  }
   return {
     message: typeof error === 'string' ? error : undefined,
   };
@@ -170,7 +221,7 @@ export function createPortfolioClient(
           },
         });
       } catch (error) {
-        if ((error as Error).name === 'AbortError')
+        if (isAbortError(error))
           throw new PortfolioClientError('aborted', 'Request was cancelled.');
         if (attempt < maxAttempts) {
           await sleep(baseDelayMs * 2 ** (attempt - 1));

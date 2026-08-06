@@ -56,10 +56,7 @@ const runDetailsClient = createRunDetailsClient({
 const portfolioBaseUrl =
   import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
 const portfolioClient = portfolioBaseUrl
-  ? createPortfolioClient({
-      baseUrl: portfolioBaseUrl,
-      token: import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_TOKEN?.trim(),
-    })
+  ? createPortfolioClient({ baseUrl: portfolioBaseUrl })
   : undefined;
 
 const titles: Record<string, string> = {

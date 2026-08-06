@@ -30,6 +30,8 @@ Mutation retries remain the caller's responsibility and must reuse the same dura
 
 The `./portfolio` export provides a separate `createPortfolioClient` for the source-neutral Portfolio Control Plane. It exposes only bounded `GET` operations for status, entities, one entity, deterministic next-work selection, owner decisions, and search. Responses remain opaque projection records so the client cannot silently reinterpret LORE, Deciduous, GitHub, Linear migration evidence, or execution evidence.
 
+A server-rendered or runtime-authenticated host may inject a short-lived read credential directly into the client:
+
 ```ts
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 
@@ -38,6 +40,8 @@ const portfolio = createPortfolioClient({
   token: shortLivedPortfolioReadToken,
 });
 ```
+
+The configured base URL must be an absolute HTTP(S) URL or an origin-relative path. It must not contain credentials, a query, or a fragment, and protocol-relative URLs are rejected. Hosts may omit `token` when authentication is provided by an HTTP-only session cookie or a same-origin authenticated read proxy.
 
 The portfolio client has no outcome, owner-decision request, ingestion, reconciliation, execution, or other mutation method. It retries transient reads only.
 
@@ -58,7 +62,7 @@ The host still owns:
 
 The standalone console is the first consumer. Its only client-specific module reads Vite environment values, creates the reusable clients, and configures the default facade before rendering the shared views.
 
-For a trusted private standalone build, the Portfolio page is enabled with `VITE_PORTFOLIO_CONTROL_PLANE_URL`. `VITE_PORTFOLIO_CONTROL_PLANE_TOKEN` is optional and must never contain a long-lived administrative credential. Public or shared deployments must use an authenticated same-origin read proxy or a short-lived audience-limited read token rather than embedding an admin token in browser assets.
+For a trusted private standalone build, the Portfolio page is enabled with `VITE_PORTFOLIO_CONTROL_PLANE_URL`. The standalone Vite build deliberately accepts no Portfolio bearer-token environment variable because `VITE_*` values are compiled into browser assets. The configured endpoint must therefore authenticate reads through a secure HTTP-only session or an authenticated same-origin proxy. Runtime hosts that can inject genuinely short-lived credentials may use the reusable client's `token` option without adding that credential to static build configuration.
 
 ## Boundary rules
 
