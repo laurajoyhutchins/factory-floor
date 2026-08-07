@@ -23,25 +23,29 @@ describe('Deciduous artifact coordinate', () => {
     expect(ajv.validate(schema, coordinate), ajv.errorsText()).toBe(true);
   });
 
-  it('matches the reviewed Offline Execution Deciduous payload identity', async () => {
-    const coordinate = await readJson(coordinatePath);
+  it(
+    'matches the reviewed Offline Execution Deciduous payload identity',
+    async () => {
+      const coordinate = await readJson(coordinatePath);
 
-    expect(coordinate).toMatchObject({
-      tool_name: 'deciduous',
-      version: '0.16.0',
-      target_platform: 'x86_64-unknown-linux-musl',
-      sha256: '6bb5a475124ff5453fd088d13ae092593d9d8dea8bafecec9e4e5192216ada0e',
-      source_provenance: {
-        repository: 'notactuallytreyanastasio/deciduous',
-        commit: '33002b3713752f69a98acaedb42efbc3316deaeb',
-        release_tag: 'v0.16.0',
-      },
-      review_status: 'reviewed',
-      storage_location: {
-        authority: 'laurajoyhutchins/offline-execution',
-        path: 'tools/deciduous/0.16.0-linux-amd64/manifest.json#payload',
-      },
-      verification_date: '2026-07-30',
-    });
-  });
+      expect(coordinate).toMatchObject({
+        tool_name: 'deciduous',
+        version: '0.16.0',
+        target_platform: 'x86_64-unknown-linux-musl',
+        sha256:
+          '6bb5a475124ff5453fd088d13ae092593d9d8dea8bafecec9e4e5192216ada0e',
+        source_provenance: {
+          repository: 'notactuallytreyanastasio/deciduous',
+          commit: '33002b3713752f69a98acaedb42efbc3316deaeb',
+          release_tag: 'v0.16.0',
+        },
+        review_status: 'reviewed',
+        storage_location: {
+          authority: 'laurajoyhutchins/offline-execution',
+          path: 'tools/deciduous/0.16.0-linux-amd64/manifest.json#payload',
+        },
+        verification_date: '2026-07-30',
+      });
+    },
+  );
 });
