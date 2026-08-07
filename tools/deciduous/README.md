@@ -25,6 +25,8 @@ cargo install deciduous --version 0.16.0 --locked
 
 A reviewed prebuilt release binary may also be used. The repository wrapper never installs or upgrades Deciduous automatically.
 
+The reviewed prebuilt binary is identified by `deciduous-0.16.0-linux-amd64.coordinate.json`. That record uses the repository-neutral `artifact-coordinate.schema.json` contract and binds the Factory Floor pilot to the exact payload identity, source provenance, review status, storage authority, and verification date recorded by Offline Execution. The coordinate is evidence about a reviewed binary, not an instruction to download or install it.
+
 Verify the executable before use:
 
 ```bash
