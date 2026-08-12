@@ -66,9 +66,7 @@ describe('operator intervention controls', () => {
 
     renderWithClient(<ApprovalInterventionQueue />);
 
-    expect(
-      await screen.findByRole('region', { name: 'Approval intervention context' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Approval approval-context')).toBeInTheDocument();
     for (const heading of [
       'Policy decision',
       'Artifacts',
