@@ -9,6 +9,7 @@ import {
 } from '../../../packages/db/src/index.js';
 import {
   CommandService,
+  ResourceAdmissionService,
   StartupRecoveryService,
   WorkerProtocolService,
 } from '../../../packages/runtime-core/src/index.js';
@@ -217,5 +218,86 @@ describe('attempt and delivery lease coherence', () => {
       lease_token: claimed.envelope.leaseToken,
       lease_expires_at: new Date(heartbeat.leaseExpiresAt),
     });
+  });
+
+  it('returns concurrent-execution capacity after terminal startup recovery', async () => {
+    const region = await db
+      .selectFrom('regions')
+      .select('id')
+      .where('name', '=', 'investigation')
+      .executeTakeFirstOrThrow();
+    await new ResourceAdmissionService(db).configureRegionBudgets({
+      regionId: region.id,
+      budgets: { maximumConcurrentExecutions: 1 },
+      source: { kind: 'integration-test' },
+    });
+    const commands = new CommandService(
+      db,
+      undefined,
+      undefined,
+      () => new Date(now),
+    );
+    const workers = new WorkerProtocolService(
+      db,
+      undefined,
+      { leaseDurationMs: 60_000, baseUrl: 'http://127.0.0.1:3000' },
+      () => new Date(now),
+    );
+
+    await commands.submit({
+      region: '/investigation',
+      commandType: 'investigation.start',
+      source: { kind: 'user', subject: 'recovery-admission-test' },
+      payload: { objective: 'occupy the execution slot' },
+      correlationId: 'recovery-admission-first',
+      idempotencyKey: 'recovery-admission-first',
+    });
+    await db
+      .updateTable('deliveries')
+      .set({ available_at: now })
+      .where('correlation_id', '=', 'recovery-admission-first')
+      .execute();
+    const firstClaim = await workers.claim({
+      workerId: 'worker-a',
+      capabilities: ['retrieve@1'],
+    });
+    if (!firstClaim.claimed) throw new Error('expected first claim');
+    await db
+      .updateTable('execution_attempts')
+      .set({ attempt_number: 4 })
+      .where('id', '=', firstClaim.envelope.attemptId)
+      .execute();
+
+    now = new Date('2026-07-16T00:02:00.000Z');
+    await new StartupRecoveryService(db, { clock: () => new Date(now) }).run({
+      projectionBatchSize: 50,
+      reconciliationBatchSize: 50,
+    });
+    expect(
+      await db
+        .selectFrom('executions')
+        .select('status')
+        .where('id', '=', firstClaim.envelope.executionId)
+        .executeTakeFirstOrThrow(),
+    ).toEqual({ status: 'failed' });
+
+    await commands.submit({
+      region: '/investigation',
+      commandType: 'investigation.start',
+      source: { kind: 'user', subject: 'recovery-admission-test' },
+      payload: { objective: 'reuse the recovered execution slot' },
+      correlationId: 'recovery-admission-second',
+      idempotencyKey: 'recovery-admission-second',
+    });
+    await db
+      .updateTable('deliveries')
+      .set({ available_at: now })
+      .where('correlation_id', '=', 'recovery-admission-second')
+      .execute();
+    const secondClaim = await workers.claim({
+      workerId: 'worker-b',
+      capabilities: ['retrieve@1'],
+    });
+    expect(secondClaim.claimed).toBe(true);
   });
 });
