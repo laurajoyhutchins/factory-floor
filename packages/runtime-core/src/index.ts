@@ -9,6 +9,7 @@ export * from './routing/routing-service.js';
 export * from './scheduling/lease.js';
 export * from './scheduling/scheduler-service.js';
 export * from './scheduling/resource-admission-service.js';
+export * from './scheduling/execution-admission.js';
 export * from './registration/registration-service.js';
 export * from './systems/system-application-service.js';
 export {
