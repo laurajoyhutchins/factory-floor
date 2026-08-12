@@ -90,7 +90,7 @@ Regions have lifecycle states from declared through ready, running, completing, 
 
 Topology is immutable and versioned per region. Every accepted graph change creates a complete effective local revision, and executions retain the revision that dispatched them. Dynamic regions cannot modify ancestor topology.
 
-Policy outcomes are `deny`, `require-approval`, `modify`, and `allow`, with precedence in that order. Modifications may only narrow authority or resources. Capabilities are opaque database-backed grants; authorization verifies validity, expiration, grantee, normalized scope, usage limits, lifecycle epoch, and policy outcome.
+Policy outcomes are `deny`, `require-approval`, `modify`, and `allow`, with precedence in that order. Modifications may only narrow authority or resources. Capabilities identify operations the runtime can support; capability grants are opaque database-backed permissions to exercise those operations. Authorization verifies grant validity, expiration, grantee, normalized scope, usage limits, lifecycle epoch, and policy outcome.
 
 External writes follow a durable reconciled state machine from proposal through policy, approval, authorization, dispatch, acknowledgement, and reconciliation. Every action has an idempotency key and persisted outbound request artifact. Indeterminate actions are reconciled after restart before retry.
 
