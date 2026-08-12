@@ -24,6 +24,7 @@ create index resource_budgets_parent_idx on resource_budgets(parent_budget_id)
 
 create table resource_reservations (
   id uuid primary key,
+  request_id uuid not null,
   budget_id uuid not null references resource_budgets(id),
   region_id uuid not null references regions(id),
   execution_id uuid references executions(id),
@@ -40,6 +41,7 @@ create table resource_reservations (
 );
 create unique index resource_reservations_budget_idempotency_unique
   on resource_reservations(budget_id, idempotency_key);
+create index resource_reservations_request_idx on resource_reservations(request_id);
 create index resource_reservations_active_budget_idx
   on resource_reservations(budget_id, status)
   where status = 'reserved';
@@ -56,16 +58,22 @@ create table admission_decisions (
   reason text not null,
   requested_quantity bigint not null check (requested_quantity >= 0),
   remaining_before bigint,
+  request_id uuid,
   reservation_id uuid references resource_reservations(id),
   created_at timestamptz not null default now()
 );
 create index admission_decisions_subject_idx
   on admission_decisions(subject_kind, subject_id, created_at desc);
+
+create unique index resource_ledger_admission_request_unique
+  on resource_ledger ((attributes ->> 'admission_request_id'), resource_type)
+  where attributes ? 'admission_request_id';
 `.execute(db);
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {
   await sql`
+drop index if exists resource_ledger_admission_request_unique;
 drop table if exists admission_decisions;
 drop table if exists resource_reservations;
 drop table if exists resource_budgets;
