@@ -36,6 +36,51 @@ function renderWithClient(element: React.ReactElement) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('operator intervention controls', () => {
+  it('renders authoritative approval consequence context before mutation controls', async () => {
+    const fetch = vi.fn(async () =>
+      json({
+        items: [
+          {
+            id: 'approval-context',
+            status: 'pending',
+            reason: 'Needs review',
+            policyDecision: { outcome: 'require_approval' },
+            artifacts: [{ id: 'artifact-1' }],
+            trace: { runId: 'run-1' },
+            attempts: [{ id: 'attempt-1' }],
+            predictedEffects: ['publish initial state'],
+            alternatives: ['reject request'],
+            normalizedInputs: { templateId: 'template-1' },
+          },
+        ],
+        nextCursor: null,
+      }),
+    );
+    configureDefaultOperatorClient(
+      createOperatorClient({
+        principalId: 'standalone-console',
+        adapter: 'standalone-console',
+        fetch: fetch as typeof globalThis.fetch,
+      }),
+    );
+
+    renderWithClient(<ApprovalInterventionQueue />);
+
+    expect(
+      await screen.findByRole('region', { name: 'Approval intervention context' }),
+    ).toBeInTheDocument();
+    for (const heading of [
+      'Policy decision',
+      'Artifacts',
+      'Trace',
+      'Attempts',
+      'Predicted effects',
+      'Alternatives',
+      'Normalized inputs',
+    ])
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+  });
+
   it('requires reason and confirmation before approval submission and refreshes canonical state', async () => {
     let approvalReads = 0;
     const fetch = vi.fn(
