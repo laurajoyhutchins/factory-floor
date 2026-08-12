@@ -225,9 +225,12 @@ export class ResourceAdmissionService {
   }
 
   async reserve(input: ReserveResourceInput): Promise<AdmissionResult> {
-    if (input.quantity < 0n) throw new Error('reservation quantity must be non-negative');
+    if (input.quantity < 0n)
+      throw new Error('reservation quantity must be non-negative');
     if (!input.idempotencyKey) throw new Error('idempotency key is required');
-    return this.db.transaction().execute((trx) => this.reserveInTransaction(trx, input));
+    return this.db
+      .transaction()
+      .execute((trx) => this.reserveInTransaction(trx, input));
   }
 
   async reserveInTransaction(
@@ -289,21 +292,21 @@ export class ResourceAdmissionService {
         where budget_id = ${budget.id}::uuid and status = 'reserved'
       `.execute(trx as any);
       const consumed = await sql<{ quantity: string }>`
-        with recursive descendants as (
-          select id from regions where id = ${budget.id}::uuid and false
-          union all select id from regions where false
-        )
         select coalesce(sum(rl.quantity), 0)::text as quantity
         from resource_ledger rl
         where rl.resource_type = ${input.resourceType}
           and rl.region_id in (
             with recursive region_descendants as (
               select id from regions
-              where id::text = (select scope_id from resource_budgets where id = ${budget.id}::uuid)
+              where id::text = (
+                select scope_id from resource_budgets
+                where id = ${budget.id}::uuid
+              )
               union all
               select child.id from regions child
               join region_descendants parent on child.parent_region_id = parent.id
-            ) select id from region_descendants
+            )
+            select id from region_descendants
           )
       `.execute(trx as any);
       const decision = calculateAdmission({
@@ -369,7 +372,8 @@ export class ResourceAdmissionService {
   }
 
   async reconcile(requestId: string, actualQuantity: bigint) {
-    if (actualQuantity < 0n) throw new Error('actual quantity must be non-negative');
+    if (actualQuantity < 0n)
+      throw new Error('actual quantity must be non-negative');
     return this.db.transaction().execute(async (trx) => {
       const reservations = await sql<any>`
         select rr.*, b.resource_type, b.unit
@@ -395,7 +399,8 @@ export class ResourceAdmissionService {
       `.execute(trx as any);
       await sql`
         update resource_reservations
-        set status = 'reconciled', actual_quantity = ${actualQuantity.toString()}::bigint,
+        set status = 'reconciled',
+            actual_quantity = ${actualQuantity.toString()}::bigint,
             reconciled_at = now()
         where request_id = ${requestId}::uuid and status = 'reserved'
       `.execute(trx as any);
