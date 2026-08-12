@@ -16,7 +16,8 @@ function text(value: unknown): string {
 }
 
 function requestId(prefix: string): string {
-  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+  const random =
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   return `${prefix}-${random}`;
 }
 
@@ -26,7 +27,9 @@ function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
   const [decision, setDecision] = useState<'approve' | 'reject'>('approve');
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [clientRequestId, setClientRequestId] = useState(() => requestId('approval'));
+  const [clientRequestId, setClientRequestId] = useState(() =>
+    requestId('approval'),
+  );
   const mutation = useMutation({
     mutationFn: () =>
       operatorClient.decideApproval(approvalId, {
@@ -35,7 +38,9 @@ function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
         reason: reason.trim(),
       }),
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['operator-pending-approvals'] });
+      await queryClient.invalidateQueries({
+        queryKey: ['operator-pending-approvals'],
+      });
     },
     onSuccess: () => {
       setConfirmed(false);
@@ -43,42 +48,70 @@ function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
       setClientRequestId(requestId('approval'));
     },
   });
-  const canSubmit = approvalId.length > 0 && reason.trim().length > 0 && confirmed && !mutation.isPending;
+  const canSubmit =
+    approvalId.length > 0 &&
+    reason.trim().length > 0 &&
+    confirmed &&
+    !mutation.isPending;
 
   return (
     <article className="panel" aria-labelledby={`approval-${approvalId}`}>
       <div className="section-heading">
         <div>
           <h4 id={`approval-${approvalId}`}>Approval {approvalId}</h4>
-          <p className="muted">{text(approval.reason) || 'No request reason supplied.'}</p>
+          <p className="muted">
+            {text(approval.reason) || 'No request reason supplied.'}
+          </p>
         </div>
         <StatusBadge value={approval.status} />
       </div>
       <JsonBlock value={approval.normalizedInputs} />
       <label>
         Decision
-        <select value={decision} onChange={(event) => setDecision(event.target.value as 'approve' | 'reject')}>
+        <select
+          value={decision}
+          onChange={(event) =>
+            setDecision(event.target.value as 'approve' | 'reject')
+          }
+        >
           <option value="approve">Approve</option>
           <option value="reject">Reject</option>
         </select>
       </label>
       <label>
         Reason
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={3}
+        />
       </label>
       <label>
-        <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(event) => setConfirmed(event.target.checked)}
+        />
         I confirm this {decision} decision and its consequences.
       </label>
-      <button type="button" disabled={!canSubmit} onClick={() => mutation.mutate()}>
+      <button
+        type="button"
+        disabled={!canSubmit}
+        onClick={() => mutation.mutate()}
+      >
         {mutation.isPending ? 'Submitting…' : `Submit ${decision}`}
       </button>
       {mutation.isError ? (
         <div role="alert" className="panel-state">
-          Decision outcome was not accepted locally. Canonical approval state has been re-queried; review it before retrying.
+          Decision outcome was not accepted locally. Canonical approval state
+          has been re-queried; review it before retrying.
         </div>
       ) : null}
-      {mutation.isSuccess ? <p role="status">Decision recorded. Canonical approval state refreshed.</p> : null}
+      {mutation.isSuccess ? (
+        <p role="status">
+          Decision recorded. Canonical approval state refreshed.
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -89,7 +122,8 @@ export function ApprovalInterventionQueue() {
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       operatorClient.pendingApprovals({ cursor: pageParam, limit: 25 }, signal),
-    getNextPageParam: (lastPage: Page<InspectionRecord>) => lastPage.nextCursor ?? undefined,
+    getNextPageParam: (lastPage: Page<InspectionRecord>) =>
+      lastPage.nextCursor ?? undefined,
   });
   const approvals = useMemo(
     () => query.data?.pages.flatMap((page) => page.items) ?? [],
@@ -101,9 +135,17 @@ export function ApprovalInterventionQueue() {
       <section>
         <h3>Approval interventions</h3>
         <p className="muted">
-          Decisions require an explicit reason and confirmation. Mutations use the authoritative operator command boundary and canonical state is refreshed after every outcome.
+          Decisions require an explicit reason and confirmation. Mutations use
+          the authoritative operator command boundary and canonical state is
+          refreshed after every outcome.
         </p>
-        {approvals.length ? approvals.map((approval) => <ApprovalDecision key={text(approval.id)} approval={approval} />) : <p className="muted">No pending approvals.</p>}
+        {approvals.length ? (
+          approvals.map((approval) => (
+            <ApprovalDecision key={text(approval.id)} approval={approval} />
+          ))
+        ) : (
+          <p className="muted">No pending approvals.</p>
+        )}
         <LoadMore
           hasNextPage={Boolean(query.hasNextPage)}
           isFetchingNextPage={query.isFetchingNextPage}
@@ -118,7 +160,9 @@ export function RunCancellationIntervention({ runId }: { runId: string }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [clientRequestId, setClientRequestId] = useState(() => requestId('cancel'));
+  const [clientRequestId, setClientRequestId] = useState(() =>
+    requestId('cancel'),
+  );
   const mutation = useMutation({
     mutationFn: () =>
       operatorClient.cancelRun(runId, {
@@ -128,8 +172,12 @@ export function RunCancellationIntervention({ runId }: { runId: string }) {
     onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['operator-run', runId] }),
-        queryClient.invalidateQueries({ queryKey: ['operator-run-alerts', runId] }),
-        queryClient.invalidateQueries({ queryKey: ['operator-run-events', runId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['operator-run-alerts', runId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['operator-run-events', runId],
+        }),
       ]);
     },
     onSuccess: () => {
@@ -138,31 +186,53 @@ export function RunCancellationIntervention({ runId }: { runId: string }) {
       setClientRequestId(requestId('cancel'));
     },
   });
-  const canSubmit = runId.length > 0 && reason.trim().length > 0 && confirmed && !mutation.isPending;
+  const canSubmit =
+    runId.length > 0 &&
+    reason.trim().length > 0 &&
+    confirmed &&
+    !mutation.isPending;
 
   return (
     <section>
       <h3>Cancel run</h3>
       <p className="muted">
-        Cancellation is run-scoped. A reason and explicit confirmation are required; canonical run state is refreshed after every outcome.
+        Cancellation is run-scoped. A reason and explicit confirmation are
+        required; canonical run state is refreshed after every outcome.
       </p>
       <label>
         Reason
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={3}
+        />
       </label>
       <label>
-        <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(event) => setConfirmed(event.target.checked)}
+        />
         I confirm cancellation of run {runId}.
       </label>
-      <button type="button" disabled={!canSubmit} onClick={() => mutation.mutate()}>
+      <button
+        type="button"
+        disabled={!canSubmit}
+        onClick={() => mutation.mutate()}
+      >
         {mutation.isPending ? 'Cancelling…' : 'Cancel run'}
       </button>
       {mutation.isError ? (
         <div role="alert" className="panel-state">
-          Cancellation outcome was ambiguous or rejected. Canonical run state has been re-queried; review it before retrying.
+          Cancellation outcome was ambiguous or rejected. Canonical run state
+          has been re-queried; review it before retrying.
         </div>
       ) : null}
-      {mutation.isSuccess ? <p role="status">Cancellation recorded. Canonical run state refreshed.</p> : null}
+      {mutation.isSuccess ? (
+        <p role="status">
+          Cancellation recorded. Canonical run state refreshed.
+        </p>
+      ) : null}
     </section>
   );
 }
