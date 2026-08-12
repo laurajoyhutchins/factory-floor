@@ -90,7 +90,9 @@ const systemDocument = {
   },
 };
 
-async function registerInvestigationTemplate(registrations: RegistrationService) {
+async function registerInvestigationTemplate(
+  registrations: RegistrationService,
+) {
   await registrations.registerArtifactSchema(schemaDocument);
   await registrations.registerComponentDefinition(
     componentDocument('retrieve', [
