@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDatabase,
@@ -268,16 +267,12 @@ describe('durable command routing and scheduler concurrency', () => {
     expect(
       await db.selectFrom('execution_attempts').selectAll().execute(),
     ).toHaveLength(0);
-    const decisions = await sql<{
-      outcome: string;
-      subject_kind: string;
-      resource_type: string;
-    }>`
-      select outcome, subject_kind, resource_type
-      from admission_decisions
-      order by created_at
-    `.execute(db);
-    expect(decisions.rows).toEqual([
+    const decisions = await (db as any)
+      .selectFrom('admission_decisions')
+      .select(['outcome', 'subject_kind', 'resource_type'])
+      .orderBy('created_at')
+      .execute();
+    expect(decisions).toEqual([
       {
         outcome: 'defer',
         subject_kind: 'execution',
