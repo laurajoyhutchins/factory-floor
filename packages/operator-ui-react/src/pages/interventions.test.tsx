@@ -137,6 +137,62 @@ describe('operator intervention controls', () => {
     );
   });
 
+  it('preserves canonical prior truth on approval conflict and re-queries before another action', async () => {
+    let approvalReads = 0;
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === 'POST')
+          return new Response(
+            JSON.stringify({
+              error: {
+                code: 'approval_conflict',
+                message: 'Approval already resolved.',
+              },
+            }),
+            {
+              status: 409,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        approvalReads += 1;
+        return json({
+          items: [
+            {
+              id: 'approval-conflict',
+              status: approvalReads === 1 ? 'pending' : 'rejected',
+              reason: 'Needs review',
+              normalizedInputs: {},
+            },
+          ],
+          nextCursor: null,
+        });
+      },
+    );
+    configureDefaultOperatorClient(
+      createOperatorClient({
+        principalId: 'standalone-console',
+        adapter: 'standalone-console',
+        fetch: fetch as typeof globalThis.fetch,
+      }),
+    );
+
+    renderWithClient(<ApprovalInterventionQueue />);
+
+    await screen.findByText('Approval approval-conflict');
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: 'Approve after review' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit approve' }));
+
+    expect(
+      await screen.findByText(/conflicted with canonical approval state/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Prior truth has been preserved/i)).toBeInTheDocument();
+    await waitFor(() => expect(approvalReads).toBe(2));
+    expect(screen.getByText('rejected')).toBeInTheDocument();
+  });
+
   it('requires explicit cancellation confirmation and uses the run-scoped command boundary', async () => {
     const fetch = vi.fn(
       async (url: string | URL | Request, init?: RequestInit) => {
@@ -170,5 +226,31 @@ describe('operator intervention controls', () => {
       reason: 'Operator-requested stop',
     });
     expect(JSON.parse(String(init?.body)).clientRequestId).toMatch(/^cancel-/);
+  });
+
+  it('treats an ambiguous cancellation transport failure as a canonical re-query boundary', async () => {
+    const fetch = vi.fn(async () => {
+      throw new TypeError('connection reset');
+    });
+    configureDefaultOperatorClient(
+      createOperatorClient({
+        principalId: 'standalone-console',
+        adapter: 'standalone-console',
+        fetch: fetch as typeof globalThis.fetch,
+      }),
+    );
+
+    renderWithClient(<RunCancellationIntervention runId="run-timeout" />);
+
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: 'Operator-requested stop' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel run' }));
+
+    expect(
+      await screen.findByText(/command outcome is ambiguous/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/do not resubmit/i)).toBeInTheDocument();
   });
 });
