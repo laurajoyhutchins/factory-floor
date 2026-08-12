@@ -69,6 +69,44 @@ describe('resource admission persistence', () => {
     await admin.end();
   });
 
+  it('serializes independent reservations so a single slot cannot be over-admitted', async () => {
+    await admission.configureRegionBudgets({
+      regionId: rootRegionId,
+      budgets: { maximumConcurrentExecutions: 1 },
+      source: { kind: 'integration-test' },
+    });
+
+    const results = await Promise.all([
+      admission.reserve({
+        regionId: rootRegionId,
+        resourceType: 'concurrent_executions',
+        quantity: 1n,
+        idempotencyKey: 'concurrency-a',
+        subjectKind: 'execution',
+        subjectId: 'concurrency-a',
+      }),
+      admission.reserve({
+        regionId: rootRegionId,
+        resourceType: 'concurrent_executions',
+        quantity: 1n,
+        idempotencyKey: 'concurrency-b',
+        subjectKind: 'execution',
+        subjectId: 'concurrency-b',
+      }),
+    ]);
+
+    expect(results.map((result) => result.outcome).sort()).toEqual([
+      'admit',
+      'defer',
+    ]);
+    const reserved = await raw.query<{ count: string }>(
+      `select count(*)::text as count
+       from resource_reservations
+       where status = 'reserved'`,
+    );
+    expect(reserved.rows).toEqual([{ count: '1' }]);
+  });
+
   it('relinks an unchanged child limit when a matching parent budget is introduced', async () => {
     await admission.configureRegionBudgets({
       regionId: childRegionId,
