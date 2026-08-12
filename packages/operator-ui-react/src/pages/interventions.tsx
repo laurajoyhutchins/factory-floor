@@ -21,6 +21,50 @@ function requestId(prefix: string): string {
   return `${prefix}-${random}`;
 }
 
+function firstPresent(
+  record: InspectionRecord,
+  ...keys: string[]
+): unknown | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function ApprovalContext({ approval }: { approval: InspectionRecord }) {
+  const fields = [
+    ['Policy decision', firstPresent(approval, 'policyDecision', 'policyDecisions')],
+    ['Artifacts', firstPresent(approval, 'artifacts')],
+    ['Trace', firstPresent(approval, 'trace', 'traces')],
+    ['Attempts', firstPresent(approval, 'attempts')],
+    ['Predicted effects', firstPresent(approval, 'predictedEffects')],
+    ['Alternatives', firstPresent(approval, 'alternatives')],
+    ['Normalized inputs', firstPresent(approval, 'normalizedInputs')],
+  ] as const;
+  const present = fields.filter(([, value]) => value !== undefined);
+
+  if (!present.length) {
+    return (
+      <p className="muted">
+        No additional intervention context was supplied by the authoritative
+        approval record.
+      </p>
+    );
+  }
+
+  return (
+    <div aria-label="Approval intervention context">
+      {present.map(([label, value]) => (
+        <section key={label}>
+          <h5>{label}</h5>
+          <JsonBlock value={value} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
   const queryClient = useQueryClient();
   const approvalId = text(approval.id);
@@ -65,7 +109,7 @@ function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
         </div>
         <StatusBadge value={approval.status} />
       </div>
-      <JsonBlock value={approval.normalizedInputs} />
+      <ApprovalContext approval={approval} />
       <label>
         Decision
         <select
