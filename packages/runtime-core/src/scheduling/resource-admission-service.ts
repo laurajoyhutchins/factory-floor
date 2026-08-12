@@ -132,6 +132,7 @@ export interface AdmissionResult {
 
 type BudgetRow = {
   id: string;
+  parent_budget_id: string | null;
   resource_type: string;
   limit_quantity: string;
   unit: string;
@@ -155,7 +156,8 @@ export class ResourceAdmissionService {
     const desired = new Set(limits.map((limit) => limit.resourceType));
 
     const existing = await sql<BudgetRow>`
-      select id, resource_type, limit_quantity::text, unit, exhaustion_outcome
+      select id, parent_budget_id, resource_type, limit_quantity::text, unit,
+             exhaustion_outcome
       from resource_budgets
       where scope_kind = 'region'
         and scope_id = ${input.regionId}
@@ -173,7 +175,8 @@ export class ResourceAdmissionService {
       let parentBudgetId: string | null = null;
       if (input.parentRegionId) {
         const parent = await sql<BudgetRow>`
-          select id, resource_type, limit_quantity::text, unit, exhaustion_outcome
+          select id, parent_budget_id, resource_type, limit_quantity::text,
+                 unit, exhaustion_outcome
           from resource_budgets
           where scope_kind = 'region'
             and scope_id = ${input.parentRegionId}
@@ -196,6 +199,7 @@ export class ResourceAdmissionService {
       );
       if (
         current &&
+        current.parent_budget_id === parentBudgetId &&
         BigInt(current.limit_quantity) === limit.limitQuantity &&
         current.unit === limit.unit &&
         current.exhaustion_outcome === limit.exhaustionOutcome
@@ -258,8 +262,8 @@ export class ResourceAdmissionService {
         from regions parent
         join ancestors on ancestors.parent_region_id = parent.id
       )
-      select b.id, b.resource_type, b.limit_quantity::text, b.unit,
-             b.exhaustion_outcome
+      select b.id, b.parent_budget_id, b.resource_type,
+             b.limit_quantity::text, b.unit, b.exhaustion_outcome
       from ancestors
       join resource_budgets b
         on b.scope_kind = 'region'
