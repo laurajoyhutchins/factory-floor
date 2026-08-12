@@ -10,6 +10,7 @@ import {
 import {
   ExternalActionService,
   PolicyDecisionService,
+  ResourceAdmissionService,
   type ExternalActionProvider,
   type ExternalActionProviderRequest,
   type ExternalActionProviderResult,
@@ -24,6 +25,10 @@ const admin = new pg.Pool({
 });
 const databaseName = `ff_external_action_concurrency_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+const raw = new pg.Pool({
+  connectionString: testUrl,
+  connectionTimeoutMillis: 10_000,
+});
 
 class BlockingAcknowledgementProvider implements ExternalActionProvider {
   dispatchCalls = 0;
@@ -56,6 +61,24 @@ class BlockingAcknowledgementProvider implements ExternalActionProvider {
   async reconcile(): Promise<ExternalActionProviderResult> {
     this.reconcileCalls++;
     throw new Error('dispatch callers must not reconcile an in-flight action');
+  }
+}
+
+class ImmediateAcknowledgementProvider implements ExternalActionProvider {
+  dispatchCalls = 0;
+
+  async dispatch(
+    request: ExternalActionProviderRequest,
+  ): Promise<ExternalActionProviderResult> {
+    this.dispatchCalls++;
+    return {
+      status: 'acknowledged',
+      response: { providerOperationId: `provider-${request.actionId}` },
+    };
+  }
+
+  async reconcile(): Promise<ExternalActionProviderResult> {
+    return { status: 'acknowledged', response: {} };
   }
 }
 
@@ -253,7 +276,7 @@ async function seedAuthorizedAction(db: ReturnType<typeof createDatabase>) {
     })
     .execute();
 
-  return actionId;
+  return { actionId, regionId };
 }
 
 describe('external action dispatch concurrency', () => {
@@ -272,6 +295,7 @@ describe('external action dispatch concurrency', () => {
 
   afterAll(async () => {
     await db.destroy();
+    await raw.end();
     await admin
       .query(`drop database if exists ${databaseName}`)
       .catch(() => undefined);
@@ -279,7 +303,7 @@ describe('external action dispatch concurrency', () => {
   });
 
   it('does not reconcile while the first provider dispatch is still in flight', async () => {
-    const actionId = await seedAuthorizedAction(db);
+    const { actionId } = await seedAuthorizedAction(db);
     const provider = new BlockingAcknowledgementProvider();
     const service = new ExternalActionService(db, provider);
 
@@ -305,5 +329,84 @@ describe('external action dispatch concurrency', () => {
         .where('external_action_id', '=', actionId)
         .execute(),
     ).resolves.toEqual([{ attempt_number: 1, status: 'acknowledged' }]);
+  });
+
+  it('defers before provider I/O when the region network budget is exhausted', async () => {
+    const { actionId, regionId } = await seedAuthorizedAction(db);
+    await new ResourceAdmissionService(db).configureRegionBudgets({
+      regionId,
+      budgets: { networkRequests: 0 },
+      source: { kind: 'integration-test' },
+    });
+    const provider = new ImmediateAcknowledgementProvider();
+    const service = new ExternalActionService(db, provider);
+
+    await expect(service.dispatch(actionId)).resolves.toEqual({
+      disposition: 'deferred',
+      outcome: 'defer',
+    });
+    expect(provider.dispatchCalls).toBe(0);
+    await expect(
+      db
+        .selectFrom('external_action_attempts')
+        .selectAll()
+        .where('external_action_id', '=', actionId)
+        .execute(),
+    ).resolves.toEqual([]);
+    await expect(
+      db
+        .selectFrom('external_actions')
+        .select('status')
+        .where('id', '=', actionId)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toEqual({ status: 'authorized' });
+    const decisions = await raw.query<{
+      outcome: string;
+      subject_kind: string;
+      resource_type: string;
+    }>(
+      `select outcome, subject_kind, resource_type
+       from admission_decisions
+       where subject_id = $1
+       order by created_at`,
+      [actionId],
+    );
+    expect(decisions.rows).toEqual([
+      {
+        outcome: 'defer',
+        subject_kind: 'external_action',
+        resource_type: 'network_calls',
+      },
+    ]);
+  });
+
+  it('reconciles the admitted network reservation after an acknowledged dispatch', async () => {
+    const { actionId, regionId } = await seedAuthorizedAction(db);
+    await new ResourceAdmissionService(db).configureRegionBudgets({
+      regionId,
+      budgets: { networkRequests: 1 },
+      source: { kind: 'integration-test' },
+    });
+    const provider = new ImmediateAcknowledgementProvider();
+    const service = new ExternalActionService(db, provider);
+
+    await expect(service.dispatch(actionId)).resolves.toEqual({
+      disposition: 'dispatched',
+      status: 'acknowledged',
+    });
+    expect(provider.dispatchCalls).toBe(1);
+    const reservations = await raw.query<{
+      status: string;
+      quantity: string;
+      actual_quantity: string | null;
+    }>(
+      `select status, quantity::text, actual_quantity::text
+       from resource_reservations
+       where external_action_id = $1`,
+      [actionId],
+    );
+    expect(reservations.rows).toEqual([
+      { status: 'reconciled', quantity: '1', actual_quantity: '1' },
+    ]);
   });
 });

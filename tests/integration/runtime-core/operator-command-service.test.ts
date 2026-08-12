@@ -13,6 +13,7 @@ import {
   OperatorQueryService,
   PolicyDecisionService,
   RegistrationService,
+  ResourceAdmissionService,
   WorkerProtocolError,
   WorkerProtocolService,
 } from '../../../packages/runtime-core/src/index.js';
@@ -206,7 +207,18 @@ describe('operator command service', () => {
     ).rejects.toBeInstanceOf(OperatorConflictError);
   });
 
-  it('cancels only the selected run and fences its stale attempt', async () => {
+  it('cancels only the selected run, returns its capacity, and fences its stale attempt', async () => {
+    const region = await db
+      .selectFrom('regions')
+      .select('id')
+      .where('name', '=', 'investigation')
+      .executeTakeFirstOrThrow();
+    await new ResourceAdmissionService(db).configureRegionBudgets({
+      regionId: region.id,
+      budgets: { maximumConcurrentExecutions: 2 },
+      source: { kind: 'integration-test' },
+    });
+
     const first = await commands.submitDevelopmentTask(
       operator,
       task('Cancel this run'),
@@ -237,6 +249,16 @@ describe('operator command service', () => {
     await expect(
       commands.cancelRun(operator, first.runId, request),
     ).resolves.toMatchObject({ disposition: 'replayed' });
+
+    await commands.submitDevelopmentTask(
+      operator,
+      task('Use the released execution slot'),
+    );
+    const thirdClaim = await workers.claim({
+      workerId: 'worker-c',
+      capabilities: ['retrieve@1'],
+    });
+    expect(thirdClaim.claimed).toBe(true);
 
     const firstAttempt = await db
       .selectFrom('execution_attempts')

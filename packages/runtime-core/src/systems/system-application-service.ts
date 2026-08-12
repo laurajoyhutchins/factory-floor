@@ -11,6 +11,7 @@ import {
   validateSimpleDeclaration,
   validateSystemDeclaration,
 } from '../declarations/validation.js';
+import { ResourceAdmissionService } from '../scheduling/resource-admission-service.js';
 import { TemplateInstantiationService } from './durable-template-instantiation-service.js';
 
 export interface SystemApplyResult {
@@ -29,6 +30,7 @@ export class SystemApplicationService {
       definitions,
       topology,
     ),
+    private readonly admission = new ResourceAdmissionService(db),
   ) {}
 
   async apply(document: any): Promise<SystemApplyResult> {
@@ -57,6 +59,11 @@ export class SystemApplicationService {
         root = await this.topology.createRegion(transaction, rootName, null);
         disposition = 'created';
       }
+      await this.admission.configureRegionBudgetsInTransaction(transaction, {
+        regionId: root.id,
+        budgets: document.spec.rootRegion.budgets,
+        source,
+      });
 
       const regionRows = new Map<
         string,
@@ -76,6 +83,12 @@ export class SystemApplicationService {
           );
           disposition = 'created';
         }
+        await this.admission.configureRegionBudgetsInTransaction(transaction, {
+          regionId: region.id,
+          parentRegionId: root.id,
+          budgets: regionDeclaration.budgets,
+          source,
+        });
         regionRows.set(regionDeclaration.id, region);
       }
 

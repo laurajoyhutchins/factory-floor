@@ -197,12 +197,16 @@ describe('SystemApplicationService', () => {
       topology,
       instantiationRepository,
     );
+    const admission = {
+      configureRegionBudgetsInTransaction: async () => undefined,
+    } as any;
 
     const service = new SystemApplicationService(
       db,
       definitions,
       topology,
       instantiations,
+      admission,
     );
     const first = await service.apply(systemDocument);
     const second = await service.apply(systemDocument);

@@ -2,12 +2,17 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { createUuidV7, type Database } from '@factory-floor/db';
 import { inputSetDigest, type InputIdentity } from '../commands/identity.js';
-import { generateLeaseToken, validateLeaseDuration } from './lease.js';
 import type {
   ComponentSelector,
   LeaseToken,
   WorkerId,
 } from '../terminology.js';
+import {
+  executionLeaseMayProceed,
+  reserveExecutionLeaseAdmission,
+} from './execution-admission.js';
+import { generateLeaseToken, validateLeaseDuration } from './lease.js';
+import { ResourceAdmissionService } from './resource-admission-service.js';
 
 const CANDIDATE_GROUP_LIMIT = 50;
 const INCOMPLETE_GROUP_RECHECK_MS = 250;
@@ -39,6 +44,7 @@ export class ExecutionLeaseService {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly clock = () => new Date(),
+    private readonly admission = new ResourceAdmissionService(db),
   ) {}
 
   async leaseNextAttempt(
@@ -291,7 +297,8 @@ export class ExecutionLeaseService {
       await deferGroup();
       return null;
     }
-    if (!execution)
+    let createdExecution = false;
+    if (!execution) {
       execution = await trx
         .insertInto('executions')
         .values({
@@ -306,6 +313,26 @@ export class ExecutionLeaseService {
         } as any)
         .returningAll()
         .executeTakeFirstOrThrow();
+      createdExecution = true;
+    }
+
+    const admission = await reserveExecutionLeaseAdmission(
+      this.admission,
+      trx,
+      {
+        regionId: candidate.region_id,
+        executionId: execution.id,
+      },
+    );
+    if (!executionLeaseMayProceed(admission)) {
+      if (createdExecution)
+        await trx
+          .deleteFrom('executions')
+          .where('id', '=', execution.id)
+          .execute();
+      await deferGroup();
+      return null;
+    }
 
     for (const delivery of selected)
       await trx
