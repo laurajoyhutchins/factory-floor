@@ -7,6 +7,7 @@ import { consoleApi } from '@factory-floor/operator-client-ts';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
+  ApprovalInterventionQueue,
   ArtifactDetail,
   Artifacts,
   ExecutionDetail,
@@ -14,8 +15,8 @@ import {
   NotFound,
   Operations,
   Overview,
-  PendingApprovals,
   Portfolio,
+  RunCancellationIntervention,
   RunDetailsPanel,
   RunOperatorWorkspace,
   Shell,
@@ -66,7 +67,7 @@ const titles: Record<string, string> = {
   artifacts: 'Artifacts',
   instantiations: 'Template instantiations',
   operations: 'Operations',
-  approvals: 'Pending approvals',
+  approvals: 'Approval interventions',
   runs: 'Run inspection',
 };
 
@@ -75,6 +76,7 @@ function RunRoute() {
   return (
     <>
       <RunOperatorWorkspace runId={runId} />
+      <RunCancellationIntervention runId={runId} />
       <RunDetailsPanel
         runId={runId}
         loadDetails={(id) => runDetailsClient.getRunDetails(id)}
@@ -128,7 +130,7 @@ function App() {
           element={<TemplateInstantiationDetail />}
         />
         <Route path="/operations" element={<Operations />} />
-        <Route path="/approvals" element={<PendingApprovals />} />
+        <Route path="/approvals" element={<ApprovalInterventionQueue />} />
         <Route path="/runs/:runId" element={<RunRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -141,7 +143,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <App />
-      </BrowserRouter>
+      </QueryClientProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
