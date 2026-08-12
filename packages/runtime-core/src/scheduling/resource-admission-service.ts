@@ -8,11 +8,7 @@ import {
 } from '@factory-floor/db';
 
 export type AdmissionOutcome =
-  | 'admit'
-  | 'defer'
-  | 'require_approval'
-  | 'suspend'
-  | 'reject';
+  'admit' | 'defer' | 'require_approval' | 'suspend' | 'reject';
 
 export interface NormalizedBudgetLimit {
   resourceType: string;
@@ -146,9 +142,9 @@ export class ResourceAdmissionService {
   constructor(private readonly db: Kysely<Database>) {}
 
   async configureRegionBudgets(input: ConfigureRegionBudgetsInput) {
-    return this.db.transaction().execute((trx) =>
-      this.configureRegionBudgetsInTransaction(trx, input),
-    );
+    return this.db
+      .transaction()
+      .execute((trx) => this.configureRegionBudgetsInTransaction(trx, input));
   }
 
   async configureRegionBudgetsInTransaction(
