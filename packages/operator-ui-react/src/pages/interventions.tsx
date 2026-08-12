@@ -5,6 +5,7 @@ import {
 } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
+  ApiError,
   operatorClient,
   type InspectionRecord,
   type Page,
@@ -30,6 +31,17 @@ function firstPresent(
     if (value !== null && value !== undefined) return value;
   }
   return undefined;
+}
+
+function mutationFailureMessage(
+  error: unknown,
+  subject: 'approval' | 'run',
+): string {
+  if (error instanceof ApiError && error.status === 409)
+    return `The command conflicted with canonical ${subject} state. Prior truth has been preserved and canonical state has been re-queried; review it before taking another action.`;
+  if (error instanceof ApiError && error.kind === 'transport')
+    return `The ${subject} command outcome is ambiguous because the control plane could not be reached. Canonical state has been re-queried; do not resubmit until that state is reviewed.`;
+  return `The ${subject} command was not accepted. Canonical state has been re-queried; review it before retrying.`;
 }
 
 function ApprovalContext({ approval }: { approval: InspectionRecord }) {
@@ -147,8 +159,7 @@ function ApprovalDecision({ approval }: { approval: InspectionRecord }) {
       </button>
       {mutation.isError ? (
         <div role="alert" className="panel-state">
-          Decision outcome was not accepted locally. Canonical approval state
-          has been re-queried; review it before retrying.
+          {mutationFailureMessage(mutation.error, 'approval')}
         </div>
       ) : null}
       {mutation.isSuccess ? (
@@ -268,8 +279,7 @@ export function RunCancellationIntervention({ runId }: { runId: string }) {
       </button>
       {mutation.isError ? (
         <div role="alert" className="panel-state">
-          Cancellation outcome was ambiguous or rejected. Canonical run state
-          has been re-queried; review it before retrying.
+          {mutationFailureMessage(mutation.error, 'run')}
         </div>
       ) : null}
       {mutation.isSuccess ? (
