@@ -22,6 +22,10 @@ const admin = new pg.Pool({
 });
 const databaseName = `ff_scheduler_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+const raw = new pg.Pool({
+  connectionString: testUrl,
+  connectionTimeoutMillis: 10_000,
+});
 
 async function seedRuntime(db: ReturnType<typeof createDatabase>) {
   const schemaId = createUuidV7();
@@ -142,6 +146,7 @@ describe('durable command routing and scheduler concurrency', () => {
 
   afterAll(async () => {
     await db.destroy();
+    await raw.end();
     await admin
       .query(`drop database if exists ${databaseName}`)
       .catch(() => undefined);
@@ -267,12 +272,14 @@ describe('durable command routing and scheduler concurrency', () => {
     expect(
       await db.selectFrom('execution_attempts').selectAll().execute(),
     ).toHaveLength(0);
-    const decisions = await (db as any)
-      .selectFrom('admission_decisions')
-      .select(['outcome', 'subject_kind', 'resource_type'])
-      .orderBy('created_at')
-      .execute();
-    expect(decisions).toEqual([
+    const decisions = await raw.query<{
+      outcome: string;
+      subject_kind: string;
+      resource_type: string;
+    }>(
+      'select outcome, subject_kind, resource_type from admission_decisions order by created_at',
+    );
+    expect(decisions.rows).toEqual([
       {
         outcome: 'defer',
         subject_kind: 'execution',
