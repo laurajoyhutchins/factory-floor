@@ -68,11 +68,39 @@ create index admission_decisions_subject_idx
 create unique index resource_ledger_admission_request_unique
   on resource_ledger ((attributes ->> 'admission_request_id'), resource_type)
   where attributes ? 'admission_request_id';
+
+create function release_terminal_execution_admission()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.status in ('completed', 'failed')
+    and old.status is distinct from new.status then
+    update resource_reservations reservation
+    set
+      status = 'released',
+      reconciled_at = coalesce(reservation.reconciled_at, now())
+    from resource_budgets budget
+    where reservation.budget_id = budget.id
+      and reservation.execution_id = new.id
+      and reservation.status = 'reserved'
+      and budget.resource_type = 'concurrent_executions';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger executions_release_terminal_admission
+  after update of status on executions
+  for each row
+  execute function release_terminal_execution_admission();
 `.execute(db);
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {
   await sql`
+drop trigger if exists executions_release_terminal_admission on executions;
+drop function if exists release_terminal_execution_admission();
 drop index if exists resource_ledger_admission_request_unique;
 drop table if exists admission_decisions;
 drop table if exists resource_reservations;
