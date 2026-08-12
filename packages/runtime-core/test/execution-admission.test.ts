@@ -14,7 +14,9 @@ describe('execution lease admission', () => {
       requestId: 'request-1',
       reservationIds: ['reservation-1'],
     });
-    const admission = { reserveInTransaction } as unknown as ResourceAdmissionService;
+    const admission = {
+      reserveInTransaction,
+    } as unknown as ResourceAdmissionService;
     const trx = {} as Transaction<Database>;
 
     await reserveExecutionLeaseAdmission(admission, trx, {
