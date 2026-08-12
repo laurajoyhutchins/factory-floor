@@ -74,9 +74,11 @@ describe('operator intervention controls', () => {
   });
 
   it('requires explicit cancellation confirmation and uses the run-scoped command boundary', async () => {
-    const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
-      json({ runId: 'run-1', status: 'cancel_requested' }),
-    );
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      void url;
+      void init;
+      return json({ runId: 'run-1', status: 'cancel_requested' });
+    });
     configureDefaultOperatorClient(
       createOperatorClient({
         principalId: 'standalone-console',
