@@ -21,6 +21,10 @@ const admin = new pg.Pool({
 });
 const databaseName = `ff_registration_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+const raw = new pg.Pool({
+  connectionString: testUrl,
+  connectionTimeoutMillis: 10_000,
+});
 
 const schemaDocument = {
   apiVersion: 'factoryfloor.dev/v1alpha1',
@@ -86,6 +90,23 @@ const systemDocument = {
   },
 };
 
+async function registerInvestigationTemplate(registrations: RegistrationService) {
+  await registrations.registerArtifactSchema(schemaDocument);
+  await registrations.registerComponentDefinition(
+    componentDocument('retrieve', [
+      { name: 'objective', direction: 'input', required: true },
+      { name: 'evidence', direction: 'output', required: true },
+    ]),
+  );
+  await registrations.registerComponentDefinition(
+    componentDocument('verify', [
+      { name: 'evidence', direction: 'input', required: true },
+      { name: 'result', direction: 'output', required: true },
+    ]),
+  );
+  await registrations.registerTemplate(templateDocument);
+}
+
 describe('registration and static system application', () => {
   const db = createDatabase(testUrl);
   const registrations = new RegistrationService(db);
@@ -110,6 +131,7 @@ describe('registration and static system application', () => {
 
   afterAll(async () => {
     await db.destroy();
+    await raw.end();
     await admin
       .query(`drop database if exists ${databaseName}`)
       .catch(() => undefined);
@@ -117,20 +139,7 @@ describe('registration and static system application', () => {
   });
 
   it('applies a registered static topology once and treats the same apply as a no-op', async () => {
-    await registrations.registerArtifactSchema(schemaDocument);
-    await registrations.registerComponentDefinition(
-      componentDocument('retrieve', [
-        { name: 'objective', direction: 'input', required: true },
-        { name: 'evidence', direction: 'output', required: true },
-      ]),
-    );
-    await registrations.registerComponentDefinition(
-      componentDocument('verify', [
-        { name: 'evidence', direction: 'input', required: true },
-        { name: 'result', direction: 'output', required: true },
-      ]),
-    );
-    await registrations.registerTemplate(templateDocument);
+    await registerInvestigationTemplate(registrations);
 
     const first = await systems.apply(systemDocument);
     const second = await systems.apply(systemDocument);
@@ -177,6 +186,72 @@ describe('registration and static system application', () => {
     expect(topology.components[0].ports.map((port) => port.name)).toContain(
       'objective',
     );
+  });
+
+  it('persists declared root and child region budgets with parent narrowing', async () => {
+    await registerInvestigationTemplate(registrations);
+
+    await systems.apply({
+      ...systemDocument,
+      spec: {
+        ...systemDocument.spec,
+        rootRegion: {
+          id: 'investigation-root',
+          budgets: { maximumConcurrentExecutions: 3 },
+        },
+        regions: systemDocument.spec.regions.map((region) =>
+          region.id === 'investigation'
+            ? {
+                ...region,
+                budgets: {
+                  maximumConcurrentExecutions: 2,
+                  networkRequests: 5,
+                },
+              }
+            : region,
+        ),
+      },
+    });
+
+    const budgets = await raw.query<{
+      region_name: string;
+      resource_type: string;
+      limit_quantity: string;
+      parent_region_name: string | null;
+    }>(`
+      select
+        region.name as region_name,
+        budget.resource_type,
+        budget.limit_quantity::text,
+        parent_region.name as parent_region_name
+      from resource_budgets budget
+      join regions region on region.id::text = budget.scope_id
+      left join resource_budgets parent_budget on parent_budget.id = budget.parent_budget_id
+      left join regions parent_region on parent_region.id::text = parent_budget.scope_id
+      where budget.retired_at is null
+      order by region.name, budget.resource_type
+    `);
+
+    expect(budgets.rows).toEqual([
+      {
+        region_name: 'investigation',
+        resource_type: 'concurrent_executions',
+        limit_quantity: '2',
+        parent_region_name: 'investigation-root',
+      },
+      {
+        region_name: 'investigation',
+        resource_type: 'network_calls',
+        limit_quantity: '5',
+        parent_region_name: null,
+      },
+      {
+        region_name: 'investigation-root',
+        resource_type: 'concurrent_executions',
+        limit_quantity: '3',
+        parent_region_name: null,
+      },
+    ]);
   });
 
   it('rejects invalid declarations before writing anything', async () => {
