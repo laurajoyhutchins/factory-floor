@@ -11,6 +11,7 @@ import {
   validateSimpleDeclaration,
   validateSystemDeclaration,
 } from '../declarations/validation.js';
+import { ResourceAdmissionService } from '../scheduling/resource-admission-service.js';
 import { TemplateInstantiationService } from './durable-template-instantiation-service.js';
 
 export interface SystemApplyResult {
@@ -29,6 +30,7 @@ export class SystemApplicationService {
       definitions,
       topology,
     ),
+    private readonly admissions = new ResourceAdmissionService(db),
   ) {}
 
   async apply(document: any): Promise<SystemApplyResult> {
@@ -57,6 +59,12 @@ export class SystemApplicationService {
         root = await this.topology.createRegion(transaction, rootName, null);
         disposition = 'created';
       }
+      await this.admissions.configureRegionBudgetsInTransaction(transaction, {
+        regionId: root.id,
+        parentRegionId: null,
+        budgets: document.spec.rootRegion.budgets ?? {},
+        source,
+      });
 
       const regionRows = new Map<
         string,
@@ -90,13 +98,20 @@ export class SystemApplicationService {
 
         // Milestone 1 systems include stable boundary regions whose templates are
         // not yet registered. Preserve that compatibility behavior while routing
-        // every registered, topology-bearing template through the generic service.
+        // every registered template through the generic services.
         if (template === undefined) continue;
         const templateDocument = template.template as any;
         validateSimpleDeclaration(templateDocument, 'Template');
-        if (templateDocument.spec.initialTopology === undefined) continue;
 
         const region = regionRows.get(regionDeclaration.id)!;
+        await this.admissions.configureRegionBudgetsInTransaction(transaction, {
+          regionId: region.id,
+          parentRegionId: root.id,
+          budgets: templateDocument.spec.budgets ?? {},
+          source,
+        });
+        if (templateDocument.spec.initialTopology === undefined) continue;
+
         const result = await this.instantiations.instantiateInTransaction(
           transaction,
           {
