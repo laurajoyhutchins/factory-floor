@@ -346,7 +346,12 @@ describe('PostgreSQL template instantiation negative matrix', () => {
     );
   });
 
-  it('rolls back an activation failure without partial publication', async () => {
+  it('rolls back an activation failure and recovers on retry', async () => {
+    const request = {
+      requestId: '019bb22e-58b0-7d87-8000-000000000404',
+      targetRegionId: regionId,
+      template: 'baseline@1',
+    } as const;
     const failingTopology = new FailingActivationTopologyRepository();
     const service = new TemplateInstantiationService(
       db,
@@ -357,12 +362,9 @@ describe('PostgreSQL template instantiation negative matrix', () => {
       new ComponentStateRepository(),
     );
 
-    await expect(
-      service.instantiate({
-        targetRegionId: regionId,
-        template: 'baseline@1',
-      }),
-    ).rejects.toThrow('injected activation failure');
+    await expect(service.instantiate(request)).rejects.toThrow(
+      'injected activation failure',
+    );
     await expectNoPublication(db);
 
     expect(
@@ -375,5 +377,48 @@ describe('PostgreSQL template instantiation negative matrix', () => {
       active_topology_revision_id: null,
       lifecycle_status: 'ready',
     });
+
+    const restartedDb = createDatabase(testUrl);
+    try {
+      const restarted = new TemplateInstantiationService(restartedDb);
+      const recovered = await restarted.instantiate(request);
+      expect(recovered.disposition).toBe('created');
+
+      const repeated = await restarted.instantiate(request);
+      expect(repeated).toMatchObject({
+        disposition: 'existing',
+        instantiationId: recovered.instantiationId,
+        digest: recovered.digest,
+      });
+      expect(repeated.revision.id).toBe(recovered.revision.id);
+
+      expect(
+        await restartedDb
+          .selectFrom('regions')
+          .select(['active_topology_revision_id', 'lifecycle_status'])
+          .where('id', '=', regionId)
+          .executeTakeFirstOrThrow(),
+      ).toEqual({
+        active_topology_revision_id: recovered.revision.id,
+        lifecycle_status: 'running',
+      });
+      expect(
+        await restartedDb.selectFrom('topology_revisions').selectAll().execute(),
+      ).toHaveLength(1);
+      expect(
+        await restartedDb.selectFrom('component_instances').selectAll().execute(),
+      ).toHaveLength(2);
+      expect(
+        await restartedDb.selectFrom('connections').selectAll().execute(),
+      ).toHaveLength(1);
+      expect(
+        await restartedDb
+          .selectFrom('template_instantiations')
+          .selectAll()
+          .execute(),
+      ).toHaveLength(1);
+    } finally {
+      await restartedDb.destroy();
+    }
   });
 });
