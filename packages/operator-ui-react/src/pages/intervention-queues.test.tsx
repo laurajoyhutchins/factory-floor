@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   configureDefaultOperatorClient,
   createOperatorClient,
+  type InspectionRecord,
+  type Page,
+  type PageOptions,
 } from '@factory-floor/operator-client-ts';
 import { InterventionQueues } from './intervention-queues.js';
 
@@ -13,9 +16,23 @@ const json = (body: unknown) =>
     headers: { 'content-type': 'application/json' },
   });
 
-function renderQueue(loadCancellableRuns: (options?: unknown, signal?: AbortSignal) => Promise<any>) {
+type Loader = (
+  options?: PageOptions,
+  signal?: AbortSignal,
+) => Promise<Page<InspectionRecord>>;
+
+function renderQueue(loadCancellableRuns: Loader) {
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false }, mutations: { retry: false } } })}>
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: {
+            queries: { retry: false, refetchInterval: false },
+            mutations: { retry: false },
+          },
+        })
+      }
+    >
       <InterventionQueues loadCancellableRuns={loadCancellableRuns} />
     </QueryClientProvider>,
   );
@@ -46,7 +63,9 @@ describe('standalone intervention queues', () => {
 
     renderQueue(loadCancellableRuns);
 
-    expect(await screen.findByRole('heading', { name: 'Cancellable runs' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Cancellable runs' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('run-cancellable')).toBeInTheDocument();
     expect(screen.getByText('development.task')).toBeInTheDocument();
     expect(screen.getByText('repository-task')).toBeInTheDocument();
