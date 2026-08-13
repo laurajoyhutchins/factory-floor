@@ -1,5 +1,8 @@
-import { useInfiniteQuery, useIsMutating } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import {
+  useInfiniteQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useEffect } from 'react';
 import type { InspectionRecord, Page, PageOptions } from '../api/client.js';
 import { LoadMore, State } from '../components/ui.js';
 import {
@@ -17,8 +20,7 @@ export function InterventionQueues({
 }: {
   loadCancellableRuns: CancellableRunsLoader;
 }) {
-  const mutationCount = useIsMutating();
-  const previousMutationCount = useRef(mutationCount);
+  const queryClient = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: ['operator-cancellable-runs'],
     initialPageParam: null as string | null,
@@ -27,11 +29,19 @@ export function InterventionQueues({
     getNextPageParam: (page: Page<InspectionRecord>) =>
       page.nextCursor ?? undefined,
   });
-  useEffect(() => {
-    if (previousMutationCount.current > 0 && mutationCount === 0)
-      void query.refetch();
-    previousMutationCount.current = mutationCount;
-  }, [mutationCount, query]);
+  const refetch = query.refetch;
+  useEffect(
+    () =>
+      queryClient.getMutationCache().subscribe((event) => {
+        if (
+          event.type === 'updated' &&
+          (event.mutation.state.status === 'success' ||
+            event.mutation.state.status === 'error')
+        )
+          void refetch();
+      }),
+    [queryClient, refetch],
+  );
   const runs = query.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
