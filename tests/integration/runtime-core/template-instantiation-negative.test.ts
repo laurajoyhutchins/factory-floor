@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -29,51 +28,36 @@ const admin = new pg.Pool({
 const databaseName = `ff_template_negative_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
 
-const payloadSchema = {
-  apiVersion: 'factory-floor.dev/v1alpha1',
-  kind: 'ArtifactSchema',
-  metadata: { name: 'payload', version: '1' },
-  spec: { schema: { type: 'object', additionalProperties: true } },
-};
+function schemaDocument(name: string, schema: Record<string, unknown>) {
+  return {
+    apiVersion: 'factory-floor.dev/v1alpha1',
+    kind: 'ArtifactSchema',
+    metadata: { name, version: '1' },
+    spec: { schema },
+  };
+}
 
-const alternateSchema = {
-  apiVersion: 'factory-floor.dev/v1alpha1',
-  kind: 'ArtifactSchema',
-  metadata: { name: 'alternate', version: '1' },
-  spec: { schema: { type: 'string' } },
-};
-
-const producerDefinition = {
-  apiVersion: 'factory-floor.dev/v1alpha1',
-  kind: 'ComponentDefinition',
-  metadata: { name: 'producer', version: '1' },
-  spec: {
-    ports: [
-      {
-        name: 'value',
-        direction: 'output',
-        required: true,
-        schema: { name: 'payload', version: '1' },
-      },
-    ],
-  },
-};
-
-const workerDefinition = {
-  apiVersion: 'factory-floor.dev/v1alpha1',
-  kind: 'ComponentDefinition',
-  metadata: { name: 'worker', version: '1' },
-  spec: {
-    ports: [
-      {
-        name: 'value',
-        direction: 'input',
-        required: true,
-        schema: { name: 'payload', version: '1' },
-      },
-    ],
-  },
-};
+function componentDocument(
+  name: string,
+  direction: 'input' | 'output',
+  schema: string,
+) {
+  return {
+    apiVersion: 'factory-floor.dev/v1alpha1',
+    kind: 'ComponentDefinition',
+    metadata: { name, version: '1' },
+    spec: {
+      ports: [
+        {
+          name: 'value',
+          direction,
+          required: true,
+          schema: { name: schema, version: '1' },
+        },
+      ],
+    },
+  };
+}
 
 function templateDocument(name: string, patch: Record<string, unknown> = {}) {
   return {
@@ -100,34 +84,17 @@ class FailingActivationTopologyRepository extends TopologyRepository {
   }
 }
 
-async function expectNoPublishedInstantiation(
-  db: ReturnType<typeof createDatabase>,
-) {
-  const revisions = await db
-    .selectFrom('topology_revisions')
-    .selectAll()
-    .execute();
-  const instances = await db
-    .selectFrom('component_instances')
-    .selectAll()
-    .execute();
-  const connections = await db.selectFrom('connections').selectAll().execute();
-  const history = await db
-    .selectFrom('template_instantiations')
-    .selectAll()
-    .execute();
-  const artifacts = await db.selectFrom('artifacts').selectAll().execute();
-  const stateVersions = await db
-    .selectFrom('component_state_versions')
-    .selectAll()
-    .execute();
-
-  expect(revisions).toEqual([]);
-  expect(instances).toEqual([]);
-  expect(connections).toEqual([]);
-  expect(history).toEqual([]);
-  expect(artifacts).toEqual([]);
-  expect(stateVersions).toEqual([]);
+async function expectNoPublication(db: ReturnType<typeof createDatabase>) {
+  for (const table of [
+    'topology_revisions',
+    'component_instances',
+    'connections',
+    'template_instantiations',
+    'artifacts',
+    'component_state_versions',
+  ] as const) {
+    expect(await db.selectFrom(table).selectAll().execute()).toEqual([]);
+  }
 }
 
 describe('PostgreSQL template instantiation negative matrix', () => {
@@ -149,11 +116,16 @@ describe('PostgreSQL template instantiation negative matrix', () => {
   });
 
   beforeEach(async () => {
-    const reset = await resetDatabaseForDevelopment(db, 'test');
-    expect(reset.error).toBeUndefined();
-    await registrations.registerArtifactSchema(payloadSchema);
-    await registrations.registerComponentDefinition(producerDefinition);
-    await registrations.registerComponentDefinition(workerDefinition);
+    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    await registrations.registerArtifactSchema(
+      schemaDocument('payload', { type: 'object', additionalProperties: true }),
+    );
+    await registrations.registerComponentDefinition(
+      componentDocument('producer', 'output', 'payload'),
+    );
+    await registrations.registerComponentDefinition(
+      componentDocument('worker', 'input', 'payload'),
+    );
     await registrations.registerTemplate(templateDocument('baseline'));
     regionId = (await topology.createRegion(db, 'negative-region', null)).id;
   });
@@ -166,36 +138,33 @@ describe('PostgreSQL template instantiation negative matrix', () => {
     await admin.end();
   });
 
-  async function expectRejectedWithoutPublication(
+  async function rejectWithoutPublication(
     request: Parameters<TemplateInstantiationService['instantiate']>[0],
     code: string,
     service = new TemplateInstantiationService(db),
   ) {
     await expect(service.instantiate(request)).rejects.toMatchObject({ code });
-    await expectNoPublishedInstantiation(db);
+    await expectNoPublication(db);
   }
 
-  it('rejects a missing template without publication', async () => {
-    await expectRejectedWithoutPublication(
+  it('rejects missing and retired templates', async () => {
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'missing@1' },
       'template_not_found',
     );
-  });
 
-  it('rejects a retired template without publication', async () => {
     await db
       .updateTable('templates')
       .set({ retired_at: new Date() })
       .where('name', '=', 'baseline')
       .execute();
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'baseline@1' },
       'template_retired',
     );
   });
 
-  it('rejects a missing component without publication', async () => {
+  it('rejects missing and retired component definitions', async () => {
     await registrations.registerTemplate(
       templateDocument('missing-component', {
         initialTopology: {
@@ -204,64 +173,53 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         },
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'missing-component@1' },
       'component_definition_not_found',
     );
-  });
 
-  it('rejects a retired component without publication', async () => {
     await db
       .updateTable('component_definitions')
       .set({ retired_at: new Date() })
       .where('name', '=', 'producer')
       .execute();
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'baseline@1' },
       'component_definition_retired',
     );
   });
 
-  it('rejects a missing schema contract without publication', async () => {
+  it('rejects missing and retired schemas', async () => {
     await registrations.registerTemplate(
       templateDocument('missing-schema', {
         inputs: [{ port: 'objective', schema: 'missing@1' }],
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'missing-schema@1' },
       'artifact_schema_not_found',
     );
-  });
 
-  it('rejects a retired component port schema without publication', async () => {
     await db
       .updateTable('artifact_schemas')
       .set({ retired_at: new Date() })
       .where('name', '=', 'payload')
       .execute();
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'baseline@1' },
       'artifact_schema_retired',
     );
   });
 
-  it('rejects a missing policy without publication', async () => {
+  it('rejects missing and retired policies', async () => {
     await registrations.registerTemplate(
       templateDocument('missing-policy', { policies: ['missing-policy@1'] }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'missing-policy@1' },
       'policy_not_found',
     );
-  });
 
-  it('rejects a retired policy without publication', async () => {
     await registrations.registerPolicy({
       apiVersion: 'factory-floor.dev/v1alpha1',
       kind: 'Policy',
@@ -278,27 +236,23 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         policies: ['retired-policy@1'],
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'retired-policy-template@1' },
       'policy_retired',
     );
   });
 
-  it('rejects a missing capability without publication', async () => {
+  it('rejects missing and retired capabilities', async () => {
     await registrations.registerTemplate(
       templateDocument('missing-capability', {
         capabilities: ['missing-capability@1'],
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'missing-capability@1' },
       'capability_not_found',
     );
-  });
 
-  it('rejects a retired capability without publication', async () => {
     await db
       .insertInto('capabilities')
       .values({
@@ -316,8 +270,7 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         capabilities: ['retired-capability@1'],
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       {
         targetRegionId: regionId,
         template: 'retired-capability-template@1',
@@ -326,23 +279,13 @@ describe('PostgreSQL template instantiation negative matrix', () => {
     );
   });
 
-  it('rejects incompatible port schemas without publication', async () => {
-    await registrations.registerArtifactSchema(alternateSchema);
-    await registrations.registerComponentDefinition({
-      apiVersion: 'factory-floor.dev/v1alpha1',
-      kind: 'ComponentDefinition',
-      metadata: { name: 'alternate-worker', version: '1' },
-      spec: {
-        ports: [
-          {
-            name: 'value',
-            direction: 'input',
-            required: true,
-            schema: { name: 'alternate', version: '1' },
-          },
-        ],
-      },
-    });
+  it('rejects incompatible port schemas', async () => {
+    await registrations.registerArtifactSchema(
+      schemaDocument('alternate', { type: 'string' }),
+    );
+    await registrations.registerComponentDefinition(
+      componentDocument('alternate-worker', 'input', 'alternate'),
+    );
     await registrations.registerTemplate(
       templateDocument('incompatible', {
         initialTopology: {
@@ -354,14 +297,13 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         },
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'incompatible@1' },
       'incompatible_port_schema',
     );
   });
 
-  it('rejects invalid parameters without publication', async () => {
+  it('rejects invalid parameters and configuration', async () => {
     await registrations.registerTemplate(
       templateDocument('parameterized', {
         parameters: {
@@ -372,8 +314,7 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         },
       }),
     );
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       {
         targetRegionId: regionId,
         template: 'parameterized@1',
@@ -381,10 +322,7 @@ describe('PostgreSQL template instantiation negative matrix', () => {
       },
       'invalid_template_parameters',
     );
-  });
-
-  it('rejects invalid component configuration without publication', async () => {
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       {
         targetRegionId: regionId,
         template: 'baseline@1',
@@ -394,20 +332,19 @@ describe('PostgreSQL template instantiation negative matrix', () => {
     );
   });
 
-  it('rejects an ineligible region without publication', async () => {
+  it('rejects an ineligible region', async () => {
     await db
       .updateTable('regions')
       .set({ lifecycle_status: 'running' })
       .where('id', '=', regionId)
       .execute();
-
-    await expectRejectedWithoutPublication(
+    await rejectWithoutPublication(
       { targetRegionId: regionId, template: 'baseline@1' },
       'region_not_eligible',
     );
   });
 
-  it('rolls back revision, instances, connections, and history when activation fails', async () => {
+  it('rolls back an activation failure without partial publication', async () => {
     const failingTopology = new FailingActivationTopologyRepository();
     const service = new TemplateInstantiationService(
       db,
@@ -424,14 +361,15 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         template: 'baseline@1',
       }),
     ).rejects.toThrow('injected activation failure');
-    await expectNoPublishedInstantiation(db);
+    await expectNoPublication(db);
 
-    const region = await db
-      .selectFrom('regions')
-      .select(['active_topology_revision_id', 'lifecycle_status'])
-      .where('id', '=', regionId)
-      .executeTakeFirstOrThrow();
-    expect(region).toEqual({
+    expect(
+      await db
+        .selectFrom('regions')
+        .select(['active_topology_revision_id', 'lifecycle_status'])
+        .where('id', '=', regionId)
+        .executeTakeFirstOrThrow(),
+    ).toEqual({
       active_topology_revision_id: null,
       lifecycle_status: 'ready',
     });
