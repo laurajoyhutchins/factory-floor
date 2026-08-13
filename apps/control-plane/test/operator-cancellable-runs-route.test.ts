@@ -45,11 +45,7 @@ describe('operator cancellable-run route', () => {
         nextCursor: 'next-run',
       })),
     };
-    await registerOperatorRoutes(
-      instance,
-      commands as never,
-      queries as never,
-    );
+    await registerOperatorRoutes(instance, commands as never, queries as never);
 
     const response = await instance.inject({
       method: 'GET',
