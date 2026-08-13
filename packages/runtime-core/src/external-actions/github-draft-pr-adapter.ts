@@ -370,6 +370,10 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
   }
 
   private safeRef(value: string): boolean {
+    for (const character of value) {
+      const code = character.charCodeAt(0);
+      if (code <= 0x1f || code === 0x7f || /\s/u.test(character)) return false;
+    }
     return (
       !value.startsWith('/') &&
       !value.endsWith('/') &&
@@ -380,8 +384,7 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
       !value.includes('?') &&
       !value.includes('*') &&
       !value.includes('[') &&
-      !value.includes('\\') &&
-      !/[\u0000-\u001f\u007f\s]/u.test(value)
+      !value.includes('\\')
     );
   }
 
