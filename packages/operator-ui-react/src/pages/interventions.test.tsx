@@ -66,7 +66,9 @@ describe('operator intervention controls', () => {
 
     renderWithClient(<ApprovalInterventionQueue />);
 
-    expect(await screen.findByText('Approval approval-context')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Approval approval-context'),
+    ).toBeInTheDocument();
     for (const heading of [
       'Policy decision',
       'Artifacts',
@@ -76,7 +78,9 @@ describe('operator intervention controls', () => {
       'Alternatives',
       'Normalized inputs',
     ])
-      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: heading }),
+      ).toBeInTheDocument();
   });
 
   it('requires reason and confirmation before approval submission and refreshes canonical state', async () => {
@@ -188,7 +192,9 @@ describe('operator intervention controls', () => {
     expect(
       await screen.findByText(/conflicted with canonical approval state/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Prior truth has been preserved/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Prior truth has been preserved/i),
+    ).toBeInTheDocument();
     await waitFor(() => expect(approvalReads).toBe(2));
     expect(screen.getByText('rejected')).toBeInTheDocument();
   });
