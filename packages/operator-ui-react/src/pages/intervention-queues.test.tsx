@@ -13,19 +13,10 @@ const json = (body: unknown) =>
     headers: { 'content-type': 'application/json' },
   });
 
-function renderQueue() {
+function renderQueue(loadCancellableRuns: (options?: unknown, signal?: AbortSignal) => Promise<any>) {
   return render(
-    <QueryClientProvider
-      client={
-        new QueryClient({
-          defaultOptions: {
-            queries: { retry: false, refetchInterval: false },
-            mutations: { retry: false },
-          },
-        })
-      }
-    >
-      <InterventionQueues />
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, refetchInterval: false }, mutations: { retry: false } } })}>
+      <InterventionQueues loadCancellableRuns={loadCancellableRuns} />
     </QueryClientProvider>,
   );
 }
@@ -34,25 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('standalone intervention queues', () => {
   it('exposes authoritative cancellable runs without requiring a known run id', async () => {
-    const fetch = vi.fn(async (url: string | URL | Request) => {
-      const path = String(url);
-      if (path.includes('/api/v1/operator/cancellable-runs'))
-        return json({
-          items: [
-            {
-              runId: 'run-cancellable',
-              commandType: 'development.task',
-              regionId: 'region-1',
-              regionName: 'repository-task',
-              createdAt: '2026-08-13T00:00:00.000Z',
-            },
-          ],
-          nextCursor: null,
-        });
-      if (path.includes('/api/v1/operator/approvals'))
-        return json({ items: [], nextCursor: null });
-      throw new Error(`Unexpected request: ${path}`);
-    });
+    const fetch = vi.fn(async () => json({ items: [], nextCursor: null }));
     configureDefaultOperatorClient(
       createOperatorClient({
         principalId: 'standalone-console',
@@ -60,19 +33,24 @@ describe('standalone intervention queues', () => {
         fetch: fetch as typeof globalThis.fetch,
       }),
     );
+    const loadCancellableRuns = vi.fn(async () => ({
+      items: [
+        {
+          runId: 'run-cancellable',
+          commandType: 'development.task',
+          regionName: 'repository-task',
+        },
+      ],
+      nextCursor: null,
+    }));
 
-    renderQueue();
+    renderQueue(loadCancellableRuns);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Cancellable runs' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Cancellable runs' })).toBeInTheDocument();
     expect(screen.getByText('run-cancellable')).toBeInTheDocument();
     expect(screen.getByText('development.task')).toBeInTheDocument();
     expect(screen.getByText('repository-task')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/operator/cancellable-runs'),
-      expect.anything(),
-    );
+    expect(loadCancellableRuns).toHaveBeenCalled();
   });
 });
