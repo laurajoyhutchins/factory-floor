@@ -26,6 +26,19 @@ interface GitHubPullRequestSummary {
   base?: { ref?: string };
 }
 
+type GitHubProviderFailure = {
+  status: 'failed' | 'indeterminate';
+  response: Record<string, Json>;
+};
+
+type GitHubDraftPullRequestLookupResult =
+  | {
+      status: 'acknowledged';
+      pullRequest: GitHubPullRequestSummary | null;
+      response: Record<string, Json>;
+    }
+  | GitHubProviderFailure;
+
 export interface GitHubDraftPullRequestAdapterOptions {
   repository: string;
   token: string;
@@ -166,14 +179,7 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
   private async lookup(
     artifact: GitHubDraftPullRequestArtifact,
     idempotencyKey: string,
-  ): Promise<
-    | {
-        status: 'acknowledged';
-        pullRequest: GitHubPullRequestSummary | null;
-        response: Record<string, Json>;
-      }
-    | ExternalActionProviderResult
-  > {
+  ): Promise<GitHubDraftPullRequestLookupResult> {
     const [owner] = artifact.repository.split('/');
     const query = new URLSearchParams({
       state: 'open',
@@ -260,7 +266,7 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     operation: string,
     status: number,
     metadata: Record<string, Json>,
-  ): ExternalActionProviderResult {
+  ): GitHubProviderFailure {
     const retryable = status === 408 || status === 429 || status >= 500;
     return {
       status: retryable ? 'indeterminate' : 'failed',
