@@ -78,10 +78,12 @@ describe('standalone intervention queues', () => {
   });
 
   it('re-queries the canonical queue after ambiguous cancellation without resubmitting', async () => {
-    const fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      if (init?.method === 'POST') throw new TypeError('connection reset');
-      return json({ items: [], nextCursor: null });
-    });
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === 'POST') throw new TypeError('connection reset');
+        return json({ items: [], nextCursor: null });
+      },
+    );
     configureDefaultOperatorClient(
       createOperatorClient({
         principalId: 'standalone-console',
@@ -103,7 +105,9 @@ describe('standalone intervention queues', () => {
       await screen.findByText(/command outcome is ambiguous/i),
     ).toBeInTheDocument();
     await waitFor(() => expect(loadCancellableRuns).toHaveBeenCalledTimes(2));
-    const posts = fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+    const posts = fetch.mock.calls.filter(
+      ([, init]) => init?.method === 'POST',
+    );
     expect(posts).toHaveLength(1);
   });
 });
