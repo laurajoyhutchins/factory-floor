@@ -403,10 +403,16 @@ describe('PostgreSQL template instantiation negative matrix', () => {
         lifecycle_status: 'running',
       });
       expect(
-        await restartedDb.selectFrom('topology_revisions').selectAll().execute(),
+        await restartedDb
+          .selectFrom('topology_revisions')
+          .selectAll()
+          .execute(),
       ).toHaveLength(1);
       expect(
-        await restartedDb.selectFrom('component_instances').selectAll().execute(),
+        await restartedDb
+          .selectFrom('component_instances')
+          .selectAll()
+          .execute(),
       ).toHaveLength(2);
       expect(
         await restartedDb.selectFrom('connections').selectAll().execute(),
