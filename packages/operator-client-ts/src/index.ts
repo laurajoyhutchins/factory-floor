@@ -222,43 +222,121 @@ function transientStatus(status: number): boolean {
 export interface OperatorClient {
   inspectionHeaders(accept: string): Record<string, string>;
   health(signal?: AbortSignal): Promise<{ status: string; service: string }>;
-  regions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  events(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  deliveries(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  executions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  regions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  events(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  deliveries(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  executions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   execution(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  executionAttempts(id: string, options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  attempts(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  artifacts(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  executionAttempts(
+    id: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  attempts(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  artifacts(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   artifactLineage(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  resources(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  policyDecisions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  resources(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  policyDecisions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   projections(signal?: AbortSignal): Promise<{ items: InspectionRecord[] }>;
   topology(signal?: AbortSignal): Promise<InspectionRecord>;
-  templateInstantiations(scope: TemplateInstantiationScope, options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  templateInstantiation(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
+  templateInstantiations(
+    scope: TemplateInstantiationScope,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  templateInstantiation(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
   readonly streamPath: string;
   operatorStatus(signal?: AbortSignal): Promise<InspectionRecord>;
-  submitTask(request: DevelopmentTaskRequest, signal?: AbortSignal): Promise<InspectionRecord>;
+  submitTask(
+    request: DevelopmentTaskRequest,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
   run(runId: string, signal?: AbortSignal): Promise<InspectionRecord>;
   runTrace(runId: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  runTopology(runId: string, options?: Record<string, number | undefined>, signal?: AbortSignal): Promise<InspectionRecord>;
-  runAlerts(runId: string, options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  runEvents(runId: string, options?: PageOptions, signal?: AbortSignal): Promise<RunEventPage>;
-  runInstantiations(runId: string, options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  runArtifacts(runId: string, options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  runArtifact(runId: string, artifactId: string, maxBytes?: number, signal?: AbortSignal): Promise<InspectionRecord>;
-  pendingApprovals(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  cancellableRuns(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  decideApproval(approvalId: string, request: ApprovalDecisionRequest, signal?: AbortSignal): Promise<InspectionRecord>;
-  cancelRun(runId: string, request: RunCancellationRequest, signal?: AbortSignal): Promise<InspectionRecord>;
+  runTopology(
+    runId: string,
+    options?: Record<string, number | undefined>,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
+  runAlerts(
+    runId: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  runEvents(
+    runId: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<RunEventPage>;
+  runInstantiations(
+    runId: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  runArtifacts(
+    runId: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  runArtifact(
+    runId: string,
+    artifactId: string,
+    maxBytes?: number,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
+  pendingApprovals(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  decideApproval(
+    approvalId: string,
+    request: ApprovalDecisionRequest,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
+  cancelRun(
+    runId: string,
+    request: RunCancellationRequest,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
 }
 
-export function createOperatorClient(config: OperatorClientConfig): OperatorClient {
+export function createOperatorClient(
+  config: OperatorClientConfig,
+): OperatorClient {
   const principalId = config.principalId.trim();
   const adapter = config.adapter.trim();
   if (!principalId)
-    throw new OperatorClientError('malformed-response', 'principalId is required.');
+    throw new OperatorClientError(
+      'malformed-response',
+      'principalId is required.',
+    );
   if (!adapter)
     throw new OperatorClientError('malformed-response', 'adapter is required.');
   const baseUrl = normalizeBaseUrl(config.baseUrl);
@@ -266,13 +344,25 @@ export function createOperatorClient(config: OperatorClientConfig): OperatorClie
   const fetchImplementation = config.fetch ?? globalThis.fetch;
   const maxAttempts = positiveInteger(config.retry?.maxAttempts, 3);
   const baseDelayMs = positiveInteger(config.retry?.baseDelayMs, 100);
-  const sleep = config.retry?.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const sleep =
+    config.retry?.sleep ??
+    ((milliseconds: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
 
-  const headers = (accept: string, operator: boolean, body: boolean): Record<string, string> => ({
+  const headers = (
+    accept: string,
+    operator: boolean,
+    body: boolean,
+  ): Record<string, string> => ({
     accept,
     ...(body ? { 'content-type': 'application/json' } : {}),
     ...(token ? { authorization: `Bearer ${token}` } : {}),
-    ...(operator ? { 'x-factory-floor-principal-id': principalId, 'x-factory-floor-adapter': adapter } : {}),
+    ...(operator
+      ? {
+          'x-factory-floor-principal-id': principalId,
+          'x-factory-floor-adapter': adapter,
+        }
+      : {}),
   });
 
   const requestJson = async (
@@ -299,7 +389,10 @@ export function createOperatorClient(config: OperatorClientConfig): OperatorClie
           await sleep(baseDelayMs * 2 ** (attempt - 1));
           continue;
         }
-        throw new OperatorClientError('transport', 'Unable to reach the control plane.');
+        throw new OperatorClientError(
+          'transport',
+          'Unable to reach the control plane.',
+        );
       }
 
       if (transientStatus(response.status) && attempt < attempts) {
@@ -314,79 +407,224 @@ export function createOperatorClient(config: OperatorClientConfig): OperatorClie
           parsed = JSON.parse(text);
         } catch {
           if (!response.ok)
-            throw new OperatorClientError('http', `The control plane returned HTTP ${response.status}.`, response.status);
-          throw new OperatorClientError('malformed-response', 'The control plane returned malformed JSON.', response.status);
+            throw new OperatorClientError(
+              'http',
+              `The control plane returned HTTP ${response.status}.`,
+              response.status,
+            );
+          throw new OperatorClientError(
+            'malformed-response',
+            'The control plane returned malformed JSON.',
+            response.status,
+          );
         }
 
       if (!response.ok) {
         const details = errorDetails(parsed);
         throw new OperatorClientError(
           response.status === 404 ? 'not-found' : 'http',
-          details.message ?? `The control plane returned HTTP ${response.status}.`,
+          details.message ??
+            `The control plane returned HTTP ${response.status}.`,
           response.status,
           details.code,
         );
       }
       return normalize(parsed);
     }
-    throw new OperatorClientError('transport', 'Unable to reach the control plane.');
+    throw new OperatorClientError(
+      'transport',
+      'Unable to reach the control plane.',
+    );
   };
 
-  const getRecord = async (path: string, description: string, signal?: AbortSignal) =>
-    assertRecord(await requestJson('GET', path, undefined, signal), description);
-  const getPage = async (path: string, options?: PageOptions, signal?: AbortSignal) =>
-    assertPage(await requestJson('GET', pagePath(path, options), undefined, signal));
-  const postRecord = async (path: string, body: unknown, signal?: AbortSignal) =>
-    assertRecord(await requestJson('POST', path, body, signal), 'an operator response');
+  const getRecord = async (
+    path: string,
+    description: string,
+    signal?: AbortSignal,
+  ) =>
+    assertRecord(
+      await requestJson('GET', path, undefined, signal),
+      description,
+    );
+  const getPage = async (
+    path: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ) =>
+    assertPage(
+      await requestJson('GET', pagePath(path, options), undefined, signal),
+    );
+  const postRecord = async (
+    path: string,
+    body: unknown,
+    signal?: AbortSignal,
+  ) =>
+    assertRecord(
+      await requestJson('POST', path, body, signal),
+      'an operator response',
+    );
 
   return {
     inspectionHeaders: (accept) => headers(accept, false, false),
     health: async (signal) => {
       const value = await getRecord(inspectionPaths.health, 'health', signal);
       if (typeof value.status !== 'string' || typeof value.service !== 'string')
-        throw new OperatorClientError('malformed-response', 'The control-plane health response is incomplete.');
+        throw new OperatorClientError(
+          'malformed-response',
+          'The control-plane health response is incomplete.',
+        );
       return { status: value.status, service: value.service };
     },
-    regions: (options, signal) => getPage(inspectionPaths.regions, options, signal),
-    events: (options, signal) => getPage(inspectionPaths.events, options, signal),
-    deliveries: (options, signal) => getPage(inspectionPaths.deliveries, options, signal),
-    executions: (options, signal) => getPage(inspectionPaths.executions, options, signal),
-    execution: (id, signal) => getRecord(`${inspectionPaths.executions}/${encodeURIComponent(id)}`, 'an execution trace', signal),
-    executionAttempts: (id, options, signal) => getPage(`${inspectionPaths.executions}/${encodeURIComponent(id)}/attempts`, options, signal),
-    attempts: (options, signal) => getPage(inspectionPaths.attempts, options, signal),
-    artifacts: (options, signal) => getPage(inspectionPaths.artifacts, options, signal),
-    artifactLineage: (id, signal) => getRecord(`${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`, 'artifact lineage', signal),
-    resources: (options, signal) => getPage(inspectionPaths.resources, options, signal),
-    policyDecisions: (options, signal) => getPage(inspectionPaths.policies, options, signal),
+    regions: (options, signal) =>
+      getPage(inspectionPaths.regions, options, signal),
+    events: (options, signal) =>
+      getPage(inspectionPaths.events, options, signal),
+    deliveries: (options, signal) =>
+      getPage(inspectionPaths.deliveries, options, signal),
+    executions: (options, signal) =>
+      getPage(inspectionPaths.executions, options, signal),
+    execution: (id, signal) =>
+      getRecord(
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}`,
+        'an execution trace',
+        signal,
+      ),
+    executionAttempts: (id, options, signal) =>
+      getPage(
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}/attempts`,
+        options,
+        signal,
+      ),
+    attempts: (options, signal) =>
+      getPage(inspectionPaths.attempts, options, signal),
+    artifacts: (options, signal) =>
+      getPage(inspectionPaths.artifacts, options, signal),
+    artifactLineage: (id, signal) =>
+      getRecord(
+        `${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`,
+        'artifact lineage',
+        signal,
+      ),
+    resources: (options, signal) =>
+      getPage(inspectionPaths.resources, options, signal),
+    policyDecisions: (options, signal) =>
+      getPage(inspectionPaths.policies, options, signal),
     projections: async (signal) => {
-      const value = await getRecord(inspectionPaths.projections, 'projection status', signal);
+      const value = await getRecord(
+        inspectionPaths.projections,
+        'projection status',
+        signal,
+      );
       if (!Array.isArray(value.items) || !value.items.every(isRecord))
-        throw new OperatorClientError('malformed-response', 'The projection response is incomplete.');
+        throw new OperatorClientError(
+          'malformed-response',
+          'The projection response is incomplete.',
+        );
       return { items: value.items };
     },
-    topology: (signal) => getRecord(inspectionPaths.topology, 'active topology', signal),
+    topology: (signal) =>
+      getRecord(inspectionPaths.topology, 'active topology', signal),
     templateInstantiations: async (scope, options = {}, signal) => {
-      const url = new URL(pagePath(inspectionPaths.instantiations, options), 'http://factory-floor.local');
+      const url = new URL(
+        pagePath(inspectionPaths.instantiations, options),
+        'http://factory-floor.local',
+      );
       if (scope.regionId) url.searchParams.set('regionId', scope.regionId);
       if (scope.runId) url.searchParams.set('runId', scope.runId);
-      return assertPage(await requestJson('GET', `${url.pathname}${url.search}`, undefined, signal));
+      return assertPage(
+        await requestJson(
+          'GET',
+          `${url.pathname}${url.search}`,
+          undefined,
+          signal,
+        ),
+      );
     },
-    templateInstantiation: (id, signal) => getRecord(`${inspectionPaths.instantiations}/${encodeURIComponent(id)}`, 'a template instantiation', signal),
+    templateInstantiation: (id, signal) =>
+      getRecord(
+        `${inspectionPaths.instantiations}/${encodeURIComponent(id)}`,
+        'a template instantiation',
+        signal,
+      ),
     streamPath: targetUrl(baseUrl, inspectionPaths.stream),
-    operatorStatus: (signal) => getRecord(`${operatorPath}/status`, 'operator status', signal),
-    submitTask: (request, signal) => postRecord(`${operatorPath}/tasks`, request, signal),
-    run: (runId, signal) => getRecord(`${operatorPath}/runs/${encodeURIComponent(runId)}`, 'run status', signal),
-    runTrace: (runId, signal) => getRecord(`${operatorPath}/runs/${encodeURIComponent(runId)}/trace`, 'run trace', signal),
-    runTopology: (runId, options = {}, signal) => getRecord(withQuery(`${operatorPath}/runs/${encodeURIComponent(runId)}/topology`, options), 'run topology', signal),
-    runAlerts: (runId, options, signal) => getPage(`${operatorPath}/runs/${encodeURIComponent(runId)}/alerts`, options, signal),
-    runEvents: async (runId, options, signal) => assertRunEventPage(await requestJson('GET', pagePath(`${operatorPath}/runs/${encodeURIComponent(runId)}/events`, options), undefined, signal)),
-    runInstantiations: (runId, options, signal) => getPage(`${operatorPath}/runs/${encodeURIComponent(runId)}/instantiations`, options, signal),
-    runArtifacts: (runId, options, signal) => getPage(`${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts`, options, signal),
-    runArtifact: (runId, artifactId, maxBytes, signal) => getRecord(withQuery(`${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`, { maxBytes }), 'a run artifact', signal),
-    pendingApprovals: (options, signal) => getPage(`${operatorPath}/approvals`, options, signal),
-    cancellableRuns: (options, signal) => getPage(`${operatorPath}/cancellable-runs`, options, signal),
-    decideApproval: (approvalId, request, signal) => postRecord(`${operatorPath}/approvals/${encodeURIComponent(approvalId)}/decision`, request, signal),
-    cancelRun: (runId, request, signal) => postRecord(`${operatorPath}/runs/${encodeURIComponent(runId)}/cancel`, request, signal),
+    operatorStatus: (signal) =>
+      getRecord(`${operatorPath}/status`, 'operator status', signal),
+    submitTask: (request, signal) =>
+      postRecord(`${operatorPath}/tasks`, request, signal),
+    run: (runId, signal) =>
+      getRecord(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}`,
+        'run status',
+        signal,
+      ),
+    runTrace: (runId, signal) =>
+      getRecord(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/trace`,
+        'run trace',
+        signal,
+      ),
+    runTopology: (runId, options = {}, signal) =>
+      getRecord(
+        withQuery(
+          `${operatorPath}/runs/${encodeURIComponent(runId)}/topology`,
+          options,
+        ),
+        'run topology',
+        signal,
+      ),
+    runAlerts: (runId, options, signal) =>
+      getPage(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/alerts`,
+        options,
+        signal,
+      ),
+    runEvents: async (runId, options, signal) =>
+      assertRunEventPage(
+        await requestJson(
+          'GET',
+          pagePath(
+            `${operatorPath}/runs/${encodeURIComponent(runId)}/events`,
+            options,
+          ),
+          undefined,
+          signal,
+        ),
+      ),
+    runInstantiations: (runId, options, signal) =>
+      getPage(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/instantiations`,
+        options,
+        signal,
+      ),
+    runArtifacts: (runId, options, signal) =>
+      getPage(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts`,
+        options,
+        signal,
+      ),
+    runArtifact: (runId, artifactId, maxBytes, signal) =>
+      getRecord(
+        withQuery(
+          `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`,
+          { maxBytes },
+        ),
+        'a run artifact',
+        signal,
+      ),
+    pendingApprovals: (options, signal) =>
+      getPage(`${operatorPath}/approvals`, options, signal),
+    decideApproval: (approvalId, request, signal) =>
+      postRecord(
+        `${operatorPath}/approvals/${encodeURIComponent(approvalId)}/decision`,
+        request,
+        signal,
+      ),
+    cancelRun: (runId, request, signal) =>
+      postRecord(
+        `${operatorPath}/runs/${encodeURIComponent(runId)}/cancel`,
+        request,
+        signal,
+      ),
   };
 }
 
@@ -421,8 +659,10 @@ export const operatorClient: OperatorClient = {
   policyDecisions: (...args) => currentClient().policyDecisions(...args),
   projections: (...args) => currentClient().projections(...args),
   topology: (...args) => currentClient().topology(...args),
-  templateInstantiations: (...args) => currentClient().templateInstantiations(...args),
-  templateInstantiation: (...args) => currentClient().templateInstantiation(...args),
+  templateInstantiations: (...args) =>
+    currentClient().templateInstantiations(...args),
+  templateInstantiation: (...args) =>
+    currentClient().templateInstantiation(...args),
   get streamPath() {
     return currentClient().streamPath;
   },
@@ -437,7 +677,6 @@ export const operatorClient: OperatorClient = {
   runArtifacts: (...args) => currentClient().runArtifacts(...args),
   runArtifact: (...args) => currentClient().runArtifact(...args),
   pendingApprovals: (...args) => currentClient().pendingApprovals(...args),
-  cancellableRuns: (...args) => currentClient().cancellableRuns(...args),
   decideApproval: (...args) => currentClient().decideApproval(...args),
   cancelRun: (...args) => currentClient().cancelRun(...args),
 };
