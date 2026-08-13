@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createCancellableRunsClient } from '@factory-floor/operator-client-ts/cancellable-runs';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
@@ -47,12 +48,14 @@ const queryClient = new QueryClient({
   },
 });
 
-const runDetailsClient = createRunDetailsClient({
+const operatorConfig = {
   token: import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim(),
   baseUrl: import.meta.env.VITE_FACTORY_FLOOR_CONTROL_PLANE_URL?.trim(),
   principalId: 'standalone-console',
   adapter: 'standalone-console',
-});
+} as const;
+const runDetailsClient = createRunDetailsClient(operatorConfig);
+const cancellableRunsClient = createCancellableRunsClient(operatorConfig);
 
 const portfolioBaseUrl =
   import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
@@ -130,7 +133,16 @@ function App() {
           element={<TemplateInstantiationDetail />}
         />
         <Route path="/operations" element={<Operations />} />
-        <Route path="/approvals" element={<InterventionQueues />} />
+        <Route
+          path="/approvals"
+          element={
+            <InterventionQueues
+              loadCancellableRuns={(options, signal) =>
+                cancellableRunsClient.list(options, signal)
+              }
+            />
+          }
+        />
         <Route path="/runs/:runId" element={<RunRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
