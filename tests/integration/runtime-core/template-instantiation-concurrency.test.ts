@@ -425,7 +425,7 @@ describe('PostgreSQL template instantiation concurrency', () => {
 
     const commandService = new CommandService(db);
     const command = await commandService.submit({
-      region: '/parent/child',
+      region: 'child',
       commandType: 'child.start',
       source: {
         kind: 'user',
