@@ -7,11 +7,11 @@ import { consoleApi } from '@factory-floor/operator-client-ts';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
-  ApprovalInterventionQueue,
   ArtifactDetail,
   Artifacts,
   ExecutionDetail,
   Executions,
+  InterventionQueues,
   NotFound,
   Operations,
   Overview,
@@ -67,7 +67,7 @@ const titles: Record<string, string> = {
   artifacts: 'Artifacts',
   instantiations: 'Template instantiations',
   operations: 'Operations',
-  approvals: 'Approval interventions',
+  approvals: 'Intervention queues',
   runs: 'Run inspection',
 };
 
@@ -130,7 +130,7 @@ function App() {
           element={<TemplateInstantiationDetail />}
         />
         <Route path="/operations" element={<Operations />} />
-        <Route path="/approvals" element={<ApprovalInterventionQueue />} />
+        <Route path="/approvals" element={<InterventionQueues />} />
         <Route path="/runs/:runId" element={<RunRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
