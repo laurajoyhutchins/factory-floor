@@ -46,7 +46,10 @@ function mutationFailureMessage(
 
 function ApprovalContext({ approval }: { approval: InspectionRecord }) {
   const fields = [
-    ['Policy decision', firstPresent(approval, 'policyDecision', 'policyDecisions')],
+    [
+      'Policy decision',
+      firstPresent(approval, 'policyDecision', 'policyDecisions'),
+    ],
     ['Artifacts', firstPresent(approval, 'artifacts')],
     ['Trace', firstPresent(approval, 'trace', 'traces')],
     ['Attempts', firstPresent(approval, 'attempts')],
