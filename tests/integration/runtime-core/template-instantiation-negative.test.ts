@@ -116,7 +116,9 @@ describe('PostgreSQL template instantiation negative matrix', () => {
   });
 
   beforeEach(async () => {
-    expect((await resetDatabaseForDevelopment(db, 'test')).error).toBeUndefined();
+    expect(
+      (await resetDatabaseForDevelopment(db, 'test')).error,
+    ).toBeUndefined();
     await registrations.registerArtifactSchema(
       schemaDocument('payload', { type: 'object', additionalProperties: true }),
     );
