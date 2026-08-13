@@ -1,7 +1,4 @@
-import {
-  useInfiniteQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { InspectionRecord, Page, PageOptions } from '../api/client.js';
 import { LoadMore, State } from '../components/ui.js';
