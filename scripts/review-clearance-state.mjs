@@ -61,7 +61,8 @@ const latestClearanceRecord = (comments, ownerLogin) =>
     .filter((comment) => {
       const body = comment.body ?? '';
       const legacyOwnerReview =
-        comment.user?.login === ownerLogin && body.includes(REVIEW_CLEARANCE_MARKER);
+        comment.user?.login === ownerLogin &&
+        body.includes(REVIEW_CLEARANCE_MARKER);
       const delegatedEvidence =
         body.includes(INTEGRATION_EVIDENCE_MARKER) &&
         isTrustedDelegatedAuthor(comment, ownerLogin);
@@ -110,12 +111,24 @@ const parseLegacyOwnerReview = (comment, headSha) => {
 };
 
 const parseDelegatedEvidence = (comment, headSha) => {
-  const reviewedHead = comment.body.match(/^Head:\s*`([0-9a-f]{40})`\s*$/im)?.[1];
-  const ownerImpact = comment.body.match(/^Owner impact:\s*(.+?)\s*$/im)?.[1]?.trim();
-  const reviewThreads = comment.body.match(/^Review threads:\s*(\d+)\s*$/im)?.[1];
-  const provenance = comment.body.match(/^Provenance:\s*(.+?)\s*$/im)?.[1]?.trim();
-  const verification = comment.body.match(/^Verification:\s*(.+?)\s*$/im)?.[1]?.trim();
-  const limitations = comment.body.match(/^Limitations:\s*(.+?)\s*$/im)?.[1]?.trim();
+  const reviewedHead = comment.body.match(
+    /^Head:\s*`([0-9a-f]{40})`\s*$/im,
+  )?.[1];
+  const ownerImpact = comment.body
+    .match(/^Owner impact:\s*(.+?)\s*$/im)?.[1]
+    ?.trim();
+  const reviewThreads = comment.body.match(
+    /^Review threads:\s*(\d+)\s*$/im,
+  )?.[1];
+  const provenance = comment.body
+    .match(/^Provenance:\s*(.+?)\s*$/im)?.[1]
+    ?.trim();
+  const verification = comment.body
+    .match(/^Verification:\s*(.+?)\s*$/im)?.[1]
+    ?.trim();
+  const limitations = comment.body
+    .match(/^Limitations:\s*(.+?)\s*$/im)?.[1]
+    ?.trim();
   const complete =
     Boolean(reviewedHead) &&
     Boolean(ownerImpact) &&
@@ -180,7 +193,8 @@ export const determineReviewClearanceStatus = ({
   if (draft) {
     return {
       state: 'pending',
-      description: 'Draft pull request; technical integration eligibility is unavailable.',
+      description:
+        'Draft pull request; technical integration eligibility is unavailable.',
     };
   }
 
@@ -232,7 +246,8 @@ export const determineReviewClearanceStatus = ({
   if (clearance?.state === 'not-cleared') {
     return {
       state: 'pending',
-      description: 'Latest technical integration evidence does not clear this head.',
+      description:
+        'Latest technical integration evidence does not clear this head.',
     };
   }
 
