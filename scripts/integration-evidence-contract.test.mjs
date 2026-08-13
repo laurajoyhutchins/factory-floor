@@ -53,9 +53,7 @@ describe('integration evidence', () => {
   it('rejects evidence with material owner impact', () => {
     expect(
       parseReviewClearance({
-        comments: [
-          delegatedComment(evidence({ ownerImpact: 'timeline' })),
-        ],
+        comments: [delegatedComment(evidence({ ownerImpact: 'timeline' }))],
         ownerLogin: 'laurajoyhutchins',
         headSha: HEAD_SHA,
       }),
