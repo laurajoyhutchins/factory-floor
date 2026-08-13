@@ -1,8 +1,8 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import {
-  operatorClient,
-  type InspectionRecord,
-  type Page,
+import type {
+  InspectionRecord,
+  Page,
+  PageOptions,
 } from '../api/client.js';
 import { LoadMore, State } from '../components/ui.js';
 import {
@@ -10,12 +10,21 @@ import {
   RunCancellationIntervention,
 } from './interventions.js';
 
-export function InterventionQueues() {
+export type CancellableRunsLoader = (
+  options?: PageOptions,
+  signal?: AbortSignal,
+) => Promise<Page<InspectionRecord>>;
+
+export function InterventionQueues({
+  loadCancellableRuns,
+}: {
+  loadCancellableRuns: CancellableRunsLoader;
+}) {
   const query = useInfiniteQuery({
     queryKey: ['operator-cancellable-runs'],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.cancellableRuns({ cursor: pageParam, limit: 25 }, signal),
+      loadCancellableRuns({ cursor: pageParam, limit: 25 }, signal),
     getNextPageParam: (page: Page<InspectionRecord>) =>
       page.nextCursor ?? undefined,
   });
