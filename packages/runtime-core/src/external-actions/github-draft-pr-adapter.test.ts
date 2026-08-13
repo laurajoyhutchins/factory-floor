@@ -65,7 +65,9 @@ describe('GitHubDraftPullRequestAdapter', () => {
 
     expect(result.status).toBe('acknowledged');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl.mock.calls[0]?.[0].toString()).toContain('/repos/acme/widgets/pulls?');
+    expect(fetchImpl.mock.calls[0]?.[0].toString()).toContain(
+      '/repos/acme/widgets/pulls?',
+    );
     expect(result.response).toMatchObject({
       provider: 'github',
       operation: 'existing_draft',
@@ -95,7 +97,9 @@ describe('GitHubDraftPullRequestAdapter', () => {
     expect(result.status).toBe('acknowledged');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     const [url, init] = fetchImpl.mock.calls[1] ?? [];
-    expect(url?.toString()).toBe('https://api.github.com/repos/acme/widgets/pulls');
+    expect(url?.toString()).toBe(
+      'https://api.github.com/repos/acme/widgets/pulls',
+    );
     expect(init).toMatchObject({ method: 'POST', redirect: 'error' });
     const headers = new Headers(init?.headers);
     expect(headers.get('authorization')).toBe('Bearer server-secret');
