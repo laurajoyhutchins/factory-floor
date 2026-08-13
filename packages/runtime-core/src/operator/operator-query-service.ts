@@ -339,6 +339,62 @@ export class OperatorQueryService {
     };
   }
 
+  async listCancellableRuns(context: OperatorContext, page: PageRequest = {}) {
+    requireOperator(context);
+    const limit = normalizeLimit(page.limit, 50);
+    const afterId = decodeCursor(page.cursor);
+    const cursorClause = afterId ? sql`and command.id > ${afterId}` : sql``;
+    const rows = await sql<{
+      id: string;
+      command_type: string;
+      region_id: string;
+      region_name: string;
+      created_at: Date;
+    }>`
+      select command.id,
+             command.command_type,
+             command.region_id,
+             region.name as region_name,
+             command.created_at
+      from commands as command
+      join regions as region on region.id = command.region_id
+      where command.command_type <> 'operator.run.cancel_requested'
+        and command.correlation_id is not null
+        ${cursorClause}
+        and (
+          exists (
+            select 1
+            from deliveries as delivery
+            where delivery.region_id = command.region_id
+              and delivery.correlation_id = command.correlation_id
+              and delivery.status not in ('completed', 'failed', 'cancelled', 'dead_lettered')
+          )
+          or exists (
+            select 1
+            from deliveries as delivery
+            join executions as execution on execution.delivery_id = delivery.id
+            where delivery.region_id = command.region_id
+              and delivery.correlation_id = command.correlation_id
+              and execution.status not in ('completed', 'failed')
+          )
+        )
+      order by command.id
+      limit ${limit + 1}
+    `.execute(this.db);
+    const items = rows.rows.slice(0, limit).map((row) => ({
+      runId: row.id,
+      commandType: row.command_type,
+      regionId: row.region_id,
+      regionName: row.region_name,
+      createdAt: row.created_at,
+    }));
+    return {
+      items,
+      nextCursor:
+        rows.rows.length > limit ? encodeCursor(items.at(-1)!.runId) : null,
+    };
+  }
+
   private async findRun(runId: string): Promise<RunRow> {
     const run = await this.db
       .selectFrom('commands as command')
