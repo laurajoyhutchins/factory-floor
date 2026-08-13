@@ -69,9 +69,7 @@ describe('standalone intervention queues', () => {
     expect(screen.getByText('run-cancellable')).toBeInTheDocument();
     expect(screen.getByText('development.task')).toBeInTheDocument();
     expect(screen.getByText('repository-task')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Cancel run' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/operator/cancellable-runs'),
       expect.anything(),
