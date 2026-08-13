@@ -1,13 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   ArtifactRepository,
   ComponentStateRepository,
@@ -32,8 +25,7 @@ const admin = new pg.Pool({
   connectionString: base,
   connectionTimeoutMillis: 10_000,
 });
-const databaseName =
-  `ff_template_concurrency_${randomUUID().replaceAll('-', '')}`;
+const databaseName = `ff_template_concurrency_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
 
 const identicalRequestId = '019bb22e-58b0-7d87-8000-000000000401';
@@ -240,9 +232,7 @@ describe('PostgreSQL template instantiation concurrency', () => {
     const reset = await resetDatabaseForDevelopment(db, 'test');
     expect(reset.error).toBeUndefined();
     await registerFixture(registrations);
-    regionId = (
-      await topology.createRegion(db, 'concurrent-region', null)
-    ).id;
+    regionId = (await topology.createRegion(db, 'concurrent-region', null)).id;
   });
 
   afterAll(async () => {
@@ -271,11 +261,11 @@ describe('PostgreSQL template instantiation concurrency', () => {
       service.instantiate(request),
     ]);
 
-    const dispositions = results
-      .map((result) => result.disposition)
-      .sort();
+    const dispositions = results.map((result) => result.disposition).sort();
     expect(dispositions).toEqual(['created', 'existing']);
-    expect(new Set(results.map((result) => result.instantiationId)).size).toBe(1);
+    expect(new Set(results.map((result) => result.instantiationId)).size).toBe(
+      1,
+    );
     expect(new Set(results.map((result) => result.digest)).size).toBe(1);
     expect(new Set(results.map((result) => result.revision.id)).size).toBe(1);
 
@@ -287,7 +277,10 @@ describe('PostgreSQL template instantiation concurrency', () => {
       .selectFrom('component_instances')
       .selectAll()
       .execute();
-    const connections = await db.selectFrom('connections').selectAll().execute();
+    const connections = await db
+      .selectFrom('connections')
+      .selectAll()
+      .execute();
     const history = await db
       .selectFrom('template_instantiations')
       .selectAll()
@@ -363,7 +356,10 @@ describe('PostgreSQL template instantiation concurrency', () => {
       .selectFrom('component_instances')
       .selectAll()
       .execute();
-    const connections = await db.selectFrom('connections').selectAll().execute();
+    const connections = await db
+      .selectFrom('connections')
+      .selectAll()
+      .execute();
     const history = await db
       .selectFrom('template_instantiations')
       .selectAll()
