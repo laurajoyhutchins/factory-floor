@@ -1,9 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type {
-  InspectionRecord,
-  Page,
-  PageOptions,
-} from '../api/client.js';
+import type { InspectionRecord, Page, PageOptions } from '../api/client.js';
 import { LoadMore, State } from '../components/ui.js';
 import {
   ApprovalInterventionQueue,
