@@ -71,8 +71,8 @@ describe('standalone intervention queues', () => {
       await screen.findByRole('heading', { name: 'Cancellable runs' }),
     ).toBeInTheDocument();
     expect(screen.getByText('run-cancellable')).toBeInTheDocument();
-    expect(screen.getByText('development.task')).toBeInTheDocument();
-    expect(screen.getByText('repository-task')).toBeInTheDocument();
+    expect(screen.getByText(/development\.task/)).toBeInTheDocument();
+    expect(screen.getByText(/repository-task/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled();
     expect(loadCancellableRuns).toHaveBeenCalled();
   });
