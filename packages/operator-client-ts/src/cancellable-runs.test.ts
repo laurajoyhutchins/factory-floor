@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createOperatorClient,
-  type InspectionRecord,
-  type Page,
-  type PageOptions,
-} from './index.js';
+import { createCancellableRunsClient } from './cancellable-runs.js';
 
 describe('cancellable-run operator client', () => {
   it('uses the authoritative paged cancellable-run endpoint', async () => {
@@ -29,29 +24,17 @@ describe('cancellable-run operator client', () => {
             ],
             nextCursor: null,
           }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         );
       },
     );
-    const client = createOperatorClient({
+    const client = createCancellableRunsClient({
       principalId: 'standalone-console',
       adapter: 'standalone-console',
       fetch: fetch as typeof globalThis.fetch,
     });
-    const cancellableRuns = (
-      client as unknown as {
-        cancellableRuns(options?: PageOptions): Promise<Page<InspectionRecord>>;
-      }
-    ).cancellableRuns;
 
-    expect(cancellableRuns).toBeTypeOf('function');
-    const page = await cancellableRuns({
-      cursor: 'previous-run',
-      limit: 10,
-    });
+    const page = await client.list({ cursor: 'previous-run', limit: 10 });
     expect(page.items[0]?.runId).toBe('run-cancellable');
   });
 });
