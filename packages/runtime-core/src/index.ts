@@ -37,6 +37,7 @@ export * from './artifacts/artifact-reconciliation-service.js';
 export * from './artifacts/artifact-tombstone-service.js';
 export * from './artifacts/proposed-result-prevalidation-service.js';
 export * from './external-actions/external-action-service.js';
+export * from './external-actions/github-draft-pr-adapter.js';
 export {
   WorkerProtocolError,
   type WorkerErrorCode,
