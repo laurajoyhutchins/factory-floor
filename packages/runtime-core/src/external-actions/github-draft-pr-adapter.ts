@@ -61,7 +61,10 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     const prepared = await this.prepare(request);
     if ('failure' in prepared) return prepared.failure;
 
-    const existing = await this.lookup(prepared.artifact, request.idempotencyKey);
+    const existing = await this.lookup(
+      prepared.artifact,
+      request.idempotencyKey,
+    );
     if (existing.status !== 'acknowledged') return existing;
     if (existing.pullRequest)
       return this.acknowledged(
@@ -131,7 +134,10 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     const prepared = await this.prepare(request);
     if ('failure' in prepared) return prepared.failure;
 
-    const existing = await this.lookup(prepared.artifact, request.idempotencyKey);
+    const existing = await this.lookup(
+      prepared.artifact,
+      request.idempotencyKey,
+    );
     if (existing.status !== 'acknowledged') return existing;
     if (existing.pullRequest)
       return this.acknowledged(
@@ -151,7 +157,9 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     };
   }
 
-  private async prepare(request: ExternalActionProviderRequest): Promise<
+  private async prepare(
+    request: ExternalActionProviderRequest,
+  ): Promise<
     | { artifact: GitHubDraftPullRequestArtifact }
     | { failure: ExternalActionProviderResult }
   > {
@@ -164,11 +172,12 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
       request.outboundRequestArtifactId,
     );
     const artifact = this.parseArtifact(raw);
-    if (!artifact) return { failure: this.scopeFailure('invalid_request_artifact') };
+    if (!artifact)
+      return { failure: this.scopeFailure('invalid_request_artifact') };
     if (
       artifact.repository !== this.options.repository ||
       !this.options.allowedBaseBranches.includes(artifact.base) ||
-      !this.options.allowedHeadPrefixes.some(prefix =>
+      !this.options.allowedHeadPrefixes.some((prefix) =>
         artifact.head.startsWith(prefix),
       )
     )
@@ -212,7 +221,11 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
 
     const metadata = this.responseMetadata(providerResponse);
     if (!providerResponse.ok)
-      return this.providerFailure('reconcile', providerResponse.status, metadata);
+      return this.providerFailure(
+        'reconcile',
+        providerResponse.status,
+        metadata,
+      );
 
     const payload = await this.readJson(providerResponse);
     if (!Array.isArray(payload))
@@ -229,9 +242,9 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
 
     const marker = this.idempotencyMarker(idempotencyKey);
     const pullRequest = payload
-      .map(item => this.pullRequestSummary(item))
+      .map((item) => this.pullRequestSummary(item))
       .find(
-        item =>
+        (item) =>
           item !== null &&
           item.draft &&
           item.head?.ref === artifact.head &&
@@ -277,9 +290,7 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
           ? 'github_provider_retryable_failure'
           : 'github_provider_terminal_failure',
         http_status: status,
-        retry_classification: retryable
-          ? 'reconcile_before_retry'
-          : 'terminal',
+        retry_classification: retryable ? 'reconcile_before_retry' : 'terminal',
         ...metadata,
       },
     };
@@ -337,7 +348,13 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     const base = this.boundedString(value.base, 255);
     const title = this.boundedString(value.title, 256);
     const body = this.boundedString(value.body, 65_000, true);
-    if (repository === null || head === null || base === null || title === null || body === null)
+    if (
+      repository === null ||
+      head === null ||
+      base === null ||
+      title === null ||
+      body === null
+    )
       return null;
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) return null;
     if (!this.safeRef(head) || !this.safeRef(base)) return null;
@@ -347,12 +364,16 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
   private pullRequestSummary(raw: unknown): GitHubPullRequestSummary | null {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const value = raw as Record<string, unknown>;
-    if (!Number.isSafeInteger(value.number) || Number(value.number) < 1) return null;
+    if (!Number.isSafeInteger(value.number) || Number(value.number) < 1)
+      return null;
     if (typeof value.draft !== 'boolean' || typeof value.html_url !== 'string')
       return null;
     const head = this.refObject(value.head);
     const base = this.refObject(value.base);
-    const body = value.body === null || typeof value.body === 'string' ? value.body : undefined;
+    const body =
+      value.body === null || typeof value.body === 'string'
+        ? value.body
+        : undefined;
     return {
       number: Number(value.number),
       draft: value.draft,
@@ -369,7 +390,11 @@ export class GitHubDraftPullRequestAdapter implements ExternalActionProvider {
     return typeof ref === 'string' ? { ref } : undefined;
   }
 
-  private boundedString(raw: unknown, maxLength: number, allowEmpty = false): string | null {
+  private boundedString(
+    raw: unknown,
+    maxLength: number,
+    allowEmpty = false,
+  ): string | null {
     if (typeof raw !== 'string' || raw.length > maxLength) return null;
     if (!allowEmpty && raw.trim() === '') return null;
     return raw;
