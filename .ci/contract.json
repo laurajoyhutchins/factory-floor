@@ -2,9 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/laurajoyhutchins/personal-codex-skills/main/docs/reference/repository-ci-contract-v1.schema.json",
   "version": 1,
   "verify": {
-    "commands": [
-      ["pnpm", "verify"]
-    ]
+    "commands": [["pnpm", "verify"]]
   },
   "evidence": {
     "path": ".factory-floor/ci-evidence/verification.json"
