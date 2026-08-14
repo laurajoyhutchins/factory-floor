@@ -37,7 +37,10 @@ async function app() {
   };
   const queries = {
     getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
-    getCommandStatus: vi.fn(async () => ({ commandId: 'cmd-1', status: 'running' })),
+    getCommandStatus: vi.fn(async () => ({
+      commandId: 'cmd-1',
+      status: 'running',
+    })),
     inspectCommandTrace: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
     getCommandTopology: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
     listCommandAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
@@ -47,7 +50,10 @@ async function app() {
       resumeCursor: null,
       complete: true,
     })),
-    listCommandTemplateInstantiations: vi.fn(async () => ({ items: [], nextCursor: null })),
+    listCommandTemplateInstantiations: vi.fn(async () => ({
+      items: [],
+      nextCursor: null,
+    })),
     listCommandArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
     readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
     listPendingApprovals: vi.fn(async () => ({ items: [], nextCursor: null })),
@@ -86,7 +92,10 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(status.statusCode).toBe(200);
-    expect(context.queries.getCommandStatus).toHaveBeenCalledWith(expect.any(Object), 'cmd-1');
+    expect(context.queries.getCommandStatus).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+    );
 
     const artifacts = await context.instance.inject({
       method: 'GET',
