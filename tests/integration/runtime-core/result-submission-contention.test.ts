@@ -211,7 +211,9 @@ describe('result submission contention', () => {
       service.submitResult(conflicting),
     ]);
 
-    expect(settled.filter((entry) => entry.status === 'fulfilled')).toHaveLength(1);
+    expect(
+      settled.filter((entry) => entry.status === 'fulfilled'),
+    ).toHaveLength(1);
     const rejected = settled.find((entry) => entry.status === 'rejected');
     expect(rejected).toMatchObject({
       status: 'rejected',
