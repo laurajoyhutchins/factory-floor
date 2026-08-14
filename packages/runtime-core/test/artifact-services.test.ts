@@ -87,4 +87,66 @@ describe('artifact domain helpers', () => {
     expect(removeStaged).not.toHaveBeenCalled();
     expect(markStagingAbandoned).not.toHaveBeenCalled();
   });
+
+  it('converges after promotion is interrupted between metadata commit and blob availability', async () => {
+    const now = new Date('2026-07-15T05:00:00.000Z');
+    const digest = 'c'.repeat(64);
+    const artifact = { id: 'artifact-1', digest, size_bytes: '7' };
+    const staging = {
+      id: 'staging-1',
+      artifact_id: 'artifact-1',
+      staged_ref: 'staging/staging-1',
+      status: 'staged',
+    };
+    let committed = false;
+    let attempts = 0;
+    const promote = vi.fn(async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('injected promotion interruption');
+      committed = true;
+    });
+    const markStagingPromoted = vi.fn();
+    const repository = {
+      findCommittedArtifactsNeedingBlobCheck: vi
+        .fn()
+        .mockResolvedValue([artifact]),
+      readStagingRowsByArtifactId: vi.fn().mockResolvedValue([staging]),
+      markStagingPromoted,
+      listReconciliationCandidates: vi.fn().mockResolvedValue([]),
+      readStagingRowsByLocator: vi.fn().mockResolvedValue([]),
+    };
+    const blobStore = {
+      committedExists: vi.fn(async () => committed),
+      promote,
+      listStaged: vi.fn().mockResolvedValue({ objects: [] }),
+    };
+    const service = new ArtifactReconciliationService({
+      db: {} as never,
+      repository: repository as never,
+      blobStore: blobStore as never,
+      clock: () => now,
+    });
+
+    await expect(service.runBatch({ limit: 10 })).rejects.toThrow(
+      'injected promotion interruption',
+    );
+    expect(markStagingPromoted).not.toHaveBeenCalled();
+
+    const recovered = await service.runBatch({ limit: 10 });
+    expect(recovered.promoted).toBe(1);
+    expect(recovered.unresolved).toEqual([]);
+    expect(promote).toHaveBeenCalledTimes(2);
+    expect(markStagingPromoted).toHaveBeenCalledTimes(1);
+    expect(markStagingPromoted).toHaveBeenCalledWith(
+      expect.anything(),
+      'staging-1',
+      'artifact-1',
+      now,
+    );
+
+    const stable = await service.runBatch({ limit: 10 });
+    expect(stable.alreadyConsistent).toBe(1);
+    expect(promote).toHaveBeenCalledTimes(2);
+    expect(markStagingPromoted).toHaveBeenCalledTimes(1);
+  });
 });
