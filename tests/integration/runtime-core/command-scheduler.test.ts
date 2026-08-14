@@ -9,6 +9,7 @@ import {
 } from '../../../packages/db/src/index.js';
 import {
   CommandService,
+  ResourceAdmissionService,
   SchedulerService,
 } from '../../../packages/runtime-core/src/index.js';
 
@@ -21,6 +22,10 @@ const admin = new pg.Pool({
 });
 const databaseName = `ff_scheduler_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
+const raw = new pg.Pool({
+  connectionString: testUrl,
+  connectionTimeoutMillis: 10_000,
+});
 
 async function seedRuntime(db: ReturnType<typeof createDatabase>) {
   const schemaId = createUuidV7();
@@ -141,6 +146,7 @@ describe('durable command routing and scheduler concurrency', () => {
 
   afterAll(async () => {
     await db.destroy();
+    await raw.end();
     await admin
       .query(`drop database if exists ${databaseName}`)
       .catch(() => undefined);
@@ -230,6 +236,56 @@ describe('durable command routing and scheduler concurrency', () => {
     expect(
       new Set(deliveries.map((delivery) => delivery.lease_token)).size,
     ).toBe(1);
+  });
+
+  it('does not lease when the region concurrent-execution budget is exhausted', async () => {
+    const region = await db
+      .selectFrom('regions')
+      .select('id')
+      .where('name', '=', 'investigation')
+      .executeTakeFirstOrThrow();
+    await new ResourceAdmissionService(db).configureRegionBudgets({
+      regionId: region.id,
+      budgets: { maximumConcurrentExecutions: 0 },
+      source: { kind: 'integration-test' },
+    });
+
+    const commands = new CommandService(db);
+    await commands.submit({
+      region: '/investigation',
+      commandType: 'investigation.start',
+      source: { kind: 'user', subject: 'integration-test' },
+      payload: { objective: 'respect the execution budget' },
+      correlationId: 'budget-correlation',
+      idempotencyKey: 'budget-request',
+    });
+
+    const scheduled = await new SchedulerService(db).pollForExecution({
+      owner: 'worker-a',
+      leaseDurationMs: 30_000,
+    });
+
+    expect(scheduled).toBeNull();
+    expect(
+      await db.selectFrom('executions').selectAll().execute(),
+    ).toHaveLength(0);
+    expect(
+      await db.selectFrom('execution_attempts').selectAll().execute(),
+    ).toHaveLength(0);
+    const decisions = await raw.query<{
+      outcome: string;
+      subject_kind: string;
+      resource_type: string;
+    }>(
+      'select outcome, subject_kind, resource_type from admission_decisions order by created_at',
+    );
+    expect(decisions.rows).toEqual([
+      {
+        outcome: 'defer',
+        subject_kind: 'execution',
+        resource_type: 'concurrent_executions',
+      },
+    ]);
   });
 
   it('durably rejects an already expired command without creating deliveries', async () => {

@@ -1,5 +1,10 @@
-import type { Kysely } from 'kysely';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { sql, type Kysely } from 'kysely';
 import { createUuidV7, type Database, type Json } from '@factory-floor/db';
+import {
+  ResourceAdmissionService,
+  type AdmissionOutcome,
+} from '../scheduling/resource-admission-service.js';
 
 export interface ExternalActionProviderRequest {
   readonly actionId: string;
@@ -60,6 +65,10 @@ type DispatchPreparation =
       attemptId: string;
     }
   | {
+      disposition: 'deferred';
+      outcome: AdmissionOutcome;
+    }
+  | {
       disposition: 'uncertain';
       status: 'dispatching' | 'indeterminate' | 'acknowledged';
     }
@@ -70,6 +79,7 @@ export class ExternalActionService {
     private readonly db: Kysely<Database>,
     private readonly provider: ExternalActionProvider,
     private readonly clock = () => new Date(),
+    private readonly admission = new ResourceAdmissionService(db),
   ) {}
 
   async dispatch(actionId: string) {
@@ -185,8 +195,11 @@ export class ExternalActionService {
           'action.idempotency_key',
           'action.capability_grant_id',
           'action.outbound_request_artifact_id',
+          'action.attempt_id',
           'action.status',
+          'execution.id as execution_id',
           'execution.lifecycle_epoch as execution_lifecycle_epoch',
+          'region.id as region_id',
           'region.lifecycle_epoch as region_lifecycle_epoch',
           'region.lifecycle_status',
         ])
@@ -216,6 +229,21 @@ export class ExternalActionService {
           .execute();
         return { disposition: 'cancelled' };
       }
+
+      const admission = await this.admission.reserveInTransaction(trx, {
+        regionId: action.region_id,
+        resourceType: 'network_calls',
+        quantity: 1n,
+        idempotencyKey: `external-action:${action.id}:network-calls`,
+        subjectKind: 'external_action',
+        subjectId: action.id,
+        executionId: action.execution_id,
+        attemptId: action.attempt_id,
+        externalActionId: action.id,
+        attributes: { admission_boundary: 'external_action_dispatch' },
+      });
+      if (admission.outcome !== 'admit')
+        return { disposition: 'deferred', outcome: admission.outcome };
 
       const previous = await trx
         .selectFrom('external_action_attempts')
@@ -263,6 +291,8 @@ export class ExternalActionService {
       actionStatus,
       result.response,
     );
+    if (result.status !== 'indeterminate')
+      await this.reconcileNetworkReservation(actionId);
     return { disposition: 'dispatched' as const, status: actionStatus };
   }
 
@@ -279,6 +309,8 @@ export class ExternalActionService {
       actionStatus,
       result.response,
     );
+    if (result.status !== 'indeterminate')
+      await this.reconcileNetworkReservation(actionId);
     return { disposition: 'reconciled' as const, status: actionStatus };
   }
 
@@ -339,6 +371,21 @@ export class ExternalActionService {
         .where('id', '=', actionId)
         .execute();
     });
+  }
+
+  private async reconcileNetworkReservation(actionId: string) {
+    const reservation = await sql<{ request_id: string }>`
+      select rr.request_id::text as request_id
+      from resource_reservations rr
+      join resource_budgets b on b.id = rr.budget_id
+      where rr.external_action_id = ${actionId}::uuid
+        and b.resource_type = 'network_calls'
+      order by rr.reserved_at, rr.id
+      limit 1
+    `.execute(this.db as any);
+    const requestId = reservation.rows[0]?.request_id;
+    if (!requestId) return false;
+    return this.admission.reconcile(requestId, 1n);
   }
 
   private providerRequest(action: {
