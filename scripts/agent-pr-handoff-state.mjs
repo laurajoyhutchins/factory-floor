@@ -35,29 +35,17 @@ export const determineHandoffState = ({
   mergeableState,
 }) => {
   if (draft) {
-    return {
-      state: 'implementing',
-      externalBlocker: null,
-      nextAction:
-        'Complete implementation, run a fresh self-review, and verify the current head.',
-    };
+    return { state: 'implementing', externalBlocker: null };
   }
 
   if (!verificationRun || verificationRun.status !== 'completed') {
-    return {
-      state: 'awaiting-ci',
-      externalBlocker: null,
-      nextAction:
-        'Re-evaluate this handoff when Repository Verification completes for the current head.',
-    };
+    return { state: 'awaiting-ci', externalBlocker: null };
   }
 
   if (verificationRun.conclusion !== 'success') {
     return {
       state: 'needs-attention',
       externalBlocker: 'repository-verification-failed',
-      nextAction:
-        'Address the first actionable error from the retained Repository Verification handoff artifact.',
     };
   }
 
@@ -65,18 +53,11 @@ export const determineHandoffState = ({
     return {
       state: 'needs-attention',
       externalBlocker: 'review-state-unavailable',
-      nextAction:
-        'Restore access to the complete review-thread state before treating this pull request as ready.',
     };
   }
 
   if (reviewThreads.unresolvedCount > 0) {
-    return {
-      state: 'review',
-      externalBlocker: null,
-      nextAction:
-        'Resolve outstanding review threads, then re-run exact-head verification.',
-    };
+    return { state: 'review', externalBlocker: null };
   }
 
   if (
@@ -90,17 +71,8 @@ export const determineHandoffState = ({
         mergeable === false
           ? 'pull-request-not-mergeable'
           : `mergeable-state:${mergeableState ?? 'unknown'}`,
-      nextAction:
-        mergeableState === 'behind'
-          ? 'Synchronize the pull-request branch with its base, then verify the new exact head.'
-          : 'Resolve the GitHub mergeability blocker before treating this pull request as ready.',
     };
   }
 
-  return {
-    state: 'ready',
-    externalBlocker: null,
-    nextAction:
-      'Perform the final independent review and merge according to AGENTS.md.',
-  };
+  return { state: 'ready', externalBlocker: null };
 };

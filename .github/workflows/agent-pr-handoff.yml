@@ -101,7 +101,6 @@ jobs:
                     }
                   : null,
                 externalBlocker: decision.externalBlocker,
-                nextAction: decision.nextAction,
                 updatedAt: new Date().toISOString(),
               };
               const workflowCell = latestRun
@@ -124,7 +123,6 @@ jobs:
               | Review-thread state | ${reviewThreads.status} |
               | Unresolved review threads | ${reviewThreadCell} |
               | External blocker | ${decision.externalBlocker ?? 'none'} |
-              | Next action | ${decision.nextAction} |
 
               <details>
               <summary>Machine-readable state</summary>
