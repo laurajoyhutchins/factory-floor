@@ -233,4 +233,35 @@ describe('result submission contention', () => {
         .execute(),
     ).resolves.toHaveLength(4);
   });
+
+  it('fences stale result publication after the region lifecycle advances', async () => {
+    const env = await claim();
+    await db
+      .updateTable('regions')
+      .set({ lifecycle_status: 'cancelling', lifecycle_epoch: 1 })
+      .where('name', '=', 'contention')
+      .executeTakeFirstOrThrow();
+
+    await expect(service.cancellation(env)).resolves.toEqual({
+      protocolVersion: '1.0',
+      state: 'cancellation_requested',
+    });
+    await expect(service.submitResult(result(env, 2))).rejects.toMatchObject({
+      code: 'stale_lifecycle_epoch',
+    });
+    await expect(
+      db
+        .selectFrom('worker_result_submissions')
+        .selectAll()
+        .where('attempt_id', '=', env.attemptId)
+        .execute(),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db
+        .selectFrom('executions')
+        .select('status')
+        .where('id', '=', env.executionId)
+        .executeTakeFirstOrThrow(),
+    ).resolves.toEqual({ status: 'running' });
+  });
 });
