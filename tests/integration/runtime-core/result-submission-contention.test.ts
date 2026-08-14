@@ -106,12 +106,11 @@ async function seedRuntime(db: ReturnType<typeof createDatabase>) {
 
 describe('result submission contention', () => {
   const db = createDatabase(testUrl);
-  const now = new Date('2026-07-17T00:00:00.000Z');
   const service = new WorkerProtocolService(
     db,
     undefined,
     { leaseDurationMs: 60_000, baseUrl: 'http://127.0.0.1:3000' },
-    () => now,
+    () => new Date(Date.now() + 60_000),
   );
 
   beforeAll(async () => {
