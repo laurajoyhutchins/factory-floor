@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import { ArtifactReconciliationService } from '../../../packages/runtime-core/src/index.js';
 import {
@@ -94,6 +96,39 @@ describe.each(artifactStoreAdapters)(
         ).resolves.toEqual({ provenance: context.provenance });
       } finally {
         await context.cleanup();
+      }
+    });
+
+    it('does not expose a partial staged or committed artifact after an interrupted stream', async () => {
+      const store = await scenario.createStore();
+      const stagingId = `interrupted-${randomUUID()}`;
+      const completeBody = Buffer.from('complete artifact body');
+      const digest = createHash('sha256').update(completeBody).digest('hex');
+      const interrupted = Readable.from(
+        (async function* () {
+          yield completeBody.subarray(0, 8);
+          throw new Error('injected artifact stream interruption');
+        })(),
+      );
+
+      try {
+        await expect(
+          store.blobStore.stage(stagingId, interrupted, {
+            expectedDigest: digest,
+            expectedSize: BigInt(completeBody.length),
+          }),
+        ).rejects.toThrow('injected artifact stream interruption');
+        await expect(store.blobStore.stagedExists(stagingId)).resolves.toBe(
+          false,
+        );
+        await expect(store.blobStore.committedExists(digest)).resolves.toBe(
+          false,
+        );
+        await expect(
+          store.blobStore.listStaged({ limit: 10 }),
+        ).resolves.toEqual({ objects: [], nextCursor: undefined });
+      } finally {
+        await store.cleanup();
       }
     });
   },
