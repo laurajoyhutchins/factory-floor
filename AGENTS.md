@@ -61,26 +61,29 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 - Resolve ordinary implementation details autonomously in favor of deterministic, strict, and testable behavior.
 - Record design changes as ADRs.
 
-## Deciduous pilot
+## Deciduous
 
-The Deciduous integration is a nonblocking development-history pilot. GitHub issues, ADRs, pull requests, and commits remain authoritative. Deciduous records only useful options, decisions, observations, pivots, and outcomes.
+Deciduous is optional, non-normative, repository-local causal-history tooling. GitHub issues, ADRs, repository code and tests, pull requests, and commits remain authoritative for their respective concerns. Deciduous records only useful goals, decisions, observations, revisits, actions, and outcomes.
 
-For a substantial pilot task, use the repository wrapper at three checkpoints:
+Use upstream Deciduous directly. Do not create repository-owned wrappers, aliases, proxy CLIs, shadow schemas, or synchronization services around it.
+
+When Deciduous is available, use the installed native interface:
 
 ```bash
-bash scripts/deciduous-pilot.sh start "Goal tied to the issue or PR"
-bash scripts/deciduous-pilot.sh decision "Chosen approach" "Why this approach was selected"
-bash scripts/deciduous-pilot.sh observe "A discovery that changed or clarified the work"
-bash scripts/deciduous-pilot.sh finish "Verified outcome" HEAD
-bash scripts/deciduous-pilot.sh export "descriptive-graph-snapshot.json"
+deciduous --version
+deciduous --help
+deciduous nodes
+deciduous context
 ```
 
-- Run `bash scripts/deciduous-pilot.sh recover` when resuming work after context loss.
-- Record consequential reasoning, not routine edits, formatting, or repeated test commands.
-- Never record secrets, credentials, private environment values, or hidden chain-of-thought.
-- Do not run upstream `deciduous init` or `deciduous update`; they install generated assistant integrations outside this pilot's boundary.
-- Do not block edits or commits when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
-- See `tools/deciduous/README.md` and issue #57 for installation, snapshot persistence, evaluation, and rollback.
+Use native mutation commands such as `deciduous add` and `deciduous link` when a consequential decision should be recorded. Follow the installed release's help instead of translating commands through Factory Floor tooling.
+
+- Record consequential causal history, not routine edits, formatting, or repeated test commands.
+- Never record secrets, credentials, private environment values, customer data, or hidden chain-of-thought.
+- Keep Factory Floor history repository-local. Do not build a centralized Deciduous graph for portfolio state.
+- If Deciduous is unavailable, continue the repository task and report that causal-history materialization was unavailable. Do not substitute a home-grown implementation.
+- `.deciduous/exports/factory-floor-archaeology.json` is a historical native snapshot through 2026-08-02, not a continuously synchronized projection.
+- See `.deciduous/README.md` and `tools/deciduous/README.md` for authority, persistence, reviewed version, and backfill guidance.
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
