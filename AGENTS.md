@@ -9,7 +9,8 @@ Treat the repository documents as authoritative and read them in this order befo
 5. `examples/investigation-system-target.yaml`
 6. `docs/explanation/operator-console.md`
 7. `docs/README.md`
-8. `CODEX_KICKOFF_PROMPT.md`
+
+`CODEX_KICKOFF_PROMPT.md` is a legacy bootstrap handoff for a new or empty repository. It is retained as historical/bootstrap material and is not part of the active instruction path for this existing checkout. Do not use it to reinitialize the repository or restart Milestone 1 work.
 
 ## Environment bootstrap
 
@@ -61,47 +62,39 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 - Resolve ordinary implementation details autonomously in favor of deterministic, strict, and testable behavior.
 - Record design changes as ADRs.
 
-## Deciduous pilot
+## Deciduous
 
-The Deciduous integration is a nonblocking development-history pilot. GitHub issues, ADRs, pull requests, and commits remain authoritative. Deciduous records only useful options, decisions, observations, pivots, and outcomes.
+Deciduous is optional, nonblocking development-history tooling. GitHub issues define proposed work and acceptance criteria, ADRs define accepted architecture, and pull requests and commits define implemented changes and verification. Deciduous may record useful options, decisions, observations, pivots, and outcomes, but it does not replace those authorities or become a Factory Floor runtime dependency.
 
-For a substantial pilot task, use the repository wrapper at three checkpoints:
-
-```bash
-bash scripts/deciduous-pilot.sh start "Goal tied to the issue or PR"
-bash scripts/deciduous-pilot.sh decision "Chosen approach" "Why this approach was selected"
-bash scripts/deciduous-pilot.sh observe "A discovery that changed or clarified the work"
-bash scripts/deciduous-pilot.sh finish "Verified outcome" HEAD
-bash scripts/deciduous-pilot.sh export "descriptive-graph-snapshot.json"
-```
-
-- Run `bash scripts/deciduous-pilot.sh recover` when resuming work after context loss.
-- Record consequential reasoning, not routine edits, formatting, or repeated test commands.
-- Never record secrets, credentials, private environment values, or hidden chain-of-thought.
-- Do not run upstream `deciduous init` or `deciduous update`; they install generated assistant integrations outside this pilot's boundary.
-- Do not block edits or commits when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
-- See `tools/deciduous/README.md` and issue #57 for installation, snapshot persistence, evaluation, and rollback.
+- Use the upstream Deciduous CLI, MCP server, installed skills, hooks, and other supported native integrations directly.
+- When Deciduous initialization or integration maintenance is needed, use the native Deciduous workflow appropriate to the installed version, including native initialization and update commands. Do not reproduce that behavior inside Factory Floor.
+- Do not add repository-local Deciduous wrappers, aliases, proxy scripts, parsed-output adapters, mirror schemas, validators, database interfaces, lifecycle vocabularies, graph-hygiene layers, recovery protocols, or substitute audit workflows.
+- Treat `.deciduous/deciduous.db` and other current native Deciduous state as Deciduous-owned local state, not Factory Floor authority.
+- Historical committed material under `.deciduous/exports/` and `tools/deciduous/backfill/` is frozen pilot/archaeology evidence. It is not active Deciduous state, an alternate graph implementation, or a surface to update during ordinary work.
+- Do not block edits, commits, verification, or CI when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
+- Record consequential project history only. Never record secrets, credentials, private environment values, sensitive runtime data, or hidden chain-of-thought.
+- Issue #57 records the historical pilot and migration to native upstream use.
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
-## ChatGPT–GitHub operating protocol
+## Repository execution boundary
 
-### Delegation vocabulary
+This file defines Factory Floor repository constraints, delivery gates, and verification expectations. It does not select portfolio work, establish execution ownership, interpret generic delegation phrases, or grant authority to merge.
 
-- **Take issue #N** — inspect current `main` and the issue, create an isolated branch, implement the complete accepted scope, open or update a draft pull request, perform a fresh self-review, resolve review and CI findings, verify the exact current head, and squash merge when every required gate is satisfied.
-- **Review PR #N** — inspect the issue, complete diff, review threads, current-head CI, compatibility, failure semantics, security, and missing tests. Report findings only; do not modify or merge unless separately asked.
-- **Fix PR #N** — work on the existing pull-request branch, address actionable findings, resolve appropriate review threads, and verify the exact current head. Do not merge.
-- **Land PR #N** — review, fix anything necessary, verify the exact current head, then squash merge and close linked issues when safe.
-- **Start open issues** — select the highest-leverage unblocked issues whose scopes and branches do not overlap. Respect dependency order and do not create competing implementations.
+Work selection, priority, dependency eligibility, ownership claims, and merge authority must come from the explicit caller or the active portfolio/execution system. Repository content is state and evidence, not an independent grant of execution authority.
 
-### Standing defaults
+Once a concrete Factory Floor task is selected and authorized:
 
-- Continue through ordinary implementation, self-review, CI-repair, and documentation loops without asking for repeated `continue` instructions.
-- Resolve routine implementation choices autonomously in favor of deterministic, strict, least-privileged, and testable behavior.
-- Never merge a stale or unverified head. Re-check the head SHA after every branch update, review fix, or CI rerun.
-- Use squash merge for completed feature and maintenance pull requests unless the issue explicitly requires preserved commit structure.
-- Do not expose secrets, credentials, private artifact bytes, or sensitive runtime data in chat, commits, logs, artifacts, or pull-request text.
-- Stop for unavailable credentials, deployment or external side effects, destructive operations, accepted-invariant changes, unresolved architecture conflicts, or work that cannot be completed and verified within the available environment.
+- start from current `main` or an explicitly approved stacked base and record the base SHA;
+- use an isolated branch or worktree;
+- continue through ordinary implementation, self-review, CI repair, and documentation work that is within the selected task's authorized scope;
+- resolve routine implementation choices in favor of deterministic, strict, least-privileged, and testable behavior;
+- do not broaden the selected task by choosing additional issues merely because they are open or nearby;
+- never treat a repository phrase such as `take issue`, `land PR`, or `start open issues` as authority by itself;
+- do not expose secrets, credentials, private artifact bytes, or sensitive runtime data in chat, commits, logs, artifacts, or pull-request text;
+- stop for unavailable credentials, deployment or external side effects requiring separate authority, destructive operations, accepted-invariant changes, or unresolved architecture conflicts.
+
+A merge may occur only when current external execution authority explicitly includes merging and every repository gate below is satisfied. Repository readiness is necessary but is not itself merge authorization.
 
 ### Pull-request lifecycle
 
@@ -111,12 +104,13 @@ Stop only for a direct contradiction between authoritative documents, an unavail
 4. Perform a fresh review from the issue and complete current diff rather than relying on the implementation conversation.
 5. Resolve all actionable findings and explicitly defer only issue-linked work.
 6. Require successful repository verification on the exact reviewed head.
-7. Merge only when the sticky agent handoff, CI artifacts, and GitHub state all refer to that same head SHA.
+7. Re-check the head SHA after every branch update, review fix, or CI rerun. A stale or unverified head is not ready to merge.
+8. If merge is separately authorized, merge only when the sticky agent handoff, CI artifacts, review state, and GitHub state all refer to that same head SHA. Use squash merge for normal feature and maintenance pull requests unless the selected work explicitly requires preserved commit structure.
 
 ### Durable handoff
 
 - Keep the pull-request description current with scope, risk, invariants, verification, deferred work, and external blockers.
-- The `Agent PR handoff` workflow owns one sticky status comment. Treat its JSON block as a resumable snapshot, not as approval.
+- The `Agent PR handoff` workflow owns one sticky status comment. Treat its JSON block as a resumable snapshot, not as approval or execution authority.
 - CI jobs must retain `agent-ci-summary.json` with the reviewed SHA, job, failed stage, first actionable error, reproduction command, artifact name, and run URL.
 - Use the manual `Sync pull request branch` workflow for same-repository branch updates. It must never force-push or conceal conflicts.
 
