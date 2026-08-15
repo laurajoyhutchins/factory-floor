@@ -27,7 +27,7 @@ deciduous nodes
 deciduous context
 deciduous add decision "..."
 deciduous link <from> <to>
-deciduous export json
+deciduous graph
 ```
 
 Consult `deciduous --help` for the installed release instead of relying on repository-authored command emulation.
