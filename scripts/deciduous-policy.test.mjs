@@ -27,7 +27,9 @@ describe('Deciduous repository policy', () => {
     expect(agents).toContain('Use upstream Deciduous directly');
     expect(agents).toContain('deciduous add');
     expect(agents).toContain('deciduous link');
-    expect(agents).toContain('If Deciduous is unavailable, continue the repository task');
+    expect(agents).toContain(
+      'If Deciduous is unavailable, continue the repository task',
+    );
     expect(agents).not.toContain('scripts/deciduous-pilot.sh');
   });
 
@@ -36,7 +38,9 @@ describe('Deciduous repository policy', () => {
     const stateGuide = await readRepositoryFile('.deciduous/README.md');
 
     expect(guide).toContain('Deciduous 0.16.0');
-    expect(guide).toContain('Do not create or restore a Factory Floor wrapper around Deciduous');
+    expect(guide).toContain(
+      'Do not create or restore a Factory Floor wrapper around Deciduous',
+    );
     expect(guide).toContain('offline-execution');
     expect(guide).toContain('2026-08-03-through-2026-08-14.md');
     expect(stateGuide).toContain('Use upstream Deciduous directly');
@@ -45,7 +49,9 @@ describe('Deciduous repository policy', () => {
   });
 
   test('removes the repository-specific command dialect', async () => {
-    await expect(readRepositoryFile('scripts/deciduous-pilot.sh')).rejects.toMatchObject({
+    await expect(
+      readRepositoryFile('scripts/deciduous-pilot.sh'),
+    ).rejects.toMatchObject({
       code: 'ENOENT',
     });
   });
