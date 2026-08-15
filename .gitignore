@@ -30,8 +30,10 @@ artifacts/
 data/
 .minio/
 
-# Native Deciduous local state
-.deciduous/
+# Native Deciduous operational state is local; native collaboration state is shared.
+.deciduous/*
+!.deciduous/sync/
+!.deciduous/sync/**
 
 # Editors and operating systems
 .vscode/*
