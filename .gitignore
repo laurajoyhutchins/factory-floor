@@ -30,8 +30,9 @@ artifacts/
 data/
 .minio/
 
-# Deciduous pilot local state
+# Deciduous local state and reviewed snapshots
 .deciduous/*
+!.deciduous/README.md
 !.deciduous/exports/
 .deciduous/exports/*
 !.deciduous/exports/.gitkeep
