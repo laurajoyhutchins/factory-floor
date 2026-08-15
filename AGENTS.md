@@ -66,14 +66,17 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 
 Deciduous is optional, nonblocking development-history tooling. GitHub issues define proposed work and acceptance criteria, ADRs define accepted architecture, and pull requests and commits define implemented changes and verification. Deciduous may record useful options, decisions, observations, pivots, and outcomes, but it does not replace those authorities or become a Factory Floor runtime dependency.
 
-- Use the upstream Deciduous CLI, MCP server, installed skills, hooks, and other supported native integrations directly.
-- When Deciduous initialization or integration maintenance is needed, use the native Deciduous workflow appropriate to the installed version, including native initialization and update commands. Do not reproduce that behavior inside Factory Floor.
+- Use the stock upstream Deciduous CLI, MCP server, installed skills, hooks, and other supported native integrations directly.
+- `.deciduous/deciduous.db` and other operational database state are Deciduous-owned local state. When native event sync is initialized, `.deciduous/sync/` is Deciduous-owned Git-shared collaboration state and is not a Factory Floor schema or runtime interface.
+- In a fresh checkout that already contains `.deciduous/sync/`, run `deciduous events status` and rebuild the local graph with `deciduous events rebuild` when the database is absent or shared events are pending before relying on graph context. Use `deciduous pulse` to inspect the recovered graph.
+- Use native Deciduous commands for graph mutations. When those mutations materially change `.deciduous/sync/`, include the native sync files in the same repository candidate that caused the graph change.
+- Do not run `deciduous events init` merely because `.deciduous/sync/` is absent. Issue #171 owns the one-time migration from the actual maintained local database to native shared sync state. Never reconstruct current state from historical exports.
+- When Deciduous initialization or integration maintenance is otherwise needed, use the native Deciduous workflow appropriate to the installed version. Do not reproduce that behavior inside Factory Floor.
 - Do not add repository-local Deciduous wrappers, aliases, proxy scripts, parsed-output adapters, mirror schemas, validators, database interfaces, lifecycle vocabularies, graph-hygiene layers, recovery protocols, or substitute audit workflows.
-- Treat `.deciduous/deciduous.db` and other current native Deciduous state as Deciduous-owned local state, not Factory Floor authority.
 - Historical committed material under `.deciduous/exports/` and `tools/deciduous/backfill/` is frozen pilot/archaeology evidence. It is not active Deciduous state, an alternate graph implementation, or a surface to update during ordinary work.
-- Do not block edits, commits, verification, or CI when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
+- Do not block edits, commits, verification, or CI when Deciduous is unavailable. Report the missing optional tool and continue the repository task unless the selected gate explicitly requires Deciduous itself.
 - Record consequential project history only. Never record secrets, credentials, private environment values, sensitive runtime data, or hidden chain-of-thought.
-- Issue #57 records the historical pilot and migration to native upstream use.
+- Issue #57 records the historical pilot and migration to native upstream use. Issue #171 owns the native event-sync bootstrap for fresh checkouts.
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
