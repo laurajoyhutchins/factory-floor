@@ -21,6 +21,7 @@ import {
   StartupRecoveryService,
   SystemApplicationService,
 } from '../../packages/runtime-core/src/index.js';
+import { authoredPlan } from './dogfood-plan.js';
 
 const root = new URL('../../', import.meta.url);
 const rootPath = fileURLToPath(root);
@@ -165,82 +166,6 @@ function repositoryIdentity(
     snapshotDigest: sha256(JSON.stringify(canonicalFiles)),
     dirtyStatePolicy: 'require-clean' as const,
   };
-}
-
-function authoredPlan(baseRevision: string): string {
-  return `---
-schemaVersion: 1
-repository:
-  owner: laurajoyhutchins
-  name: factory-floor
-  baseRevision: ${baseRevision}
-allowedPaths:
-  - workers/repository-task-ts/src/repository-task-worker-component.ts
-  - workers/repository-task-ts/test/repository-task-worker-component.test.ts
-  - workers/repository-task-ts/src/index.ts
-recipe:
-  name: typescript-module
-  version: '1'
-  inputs:
-    package: '@factory-floor/repository-task-worker'
-    moduleName: repository-task-worker-component
-    responsibility: Describe the bounded durable worker that compiles, applies, verifies, and retains repository-task evidence.
-    exports:
-      - name: REPOSITORY_TASK_WORKER_COMPONENT
-        typeName: RepositoryTaskWorkerComponent
-        value:
-          capabilities:
-            - apply-isolated-patch
-            - compile-authored-plan
-            - retain-evidence
-            - run-trusted-verification
-          name: repository-task-worker
-          responsibility: Describe the bounded durable worker that compiles, applies, verifies, and retains repository-task evidence.
-    testCases:
-      - name: describes the bounded durable repository-task worker
-        exportName: REPOSITORY_TASK_WORKER_COMPONENT
-        expected:
-          capabilities:
-            - apply-isolated-patch
-            - compile-authored-plan
-            - retain-evidence
-            - run-trusted-verification
-          name: repository-task-worker
-          responsibility: Describe the bounded durable worker that compiles, applies, verifies, and retains repository-task evidence.
-outputContract:
-  outputs:
-    - name: implementation
-      kind: file
-      path: workers/repository-task-ts/src/repository-task-worker-component.ts
-      mediaType: text/typescript
-      required: true
-    - name: public-export
-      kind: export
-      path: workers/repository-task-ts/src/index.ts
-      mediaType: text/typescript
-      required: true
-    - name: unit-test
-      kind: test
-      path: workers/repository-task-ts/test/repository-task-worker-component.test.ts
-      mediaType: text/typescript
-      required: true
-verificationProfile: factory-floor
-resourceBounds:
-  maxFiles: 3
-  maxPatchBytes: 131072
-  maxVerificationSeconds: 600
-requestedCapabilities:
-  - repository.read
-  - repository.proposePatch
-  - verification.request
-completionCriteria:
-  - The worker component descriptor is publicly exported.
-  - The generated unit test passes.
-  - The retained patch and verification evidence agree.
----
-
-Add the retained repository-task worker component descriptor through Factory Floor itself.
-`;
 }
 
 function repositoryProfile() {
