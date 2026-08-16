@@ -729,3 +729,4 @@ if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href) {
     process.exitCode = 1;
   });
 }
+export * from './repository-task-worker-component.js';
