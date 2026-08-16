@@ -30,8 +30,11 @@ artifacts/
 data/
 .minio/
 
-# Native Deciduous local state
-.deciduous/
+# Native Deciduous operational/local state; shared sync state remains tracked
+.deciduous/deciduous.db
+.deciduous/.version
+.deciduous/config.toml
+.deciduous/documents/
 
 # Editors and operating systems
 .vscode/*

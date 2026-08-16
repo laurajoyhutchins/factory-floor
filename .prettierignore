@@ -9,4 +9,4 @@ pnpm-lock.yaml
 **/uv.lock
 packages/contracts-ts/src/generated/
 packages/contracts-py/factory_floor_contracts/
-.deciduous/exports/*.json
+.deciduous/sync/events/*.jsonl
