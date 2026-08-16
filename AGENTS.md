@@ -64,16 +64,22 @@ Maintain the accepted v0.1 **Durable Reactive Graph** baseline and scope new arc
 
 ## Deciduous
 
-Deciduous is optional, nonblocking development-history tooling. GitHub issues define proposed work and acceptance criteria, ADRs define accepted architecture, and pull requests and commits define implemented changes and verification. Deciduous may record useful options, decisions, observations, pivots, and outcomes, but it does not replace those authorities or become a Factory Floor runtime dependency.
+Factory Floor maintains consequential project reasoning in stock Deciduous native sync state under `.deciduous/sync/**` as a normal repository practice. Git and GitHub remain the durable technical authority: code, schemas, tests, ADRs, commits, pull requests, and issues own the implementation and delivery facts appropriate to them. Deciduous records the consequential reasoning that explains goals, architectural decisions, alternatives, constraints, observations, outcomes, supersessions, and genuinely unresolved questions without becoming a parallel implementation authority or runtime dependency.
 
-- Use the upstream Deciduous CLI, MCP server, installed skills, hooks, and other supported native integrations directly.
-- When Deciduous initialization or integration maintenance is needed, use the native Deciduous workflow appropriate to the installed version, including native initialization and update commands. Do not reproduce that behavior inside Factory Floor.
-- Do not add repository-local Deciduous wrappers, aliases, proxy scripts, parsed-output adapters, mirror schemas, validators, database interfaces, lifecycle vocabularies, graph-hygiene layers, recovery protocols, or substitute audit workflows.
-- Treat `.deciduous/deciduous.db` and other current native Deciduous state as Deciduous-owned local state, not Factory Floor authority.
-- Historical committed material under `.deciduous/exports/` and `tools/deciduous/backfill/` is frozen pilot/archaeology evidence. It is not active Deciduous state, an alternate graph implementation, or a surface to update during ordinary work.
-- Do not block edits, commits, verification, or CI when Deciduous is unavailable. Report the missing optional tool and continue the repository task.
-- Record consequential project history only. Never record secrets, credentials, private environment values, sensitive runtime data, or hidden chain-of-thought.
-- Issue #57 records the historical pilot and migration to native upstream use.
+For consequential repository work:
+
+1. If `.deciduous/sync/**` exists, run `deciduous events status` before relying on the graph.
+2. Rebuild local `.deciduous/deciduous.db` from shared native events when it is absent or stale. Use `deciduous events rebuild --dry-run` before a rebuild when the effect is not already known, then run `deciduous events rebuild`.
+3. Run `deciduous pulse` and inspect graph health and current active state before using graph context.
+4. Use stock Deciduous commands and supported native integrations directly. Do not emulate the CLI or write alternate events.
+5. Record material reasoning changes as part of the same repository candidate that caused them. Do not turn routine issue metadata, code facts, or commit history into duplicate graph nodes.
+6. Commit material `.deciduous/sync/**` changes with that work.
+7. Keep `.deciduous/deciduous.db` and other native operational/local initialization state untracked.
+8. Never introduce a Factory Floor-specific Deciduous wrapper, alias, parser, mirror schema, validator, database interface, event replay layer, materializer, recovery protocol, synchronization format, or other abstraction over native Deciduous.
+
+When the supported native executable and shared sync state are available, maintaining the graph is the expected path rather than an optional enhancement. If the native executable is genuinely unavailable, record that limitation and continue ordinary Git work when appropriate; do not substitute a repository-owned parser, writer, reconstruction tool, or alternate graph format.
+
+Record consequential project history only. Never record secrets, credentials, private environment values, sensitive runtime data, or hidden chain-of-thought.
 
 Stop only for a direct contradiction between authoritative documents, an unavailable required credential or service, a change to an accepted invariant or ADR, or a potentially destructive external action.
 
