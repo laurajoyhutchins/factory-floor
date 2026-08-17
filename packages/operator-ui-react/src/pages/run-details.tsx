@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { CommandDetailsPage } from '@factory-floor/operator-client-ts/run-details';
+import type { CommandDetailsPage } from '@factory-floor/operator-client-ts/command-details';
 import {
   CopyId,
   JsonBlock,

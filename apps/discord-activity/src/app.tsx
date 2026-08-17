@@ -3,7 +3,7 @@ import {
   configureDefaultOperatorClient,
   createOperatorClient,
 } from '@factory-floor/operator-client-ts';
-import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/run-details';
+import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/command-details';
 import {
   CommandDetailsPanel,
   CommandOperatorWorkspace,

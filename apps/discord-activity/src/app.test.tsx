@@ -32,7 +32,7 @@ vi.mock('@factory-floor/operator-client-ts', () => ({
   configureDefaultOperatorClient: mocks.configureDefaultOperatorClient,
 }));
 
-vi.mock('@factory-floor/operator-client-ts/run-details', () => ({
+vi.mock('@factory-floor/operator-client-ts/command-details', () => ({
   createCommandDetailsClient: mocks.createCommandDetailsClient,
 }));
 
@@ -196,4 +196,4 @@ describe('Discord Activity shell', () => {
     });
     expect(terminalClientConfig).not.toHaveProperty('token');
   });
-});
+}

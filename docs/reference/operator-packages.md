@@ -30,7 +30,7 @@ Mutation retries remain the caller's responsibility and must reuse the same dura
 
 ### Command details
 
-The `./run-details` module name is retained as a source-compatibility filename, but its public contract is command-scoped: `createCommandDetailsClient()` exposes `getCommandDetails(commandId)` and returns a payload identified by `commandId`. New code should use the command terminology regardless of the historical module filename.
+The `./command-details` export provides `createCommandDetailsClient()`, which exposes `getCommandDetails(commandId)` and returns a payload identified by `commandId`. The former `./run-details` public export is intentionally absent so `run` is not retained as a compatibility identity.
 
 ### Portfolio Control Plane reads
 
@@ -57,7 +57,7 @@ The React package owns reusable overview, portfolio, topology, execution trace, 
 
 The views preserve textual graph alternatives, keyboard navigation, responsive layouts, opaque JSON rendering, loading and disconnected states, and reduced-motion behavior. Pending approvals remain read-only until the safe mutation workflow is added through the existing idempotent operator command boundary.
 
-Historical source filenames such as `run-operator.tsx` and `run-details.tsx` are implementation compatibility details. Their exported UI surfaces are command-oriented and take `commandId`.
+Historical source filenames such as `run-operator.tsx` and `run-details.tsx` are internal implementation details. Their exported UI surfaces are command-oriented and take `commandId`; they are not public package subpaths.
 
 `Portfolio` receives an optional `PortfolioClient`. Without one it renders an explicit unconfigured state and performs no request. With one it loads independent status, next-work, owner-decision, and semantic-work reads in parallel. It does not claim work or record outcomes.
 

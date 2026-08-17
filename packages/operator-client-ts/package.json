@@ -9,7 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./portfolio": "./src/portfolio.ts",
-    "./run-details": "./src/run-details.ts"
+    "./command-details": "./src/run-details.ts"
   },
   "scripts": {
     "typecheck": "tsc -b --pretty false",

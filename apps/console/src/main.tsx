@@ -4,8 +4,8 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/command-details';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
-import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
   ArtifactDetail,
   Artifacts,
