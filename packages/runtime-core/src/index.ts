@@ -37,6 +37,7 @@ export * from './artifacts/artifact-reconciliation-service.js';
 export * from './artifacts/artifact-tombstone-service.js';
 export * from './artifacts/proposed-result-prevalidation-service.js';
 export * from './external-actions/external-action-service.js';
+export * from './external-actions/github-draft-pr-adapter.js';
 export {
   WorkerProtocolError,
   type WorkerErrorCode,
@@ -60,11 +61,12 @@ export {
 export * from './observability/recovery-service.js';
 export * from './operator/types.js';
 export * from './operator/errors.js';
-export { OperatorCommandService } from './operator/command-scoped-operator-command-service.js';
+export * from './operator/operator-command-service.js';
+export { OperatorQueryService as BaseOperatorQueryService } from './operator/operator-query-service.js';
 export {
-  CommandScopedOperatorQueryService,
-  commandScopedCursorSemantics,
-} from './operator/command-scoped-operator-query-service.js';
+  RunScopedOperatorQueryService,
+  runScopedCursorSemantics,
+} from './operator/run-scoped-operator-query-service.js';
 export { OperatorQueryService } from './inspection/template-instantiation-operator-query-service.js';
 export * from './repository-task/apply-verify-service.js';
 export * from './repository-task-planner-component.js';

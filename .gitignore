@@ -30,12 +30,11 @@ artifacts/
 data/
 .minio/
 
-# Deciduous pilot local state
-.deciduous/*
-!.deciduous/exports/
-.deciduous/exports/*
-!.deciduous/exports/.gitkeep
-!.deciduous/exports/*.json
+# Native Deciduous operational/local state; shared sync state remains tracked
+.deciduous/deciduous.db
+.deciduous/.version
+.deciduous/config.toml
+.deciduous/documents/
 
 # Editors and operating systems
 .vscode/*
