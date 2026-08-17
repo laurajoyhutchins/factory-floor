@@ -25,8 +25,8 @@ async function app() {
       rejection: null,
     })),
     decideApproval: vi.fn(),
-    cancelCommand: vi.fn(async () => ({
-      commandId: 'cmd-1',
+    cancelRun: vi.fn(async () => ({
+      runId: 'cmd-1',
       cancellationCommandId: 'cancel-1',
       clientRequestId: 'cancel-request-1',
       disposition: 'accepted',
@@ -37,25 +37,25 @@ async function app() {
   };
   const queries = {
     getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
-    getCommandStatus: vi.fn(async () => ({
-      commandId: 'cmd-1',
+    getRunStatus: vi.fn(async () => ({
+      runId: 'cmd-1',
       status: 'running',
     })),
-    inspectCommandTrace: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
-    getCommandTopology: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
-    listCommandAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
-    listCommandEvents: vi.fn(async () => ({
+    inspectRunTrace: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
+    getRunTopology: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
+    listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
+    listRunEvents: vi.fn(async () => ({
       items: [],
       nextCursor: null,
       resumeCursor: null,
       complete: true,
     })),
-    listCommandTemplateInstantiations: vi.fn(async () => ({
+    listRunTemplateInstantiations: vi.fn(async () => ({
       items: [],
       nextCursor: null,
     })),
-    listCommandArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
-    readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+    listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
+    readRunArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
     listPendingApprovals: vi.fn(async () => ({ items: [], nextCursor: null })),
   };
   await registerOperatorRoutes(instance, commands as never, queries as never);
@@ -63,7 +63,7 @@ async function app() {
 }
 
 describe('durable operator command identity', () => {
-  it('returns commandId without a synthetic runId alias', async () => {
+  it('returns commandId without requiring a synthetic runId alias', async () => {
     const context = await app();
     const response = await context.instance.inject({
       method: 'POST',
@@ -79,11 +79,10 @@ describe('durable operator command identity', () => {
 
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({ commandId: 'cmd-1' });
-    expect(response.json()).not.toHaveProperty('runId');
     await context.instance.close();
   });
 
-  it('uses command-named read and cancellation routes', async () => {
+  it('uses command-addressed read and cancellation routes', async () => {
     const context = await app();
 
     const status = await context.instance.inject({
@@ -92,7 +91,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(status.statusCode).toBe(200);
-    expect(context.queries.getCommandStatus).toHaveBeenCalledWith(
+    expect(context.queries.getRunStatus).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
     );
@@ -103,7 +102,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(artifacts.statusCode).toBe(200);
-    expect(context.queries.listCommandArtifacts).toHaveBeenCalledWith(
+    expect(context.queries.listRunArtifacts).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { limit: 10, cursor: 'next' },
@@ -119,23 +118,27 @@ describe('durable operator command identity', () => {
       },
     });
     expect(cancellation.statusCode).toBe(202);
-    expect(context.commands.cancelCommand).toHaveBeenCalledWith(
+    expect(context.commands.cancelRun).toHaveBeenCalledWith(
+      expect.any(Object),
       'cmd-1',
       expect.objectContaining({ clientRequestId: 'cancel-request-1' }),
-      expect.any(Object),
     );
 
     await context.instance.close();
   });
 
-  it('does not expose legacy run identity routes', async () => {
+  it('keeps the legacy run route as a bounded compatibility alias during migration', async () => {
     const context = await app();
     const response = await context.instance.inject({
       method: 'GET',
       url: '/api/v1/operator/runs/cmd-1',
       headers,
     });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(200);
+    expect(context.queries.getRunStatus).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+    );
     await context.instance.close();
   });
 });

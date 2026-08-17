@@ -295,6 +295,45 @@ export async function registerOperatorRoutes(
     }
   });
 
+  app.get('/api/v1/operator/commands/:commandId', async (request, reply) => {
+    try {
+      return await queries.getRunStatus(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/artifacts', async (request, reply) => {
+    try {
+      return await queries.listRunArtifacts(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.post('/api/v1/operator/commands/:commandId/cancel', async (request, reply) => {
+    try {
+      const result = await commands.cancelRun(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        parseRunCancellationRequest(request),
+      );
+      return reply
+        .code(result.disposition === 'replayed' ? 200 : 202)
+        .send(result);
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  // Compatibility surface retained while clients migrate from the synthetic run coordinate.
   app.get('/api/v1/operator/runs/:runId', async (request, reply) => {
     try {
       return await queries.getRunStatus(
