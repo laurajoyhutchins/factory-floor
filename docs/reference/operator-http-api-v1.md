@@ -45,22 +45,22 @@ A valid Discord Activity bearer is a separate read-only authorization path. Fact
 
 ## Endpoints
 
-| Method | Path                                                         | Purpose                                              |
-| ------ | ------------------------------------------------------------ | ---------------------------------------------------- |
-| `GET`  | `/api/v1/operator/status`                                    | Factory health and active-work summary               |
-| `POST` | `/api/v1/operator/tasks`                                     | Submit a development task                            |
-| `GET`  | `/api/v1/operator/commands/:commandId`                       | Read canonical command status                        |
-| `GET`  | `/api/v1/operator/commands/:commandId/details`               | Read bounded governance, resource, and lineage detail|
-| `GET`  | `/api/v1/operator/commands/:commandId/trace`                 | Read the bounded durable command trace               |
-| `GET`  | `/api/v1/operator/commands/:commandId/topology`              | Read topology and runtime relationships              |
-| `GET`  | `/api/v1/operator/commands/:commandId/alerts`                | Read current durable operational conditions          |
-| `GET`  | `/api/v1/operator/commands/:commandId/events`                | Read a finite resumable event page                   |
-| `GET`  | `/api/v1/operator/commands/:commandId/instantiations`        | List template instantiations attributable to command |
-| `GET`  | `/api/v1/operator/commands/:commandId/artifacts`             | List artifacts attributable to the command           |
-| `GET`  | `/api/v1/operator/commands/:commandId/artifacts/:artifactId` | Read a bounded command-owned textual artifact        |
-| `GET`  | `/api/v1/operator/approvals`                                 | List pending approvals                               |
-| `POST` | `/api/v1/operator/approvals/:approvalId/decision`            | Approve or reject a pending action                   |
-| `POST` | `/api/v1/operator/commands/:commandId/cancel`                | Cancel only the selected command graph               |
+| Method | Path                                                         | Purpose                                               |
+| ------ | ------------------------------------------------------------ | ----------------------------------------------------- |
+| `GET`  | `/api/v1/operator/status`                                    | Factory health and active-work summary                |
+| `POST` | `/api/v1/operator/tasks`                                     | Submit a development task                             |
+| `GET`  | `/api/v1/operator/commands/:commandId`                       | Read canonical command status                         |
+| `GET`  | `/api/v1/operator/commands/:commandId/details`               | Read bounded governance, resource, and lineage detail |
+| `GET`  | `/api/v1/operator/commands/:commandId/trace`                 | Read the bounded durable command trace                |
+| `GET`  | `/api/v1/operator/commands/:commandId/topology`              | Read topology and runtime relationships               |
+| `GET`  | `/api/v1/operator/commands/:commandId/alerts`                | Read current durable operational conditions           |
+| `GET`  | `/api/v1/operator/commands/:commandId/events`                | Read a finite resumable event page                    |
+| `GET`  | `/api/v1/operator/commands/:commandId/instantiations`        | List template instantiations attributable to command  |
+| `GET`  | `/api/v1/operator/commands/:commandId/artifacts`             | List artifacts attributable to the command            |
+| `GET`  | `/api/v1/operator/commands/:commandId/artifacts/:artifactId` | Read a bounded command-owned textual artifact         |
+| `GET`  | `/api/v1/operator/approvals`                                 | List pending approvals                                |
+| `POST` | `/api/v1/operator/approvals/:approvalId/decision`            | Approve or reject a pending action                    |
+| `POST` | `/api/v1/operator/commands/:commandId/cancel`                | Cancel only the selected command graph                |
 
 List endpoints accept `limit` and opaque `cursor` query parameters. Artifact reads accept `maxBytes`, bounded by the runtime to 1 MiB. Command details accept an optional bounded `limit`.
 
@@ -223,15 +223,15 @@ Domain validation remains in the operator services and may return more specific 
 
 ## Error mapping
 
-| HTTP status | Meaning                                                         |
-| ----------- | --------------------------------------------------------------- |
-| `400`       | Malformed input, invalid/expired cursor, or bound violation     |
-| `401`       | Bearer token missing                                            |
-| `403`       | Token, Activity binding, or operator authorization denied       |
-| `404`       | Command, command-owned artifact, or approval not found          |
-| `409`       | Idempotency or durable-state conflict                           |
-| `422`       | Development task rejected by command policy                    |
-| `500`       | Unexpected internal error                                      |
+| HTTP status | Meaning                                                     |
+| ----------- | ----------------------------------------------------------- |
+| `400`       | Malformed input, invalid/expired cursor, or bound violation |
+| `401`       | Bearer token missing                                        |
+| `403`       | Token, Activity binding, or operator authorization denied   |
+| `404`       | Command, command-owned artifact, or approval not found      |
+| `409`       | Idempotency or durable-state conflict                       |
+| `422`       | Development task rejected by command policy                 |
+| `500`       | Unexpected internal error                                   |
 
 Unexpected errors are logged server-side and returned only as `internal_error`; implementation details are not exposed to clients.
 
