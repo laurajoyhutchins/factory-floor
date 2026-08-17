@@ -41,6 +41,7 @@ async function app() {
       runId: 'cmd-1',
       status: 'running',
     })),
+    getRunDetails: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
     inspectRunTrace: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
     getRunTopology: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
     listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
@@ -96,6 +97,77 @@ describe('durable operator command identity', () => {
       'cmd-1',
     );
 
+    const details = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/details?limit=7',
+      headers,
+    });
+    expect(details.statusCode).toBe(200);
+    expect(context.queries.getRunDetails).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      { limit: 7 },
+    );
+
+    const trace = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/trace',
+      headers,
+    });
+    expect(trace.statusCode).toBe(200);
+    expect(context.queries.inspectRunTrace).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+    );
+
+    const topology = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/topology?regionLimit=2&componentLimit=3',
+      headers,
+    });
+    expect(topology.statusCode).toBe(200);
+    expect(context.queries.getRunTopology).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      { regionLimit: 2, componentLimit: 3 },
+    );
+
+    const alerts = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/alerts?limit=5&cursor=alert-next',
+      headers,
+    });
+    expect(alerts.statusCode).toBe(200);
+    expect(context.queries.listRunAlerts).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      { limit: 5, cursor: 'alert-next' },
+    );
+
+    const events = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/events?limit=6&cursor=event-next',
+      headers,
+    });
+    expect(events.statusCode).toBe(200);
+    expect(context.queries.listRunEvents).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      { limit: 6, cursor: 'event-next' },
+    );
+
+    const instantiations = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/instantiations?limit=4&cursor=inst-next',
+      headers,
+    });
+    expect(instantiations.statusCode).toBe(200);
+    expect(context.queries.listRunTemplateInstantiations).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      { limit: 4, cursor: 'inst-next' },
+    );
+
     const artifacts = await context.instance.inject({
       method: 'GET',
       url: '/api/v1/operator/commands/cmd-1/artifacts?limit=10&cursor=next',
@@ -106,6 +178,19 @@ describe('durable operator command identity', () => {
       expect.any(Object),
       'cmd-1',
       { limit: 10, cursor: 'next' },
+    );
+
+    const artifact = await context.instance.inject({
+      method: 'GET',
+      url: '/api/v1/operator/commands/cmd-1/artifacts/artifact-1?maxBytes=1024',
+      headers,
+    });
+    expect(artifact.statusCode).toBe(200);
+    expect(context.queries.readRunArtifact).toHaveBeenCalledWith(
+      expect.any(Object),
+      'cmd-1',
+      'artifact-1',
+      1024,
     );
 
     const cancellation = await context.instance.inject({

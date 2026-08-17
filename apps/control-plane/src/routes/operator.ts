@@ -306,6 +306,81 @@ export async function registerOperatorRoutes(
     }
   });
 
+  app.get('/api/v1/operator/commands/:commandId/details', async (request, reply) => {
+    try {
+      const limit = optionalNumberQuery(request, 'limit');
+      return await queries.getRunDetails(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        limit === undefined ? {} : { limit },
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/trace', async (request, reply) => {
+    try {
+      return await queries.inspectRunTrace(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/topology', async (request, reply) => {
+    try {
+      return await queries.getRunTopology(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        topologyRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/alerts', async (request, reply) => {
+    try {
+      return await queries.listRunAlerts(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/events', async (request, reply) => {
+    try {
+      return await queries.listRunEvents(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get(
+    '/api/v1/operator/commands/:commandId/instantiations',
+    async (request, reply) => {
+      try {
+        return await queries.listRunTemplateInstantiations(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
+
   app.get('/api/v1/operator/commands/:commandId/artifacts', async (request, reply) => {
     try {
       return await queries.listRunArtifacts(
@@ -317,6 +392,22 @@ export async function registerOperatorRoutes(
       return handleOperatorError(request, reply, error);
     }
   });
+
+  app.get(
+    '/api/v1/operator/commands/:commandId/artifacts/:artifactId',
+    async (request, reply) => {
+      try {
+        return await queries.readRunArtifact(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          requiredParam(request, 'artifactId'),
+          artifactByteLimit(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
   app.post('/api/v1/operator/commands/:commandId/cancel', async (request, reply) => {
     try {
