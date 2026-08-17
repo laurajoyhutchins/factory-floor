@@ -32,6 +32,7 @@ type OperatorQueries = Pick<
   | 'listRunArtifacts'
   | 'readRunArtifact'
   | 'listPendingApprovals'
+  | 'listCancellableRuns'
 >;
 
 const PRINCIPAL_HEADER = 'x-factory-floor-principal-id';
@@ -412,6 +413,17 @@ export async function registerOperatorRoutes(
   app.get('/api/v1/operator/approvals', async (request, reply) => {
     try {
       return await queries.listPendingApprovals(
+        operatorContext(request),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/cancellable-runs', async (request, reply) => {
+    try {
+      return await queries.listCancellableRuns(
         operatorContext(request),
         pageRequest(request),
       );

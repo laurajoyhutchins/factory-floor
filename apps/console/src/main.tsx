@@ -4,6 +4,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createCancellableRunsClient } from '@factory-floor/operator-client-ts/cancellable-runs';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
 import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
@@ -11,11 +12,12 @@ import {
   Artifacts,
   ExecutionDetail,
   Executions,
+  InterventionQueues,
   NotFound,
   Operations,
   Overview,
-  PendingApprovals,
   Portfolio,
+  RunCancellationIntervention,
   RunDetailsPanel,
   RunOperatorWorkspace,
   Shell,
@@ -46,12 +48,14 @@ const queryClient = new QueryClient({
   },
 });
 
-const runDetailsClient = createRunDetailsClient({
+const operatorConfig = {
   token: import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim(),
   baseUrl: import.meta.env.VITE_FACTORY_FLOOR_CONTROL_PLANE_URL?.trim(),
   principalId: 'standalone-console',
   adapter: 'standalone-console',
-});
+} as const;
+const runDetailsClient = createRunDetailsClient(operatorConfig);
+const cancellableRunsClient = createCancellableRunsClient(operatorConfig);
 
 const portfolioBaseUrl =
   import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
@@ -66,7 +70,7 @@ const titles: Record<string, string> = {
   artifacts: 'Artifacts',
   instantiations: 'Template instantiations',
   operations: 'Operations',
-  approvals: 'Pending approvals',
+  approvals: 'Intervention queues',
   runs: 'Run inspection',
 };
 
@@ -75,6 +79,7 @@ function RunRoute() {
   return (
     <>
       <RunOperatorWorkspace runId={runId} />
+      <RunCancellationIntervention runId={runId} />
       <RunDetailsPanel
         runId={runId}
         loadDetails={(id) => runDetailsClient.getRunDetails(id)}
@@ -128,7 +133,16 @@ function App() {
           element={<TemplateInstantiationDetail />}
         />
         <Route path="/operations" element={<Operations />} />
-        <Route path="/approvals" element={<PendingApprovals />} />
+        <Route
+          path="/approvals"
+          element={
+            <InterventionQueues
+              loadCancellableRuns={(options, signal) =>
+                cancellableRunsClient.list(options, signal)
+              }
+            />
+          }
+        />
         <Route path="/runs/:runId" element={<RunRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
