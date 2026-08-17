@@ -25,8 +25,8 @@ async function app() {
       rejection: null,
     })),
     decideApproval: vi.fn(),
-    cancelRun: vi.fn(async () => ({
-      runId: 'cmd-1',
+    cancelCommand: vi.fn(async () => ({
+      commandId: 'cmd-1',
       cancellationCommandId: 'cancel-1',
       clientRequestId: 'cancel-request-1',
       disposition: 'accepted',
@@ -37,26 +37,26 @@ async function app() {
   };
   const queries = {
     getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
-    getRunStatus: vi.fn(async () => ({
-      runId: 'cmd-1',
+    getCommandStatus: vi.fn(async () => ({
+      commandId: 'cmd-1',
       status: 'running',
     })),
-    getRunDetails: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
-    inspectRunTrace: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
-    getRunTopology: vi.fn(async () => ({ run: { id: 'cmd-1' } })),
-    listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
-    listRunEvents: vi.fn(async () => ({
+    getCommandDetails: vi.fn(async () => ({ commandId: 'cmd-1' })),
+    inspectCommandTrace: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
+    getCommandTopology: vi.fn(async () => ({ command: { id: 'cmd-1' } })),
+    listCommandAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
+    listCommandEvents: vi.fn(async () => ({
       items: [],
       nextCursor: null,
       resumeCursor: null,
       complete: true,
     })),
-    listRunTemplateInstantiations: vi.fn(async () => ({
+    listCommandTemplateInstantiations: vi.fn(async () => ({
       items: [],
       nextCursor: null,
     })),
-    listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
-    readRunArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+    listCommandArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
+    readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
     listPendingApprovals: vi.fn(async () => ({ items: [], nextCursor: null })),
   };
   await registerOperatorRoutes(instance, commands as never, queries as never);
@@ -80,6 +80,7 @@ describe('durable operator command identity', () => {
 
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({ commandId: 'cmd-1' });
+    expect(response.json()).not.toHaveProperty('runId');
     await context.instance.close();
   });
 
@@ -92,7 +93,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(status.statusCode).toBe(200);
-    expect(context.queries.getRunStatus).toHaveBeenCalledWith(
+    expect(context.queries.getCommandStatus).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
     );
@@ -103,7 +104,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(details.statusCode).toBe(200);
-    expect(context.queries.getRunDetails).toHaveBeenCalledWith(
+    expect(context.queries.getCommandDetails).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { limit: 7 },
@@ -115,7 +116,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(trace.statusCode).toBe(200);
-    expect(context.queries.inspectRunTrace).toHaveBeenCalledWith(
+    expect(context.queries.inspectCommandTrace).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
     );
@@ -126,7 +127,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(topology.statusCode).toBe(200);
-    expect(context.queries.getRunTopology).toHaveBeenCalledWith(
+    expect(context.queries.getCommandTopology).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { regionLimit: 2, componentLimit: 3 },
@@ -138,7 +139,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(alerts.statusCode).toBe(200);
-    expect(context.queries.listRunAlerts).toHaveBeenCalledWith(
+    expect(context.queries.listCommandAlerts).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { limit: 5, cursor: 'alert-next' },
@@ -150,7 +151,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(events.statusCode).toBe(200);
-    expect(context.queries.listRunEvents).toHaveBeenCalledWith(
+    expect(context.queries.listCommandEvents).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { limit: 6, cursor: 'event-next' },
@@ -162,11 +163,12 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(instantiations.statusCode).toBe(200);
-    expect(context.queries.listRunTemplateInstantiations).toHaveBeenCalledWith(
-      expect.any(Object),
-      'cmd-1',
-      { limit: 4, cursor: 'inst-next' },
-    );
+    expect(
+      context.queries.listCommandTemplateInstantiations,
+    ).toHaveBeenCalledWith(expect.any(Object), 'cmd-1', {
+      limit: 4,
+      cursor: 'inst-next',
+    });
 
     const artifacts = await context.instance.inject({
       method: 'GET',
@@ -174,7 +176,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(artifacts.statusCode).toBe(200);
-    expect(context.queries.listRunArtifacts).toHaveBeenCalledWith(
+    expect(context.queries.listCommandArtifacts).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       { limit: 10, cursor: 'next' },
@@ -186,7 +188,7 @@ describe('durable operator command identity', () => {
       headers,
     });
     expect(artifact.statusCode).toBe(200);
-    expect(context.queries.readRunArtifact).toHaveBeenCalledWith(
+    expect(context.queries.readCommandArtifact).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       'artifact-1',
@@ -203,7 +205,7 @@ describe('durable operator command identity', () => {
       },
     });
     expect(cancellation.statusCode).toBe(202);
-    expect(context.commands.cancelRun).toHaveBeenCalledWith(
+    expect(context.commands.cancelCommand).toHaveBeenCalledWith(
       expect.any(Object),
       'cmd-1',
       expect.objectContaining({ clientRequestId: 'cancel-request-1' }),
@@ -212,18 +214,14 @@ describe('durable operator command identity', () => {
     await context.instance.close();
   });
 
-  it('keeps the legacy run route as a bounded compatibility alias during migration', async () => {
+  it('does not expose the legacy run route', async () => {
     const context = await app();
     const response = await context.instance.inject({
       method: 'GET',
       url: '/api/v1/operator/runs/cmd-1',
       headers,
     });
-    expect(response.statusCode).toBe(200);
-    expect(context.queries.getRunStatus).toHaveBeenCalledWith(
-      expect.any(Object),
-      'cmd-1',
-    );
+    expect(response.statusCode).toBe(404);
     await context.instance.close();
   });
 });

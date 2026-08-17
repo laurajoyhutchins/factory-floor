@@ -26,11 +26,14 @@ describe('Activity command-details authorization', () => {
       { operatorToken: 'operator-secret', adminToken: 'admin-secret' },
       { resolveSession },
     );
-    app.get('/api/v1/operator/commands/:commandId/details', async (request) => ({
-      commandId: (request.params as { commandId: string }).commandId,
-      principal: request.headers['x-factory-floor-principal-id'],
-      adapter: request.headers['x-factory-floor-adapter'],
-    }));
+    app.get(
+      '/api/v1/operator/commands/:commandId/details',
+      async (request) => ({
+        commandId: (request.params as { commandId: string }).commandId,
+        principal: request.headers['x-factory-floor-principal-id'],
+        adapter: request.headers['x-factory-floor-adapter'],
+      }),
+    );
 
     const allowed = await app.inject({
       method: 'GET',
