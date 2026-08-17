@@ -177,7 +177,9 @@ function parseDevelopmentTaskRequest(
     for (const value of Object.values(body.authority))
       if (typeof value !== 'boolean')
         throw new OperatorValidationError(MALFORMED_REQUEST);
-    authority = body.authority as NonNullable<DevelopmentTaskRequest['authority']>;
+    authority = body.authority as NonNullable<
+      DevelopmentTaskRequest['authority']
+    >;
   }
   let metadata: DevelopmentTaskRequest['metadata'];
   if (body.metadata !== undefined) {
@@ -210,7 +212,10 @@ function parseApprovalDecisionRequest(
   assertOnlyKeys(body, ['clientRequestId', 'decision', 'reason']);
   return {
     clientRequestId: requiredString(body, 'clientRequestId'),
-    decision: requiredString(body, 'decision') as ApprovalDecisionRequest['decision'],
+    decision: requiredString(
+      body,
+      'decision',
+    ) as ApprovalDecisionRequest['decision'],
     reason: requiredString(body, 'reason'),
   };
 }
@@ -297,89 +302,110 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get('/api/v1/operator/commands/:commandId/details', async (request, reply) => {
-    try {
-      const limit = optionalNumberQuery(request, 'limit');
-      return await queries.getCommandDetails(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        limit === undefined ? {} : { limit },
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/details',
+    async (request, reply) => {
+      try {
+        const limit = optionalNumberQuery(request, 'limit');
+        return await queries.getCommandDetails(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          limit === undefined ? {} : { limit },
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/trace', async (request, reply) => {
-    try {
-      return await queries.inspectCommandTrace(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/trace',
+    async (request, reply) => {
+      try {
+        return await queries.inspectCommandTrace(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/topology', async (request, reply) => {
-    try {
-      return await queries.getCommandTopology(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        topologyRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/topology',
+    async (request, reply) => {
+      try {
+        return await queries.getCommandTopology(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          topologyRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/alerts', async (request, reply) => {
-    try {
-      return await queries.listCommandAlerts(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        pageRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/alerts',
+    async (request, reply) => {
+      try {
+        return await queries.listCommandAlerts(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/events', async (request, reply) => {
-    try {
-      return await queries.listCommandEvents(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        pageRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/events',
+    async (request, reply) => {
+      try {
+        return await queries.listCommandEvents(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/instantiations', async (request, reply) => {
-    try {
-      return await queries.listCommandTemplateInstantiations(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        pageRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/instantiations',
+    async (request, reply) => {
+      try {
+        return await queries.listCommandTemplateInstantiations(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
-  app.get('/api/v1/operator/commands/:commandId/artifacts', async (request, reply) => {
-    try {
-      return await queries.listCommandArtifacts(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        pageRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.get(
+    '/api/v1/operator/commands/:commandId/artifacts',
+    async (request, reply) => {
+      try {
+        return await queries.listCommandArtifacts(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          pageRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
   app.get(
     '/api/v1/operator/commands/:commandId/artifacts/:artifactId',
@@ -397,20 +423,23 @@ export async function registerOperatorRoutes(
     },
   );
 
-  app.post('/api/v1/operator/commands/:commandId/cancel', async (request, reply) => {
-    try {
-      const result = await commands.cancelCommand(
-        operatorContext(request),
-        requiredParam(request, 'commandId'),
-        parseCommandCancellationRequest(request),
-      );
-      return reply
-        .code(result.disposition === 'replayed' ? 200 : 202)
-        .send(result);
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.post(
+    '/api/v1/operator/commands/:commandId/cancel',
+    async (request, reply) => {
+      try {
+        const result = await commands.cancelCommand(
+          operatorContext(request),
+          requiredParam(request, 'commandId'),
+          parseCommandCancellationRequest(request),
+        );
+        return reply
+          .code(result.disposition === 'replayed' ? 200 : 202)
+          .send(result);
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 
   app.get('/api/v1/operator/approvals', async (request, reply) => {
     try {
@@ -423,15 +452,18 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.post('/api/v1/operator/approvals/:approvalId/decision', async (request, reply) => {
-    try {
-      return await commands.decideApproval(
-        operatorContext(request),
-        requiredParam(request, 'approvalId'),
-        parseApprovalDecisionRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
+  app.post(
+    '/api/v1/operator/approvals/:approvalId/decision',
+    async (request, reply) => {
+      try {
+        return await commands.decideApproval(
+          operatorContext(request),
+          requiredParam(request, 'approvalId'),
+          parseApprovalDecisionRequest(request),
+        );
+      } catch (error) {
+        return handleOperatorError(request, reply, error);
+      }
+    },
+  );
 }
