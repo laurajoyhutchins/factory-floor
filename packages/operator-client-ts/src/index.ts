@@ -222,21 +222,45 @@ function transientStatus(status: number): boolean {
 export interface OperatorClient {
   inspectionHeaders(accept: string): Record<string, string>;
   health(signal?: AbortSignal): Promise<{ status: string; service: string }>;
-  regions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  events(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  deliveries(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  executions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  regions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  events(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  deliveries(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  executions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   execution(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
   executionAttempts(
     id: string,
     options?: PageOptions,
     signal?: AbortSignal,
   ): Promise<Page<InspectionRecord>>;
-  attempts(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  artifacts(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  attempts(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  artifacts(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   artifactLineage(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  resources(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
-  policyDecisions(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  resources(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  policyDecisions(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   projections(signal?: AbortSignal): Promise<{ items: InspectionRecord[] }>;
   topology(signal?: AbortSignal): Promise<InspectionRecord>;
   templateInstantiations(
@@ -244,12 +268,21 @@ export interface OperatorClient {
     options?: PageOptions,
     signal?: AbortSignal,
   ): Promise<Page<InspectionRecord>>;
-  templateInstantiation(id: string, signal?: AbortSignal): Promise<InspectionRecord>;
+  templateInstantiation(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
   readonly streamPath: string;
   operatorStatus(signal?: AbortSignal): Promise<InspectionRecord>;
-  submitTask(request: DevelopmentTaskRequest, signal?: AbortSignal): Promise<InspectionRecord>;
+  submitTask(
+    request: DevelopmentTaskRequest,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
   command(commandId: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  commandTrace(commandId: string, signal?: AbortSignal): Promise<InspectionRecord>;
+  commandTrace(
+    commandId: string,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
   commandTopology(
     commandId: string,
     options?: Record<string, number | undefined>,
@@ -281,7 +314,10 @@ export interface OperatorClient {
     maxBytes?: number,
     signal?: AbortSignal,
   ): Promise<InspectionRecord>;
-  pendingApprovals(options?: PageOptions, signal?: AbortSignal): Promise<Page<InspectionRecord>>;
+  pendingApprovals(
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
   decideApproval(
     approvalId: string,
     request: ApprovalDecisionRequest,
@@ -442,22 +478,46 @@ export function createOperatorClient(
         );
       return { status: value.status, service: value.service };
     },
-    regions: (options, signal) => getPage(inspectionPaths.regions, options, signal),
-    events: (options, signal) => getPage(inspectionPaths.events, options, signal),
-    deliveries: (options, signal) => getPage(inspectionPaths.deliveries, options, signal),
-    executions: (options, signal) => getPage(inspectionPaths.executions, options, signal),
+    regions: (options, signal) =>
+      getPage(inspectionPaths.regions, options, signal),
+    events: (options, signal) =>
+      getPage(inspectionPaths.events, options, signal),
+    deliveries: (options, signal) =>
+      getPage(inspectionPaths.deliveries, options, signal),
+    executions: (options, signal) =>
+      getPage(inspectionPaths.executions, options, signal),
     execution: (id, signal) =>
-      getRecord(`${inspectionPaths.executions}/${encodeURIComponent(id)}`, 'an execution trace', signal),
+      getRecord(
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}`,
+        'an execution trace',
+        signal,
+      ),
     executionAttempts: (id, options, signal) =>
-      getPage(`${inspectionPaths.executions}/${encodeURIComponent(id)}/attempts`, options, signal),
-    attempts: (options, signal) => getPage(inspectionPaths.attempts, options, signal),
-    artifacts: (options, signal) => getPage(inspectionPaths.artifacts, options, signal),
+      getPage(
+        `${inspectionPaths.executions}/${encodeURIComponent(id)}/attempts`,
+        options,
+        signal,
+      ),
+    attempts: (options, signal) =>
+      getPage(inspectionPaths.attempts, options, signal),
+    artifacts: (options, signal) =>
+      getPage(inspectionPaths.artifacts, options, signal),
     artifactLineage: (id, signal) =>
-      getRecord(`${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`, 'artifact lineage', signal),
-    resources: (options, signal) => getPage(inspectionPaths.resources, options, signal),
-    policyDecisions: (options, signal) => getPage(inspectionPaths.policies, options, signal),
+      getRecord(
+        `${inspectionPaths.artifacts}/${encodeURIComponent(id)}/lineage`,
+        'artifact lineage',
+        signal,
+      ),
+    resources: (options, signal) =>
+      getPage(inspectionPaths.resources, options, signal),
+    policyDecisions: (options, signal) =>
+      getPage(inspectionPaths.policies, options, signal),
     projections: async (signal) => {
-      const value = await getRecord(inspectionPaths.projections, 'projection status', signal);
+      const value = await getRecord(
+        inspectionPaths.projections,
+        'projection status',
+        signal,
+      );
       if (!Array.isArray(value.items) || !value.items.every(isRecord))
         throw new OperatorClientError(
           'malformed-response',
@@ -465,7 +525,8 @@ export function createOperatorClient(
         );
       return { items: value.items };
     },
-    topology: (signal) => getRecord(inspectionPaths.topology, 'active topology', signal),
+    topology: (signal) =>
+      getRecord(inspectionPaths.topology, 'active topology', signal),
     templateInstantiations: async (scope, options = {}, signal) => {
       const url = new URL(
         pagePath(inspectionPaths.instantiations, options),
@@ -474,14 +535,25 @@ export function createOperatorClient(
       if (scope.regionId) url.searchParams.set('regionId', scope.regionId);
       if (scope.commandId) url.searchParams.set('commandId', scope.commandId);
       return assertPage(
-        await requestJson('GET', `${url.pathname}${url.search}`, undefined, signal),
+        await requestJson(
+          'GET',
+          `${url.pathname}${url.search}`,
+          undefined,
+          signal,
+        ),
       );
     },
     templateInstantiation: (id, signal) =>
-      getRecord(`${inspectionPaths.instantiations}/${encodeURIComponent(id)}`, 'a template instantiation', signal),
+      getRecord(
+        `${inspectionPaths.instantiations}/${encodeURIComponent(id)}`,
+        'a template instantiation',
+        signal,
+      ),
     streamPath: targetUrl(baseUrl, inspectionPaths.stream),
-    operatorStatus: (signal) => getRecord(`${operatorPath}/status`, 'operator status', signal),
-    submitTask: (request, signal) => postRecord(`${operatorPath}/tasks`, request, signal),
+    operatorStatus: (signal) =>
+      getRecord(`${operatorPath}/status`, 'operator status', signal),
+    submitTask: (request, signal) =>
+      postRecord(`${operatorPath}/tasks`, request, signal),
     command: (commandId, signal) =>
       getRecord(
         `${operatorPath}/commands/${encodeURIComponent(commandId)}`,
@@ -496,17 +568,27 @@ export function createOperatorClient(
       ),
     commandTopology: (commandId, options = {}, signal) =>
       getRecord(
-        withQuery(`${operatorPath}/commands/${encodeURIComponent(commandId)}/topology`, options),
+        withQuery(
+          `${operatorPath}/commands/${encodeURIComponent(commandId)}/topology`,
+          options,
+        ),
         'command topology',
         signal,
       ),
     commandAlerts: (commandId, options, signal) =>
-      getPage(`${operatorPath}/commands/${encodeURIComponent(commandId)}/alerts`, options, signal),
+      getPage(
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/alerts`,
+        options,
+        signal,
+      ),
     commandEvents: async (commandId, options, signal) =>
       assertCommandEventPage(
         await requestJson(
           'GET',
-          pagePath(`${operatorPath}/commands/${encodeURIComponent(commandId)}/events`, options),
+          pagePath(
+            `${operatorPath}/commands/${encodeURIComponent(commandId)}/events`,
+            options,
+          ),
           undefined,
           signal,
         ),
@@ -518,7 +600,11 @@ export function createOperatorClient(
         signal,
       ),
     commandArtifacts: (commandId, options, signal) =>
-      getPage(`${operatorPath}/commands/${encodeURIComponent(commandId)}/artifacts`, options, signal),
+      getPage(
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/artifacts`,
+        options,
+        signal,
+      ),
     commandArtifact: (commandId, artifactId, maxBytes, signal) =>
       getRecord(
         withQuery(
@@ -528,11 +614,20 @@ export function createOperatorClient(
         'a command artifact',
         signal,
       ),
-    pendingApprovals: (options, signal) => getPage(`${operatorPath}/approvals`, options, signal),
+    pendingApprovals: (options, signal) =>
+      getPage(`${operatorPath}/approvals`, options, signal),
     decideApproval: (approvalId, request, signal) =>
-      postRecord(`${operatorPath}/approvals/${encodeURIComponent(approvalId)}/decision`, request, signal),
+      postRecord(
+        `${operatorPath}/approvals/${encodeURIComponent(approvalId)}/decision`,
+        request,
+        signal,
+      ),
     cancelCommand: (commandId, request, signal) =>
-      postRecord(`${operatorPath}/commands/${encodeURIComponent(commandId)}/cancel`, request, signal),
+      postRecord(
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/cancel`,
+        request,
+        signal,
+      ),
   };
 }
 
@@ -567,8 +662,10 @@ export const operatorClient: OperatorClient = {
   policyDecisions: (...args) => currentClient().policyDecisions(...args),
   projections: (...args) => currentClient().projections(...args),
   topology: (...args) => currentClient().topology(...args),
-  templateInstantiations: (...args) => currentClient().templateInstantiations(...args),
-  templateInstantiation: (...args) => currentClient().templateInstantiation(...args),
+  templateInstantiations: (...args) =>
+    currentClient().templateInstantiations(...args),
+  templateInstantiation: (...args) =>
+    currentClient().templateInstantiation(...args),
   get streamPath() {
     return currentClient().streamPath;
   },
@@ -579,7 +676,8 @@ export const operatorClient: OperatorClient = {
   commandTopology: (...args) => currentClient().commandTopology(...args),
   commandAlerts: (...args) => currentClient().commandAlerts(...args),
   commandEvents: (...args) => currentClient().commandEvents(...args),
-  commandInstantiations: (...args) => currentClient().commandInstantiations(...args),
+  commandInstantiations: (...args) =>
+    currentClient().commandInstantiations(...args),
   commandArtifacts: (...args) => currentClient().commandArtifacts(...args),
   commandArtifact: (...args) => currentClient().commandArtifact(...args),
   pendingApprovals: (...args) => currentClient().pendingApprovals(...args),
