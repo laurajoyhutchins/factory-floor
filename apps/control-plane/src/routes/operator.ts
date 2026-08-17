@@ -16,21 +16,21 @@ import {
 
 type OperatorCommands = Pick<
   OperatorCommandService,
-  'submitDevelopmentTask' | 'decideApproval' | 'cancelRun'
+  'submitDevelopmentTask' | 'decideApproval' | 'cancelCommand'
 >;
 
 type OperatorQueries = Pick<
   OperatorQueryService,
   | 'getFactoryStatus'
-  | 'getRunStatus'
-  | 'getRunDetails'
-  | 'inspectRunTrace'
-  | 'getRunTopology'
-  | 'listRunAlerts'
-  | 'listRunEvents'
-  | 'listRunTemplateInstantiations'
-  | 'listRunArtifacts'
-  | 'readRunArtifact'
+  | 'getCommandStatus'
+  | 'getCommandDetails'
+  | 'inspectCommandTrace'
+  | 'getCommandTopology'
+  | 'listCommandAlerts'
+  | 'listCommandEvents'
+  | 'listCommandTemplateInstantiations'
+  | 'listCommandArtifacts'
+  | 'readCommandArtifact'
   | 'listPendingApprovals'
 >;
 
@@ -159,14 +159,12 @@ function parseDevelopmentTaskRequest(
     'authority',
     'metadata',
   ]);
-
   const acceptanceCriteria = body.acceptanceCriteria;
   if (
     !Array.isArray(acceptanceCriteria) ||
     acceptanceCriteria.some((item) => typeof item !== 'string')
   )
     throw new OperatorValidationError(MALFORMED_REQUEST);
-
   let authority: DevelopmentTaskRequest['authority'];
   if (body.authority !== undefined) {
     if (!isRecord(body.authority))
@@ -179,11 +177,8 @@ function parseDevelopmentTaskRequest(
     for (const value of Object.values(body.authority))
       if (typeof value !== 'boolean')
         throw new OperatorValidationError(MALFORMED_REQUEST);
-    authority = body.authority as NonNullable<
-      DevelopmentTaskRequest['authority']
-    >;
+    authority = body.authority as NonNullable<DevelopmentTaskRequest['authority']>;
   }
-
   let metadata: DevelopmentTaskRequest['metadata'];
   if (body.metadata !== undefined) {
     if (!isRecord(body.metadata))
@@ -198,7 +193,6 @@ function parseDevelopmentTaskRequest(
         throw new OperatorValidationError(MALFORMED_REQUEST);
     metadata = body.metadata as NonNullable<DevelopmentTaskRequest['metadata']>;
   }
-
   return {
     clientRequestId: requiredString(body, 'clientRequestId'),
     repository: requiredString(body, 'repository'),
@@ -216,15 +210,12 @@ function parseApprovalDecisionRequest(
   assertOnlyKeys(body, ['clientRequestId', 'decision', 'reason']);
   return {
     clientRequestId: requiredString(body, 'clientRequestId'),
-    decision: requiredString(
-      body,
-      'decision',
-    ) as ApprovalDecisionRequest['decision'],
+    decision: requiredString(body, 'decision') as ApprovalDecisionRequest['decision'],
     reason: requiredString(body, 'reason'),
   };
 }
 
-function parseRunCancellationRequest(
+function parseCommandCancellationRequest(
   request: FastifyRequest,
 ): RunCancellationRequest {
   const body = bodyRecord(request);
@@ -297,7 +288,7 @@ export async function registerOperatorRoutes(
 
   app.get('/api/v1/operator/commands/:commandId', async (request, reply) => {
     try {
-      return await queries.getRunStatus(
+      return await queries.getCommandStatus(
         operatorContext(request),
         requiredParam(request, 'commandId'),
       );
@@ -306,163 +297,12 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get(
-    '/api/v1/operator/commands/:commandId/details',
-    async (request, reply) => {
-      try {
-        const limit = optionalNumberQuery(request, 'limit');
-        return await queries.getRunDetails(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          limit === undefined ? {} : { limit },
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/trace',
-    async (request, reply) => {
-      try {
-        return await queries.inspectRunTrace(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/topology',
-    async (request, reply) => {
-      try {
-        return await queries.getRunTopology(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          topologyRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/alerts',
-    async (request, reply) => {
-      try {
-        return await queries.listRunAlerts(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/events',
-    async (request, reply) => {
-      try {
-        return await queries.listRunEvents(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/instantiations',
-    async (request, reply) => {
-      try {
-        return await queries.listRunTemplateInstantiations(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/artifacts',
-    async (request, reply) => {
-      try {
-        return await queries.listRunArtifacts(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get(
-    '/api/v1/operator/commands/:commandId/artifacts/:artifactId',
-    async (request, reply) => {
-      try {
-        return await queries.readRunArtifact(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          requiredParam(request, 'artifactId'),
-          artifactByteLimit(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.post(
-    '/api/v1/operator/commands/:commandId/cancel',
-    async (request, reply) => {
-      try {
-        const result = await commands.cancelRun(
-          operatorContext(request),
-          requiredParam(request, 'commandId'),
-          parseRunCancellationRequest(request),
-        );
-        return reply
-          .code(result.disposition === 'replayed' ? 200 : 202)
-          .send(result);
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  // Compatibility surface retained while clients migrate from the synthetic run coordinate.
-  app.get('/api/v1/operator/runs/:runId', async (request, reply) => {
-    try {
-      return await queries.getRunStatus(
-        operatorContext(request),
-        requiredParam(request, 'runId'),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
-
-  app.get('/api/v1/operator/runs/:runId/details', async (request, reply) => {
+  app.get('/api/v1/operator/commands/:commandId/details', async (request, reply) => {
     try {
       const limit = optionalNumberQuery(request, 'limit');
-      return await queries.getRunDetails(
+      return await queries.getCommandDetails(
         operatorContext(request),
-        requiredParam(request, 'runId'),
+        requiredParam(request, 'commandId'),
         limit === undefined ? {} : { limit },
       );
     } catch (error) {
@@ -470,22 +310,22 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get('/api/v1/operator/runs/:runId/trace', async (request, reply) => {
+  app.get('/api/v1/operator/commands/:commandId/trace', async (request, reply) => {
     try {
-      return await queries.inspectRunTrace(
+      return await queries.inspectCommandTrace(
         operatorContext(request),
-        requiredParam(request, 'runId'),
+        requiredParam(request, 'commandId'),
       );
     } catch (error) {
       return handleOperatorError(request, reply, error);
     }
   });
 
-  app.get('/api/v1/operator/runs/:runId/topology', async (request, reply) => {
+  app.get('/api/v1/operator/commands/:commandId/topology', async (request, reply) => {
     try {
-      return await queries.getRunTopology(
+      return await queries.getCommandTopology(
         operatorContext(request),
-        requiredParam(request, 'runId'),
+        requiredParam(request, 'commandId'),
         topologyRequest(request),
       );
     } catch (error) {
@@ -493,11 +333,11 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get('/api/v1/operator/runs/:runId/alerts', async (request, reply) => {
+  app.get('/api/v1/operator/commands/:commandId/alerts', async (request, reply) => {
     try {
-      return await queries.listRunAlerts(
+      return await queries.listCommandAlerts(
         operatorContext(request),
-        requiredParam(request, 'runId'),
+        requiredParam(request, 'commandId'),
         pageRequest(request),
       );
     } catch (error) {
@@ -505,11 +345,35 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.get('/api/v1/operator/runs/:runId/events', async (request, reply) => {
+  app.get('/api/v1/operator/commands/:commandId/events', async (request, reply) => {
     try {
-      return await queries.listRunEvents(
+      return await queries.listCommandEvents(
         operatorContext(request),
-        requiredParam(request, 'runId'),
+        requiredParam(request, 'commandId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/instantiations', async (request, reply) => {
+    try {
+      return await queries.listCommandTemplateInstantiations(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        pageRequest(request),
+      );
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
+
+  app.get('/api/v1/operator/commands/:commandId/artifacts', async (request, reply) => {
+    try {
+      return await queries.listCommandArtifacts(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
         pageRequest(request),
       );
     } catch (error) {
@@ -518,39 +382,12 @@ export async function registerOperatorRoutes(
   });
 
   app.get(
-    '/api/v1/operator/runs/:runId/instantiations',
+    '/api/v1/operator/commands/:commandId/artifacts/:artifactId',
     async (request, reply) => {
       try {
-        return await queries.listRunTemplateInstantiations(
+        return await queries.readCommandArtifact(
           operatorContext(request),
-          requiredParam(request, 'runId'),
-          pageRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.get('/api/v1/operator/runs/:runId/artifacts', async (request, reply) => {
-    try {
-      return await queries.listRunArtifacts(
-        operatorContext(request),
-        requiredParam(request, 'runId'),
-        pageRequest(request),
-      );
-    } catch (error) {
-      return handleOperatorError(request, reply, error);
-    }
-  });
-
-  app.get(
-    '/api/v1/operator/runs/:runId/artifacts/:artifactId',
-    async (request, reply) => {
-      try {
-        return await queries.readRunArtifact(
-          operatorContext(request),
-          requiredParam(request, 'runId'),
+          requiredParam(request, 'commandId'),
           requiredParam(request, 'artifactId'),
           artifactByteLimit(request),
         );
@@ -559,6 +396,21 @@ export async function registerOperatorRoutes(
       }
     },
   );
+
+  app.post('/api/v1/operator/commands/:commandId/cancel', async (request, reply) => {
+    try {
+      const result = await commands.cancelCommand(
+        operatorContext(request),
+        requiredParam(request, 'commandId'),
+        parseCommandCancellationRequest(request),
+      );
+      return reply
+        .code(result.disposition === 'replayed' ? 200 : 202)
+        .send(result);
+    } catch (error) {
+      return handleOperatorError(request, reply, error);
+    }
+  });
 
   app.get('/api/v1/operator/approvals', async (request, reply) => {
     try {
@@ -571,31 +423,13 @@ export async function registerOperatorRoutes(
     }
   });
 
-  app.post(
-    '/api/v1/operator/approvals/:approvalId/decision',
-    async (request, reply) => {
-      try {
-        return await commands.decideApproval(
-          operatorContext(request),
-          requiredParam(request, 'approvalId'),
-          parseApprovalDecisionRequest(request),
-        );
-      } catch (error) {
-        return handleOperatorError(request, reply, error);
-      }
-    },
-  );
-
-  app.post('/api/v1/operator/runs/:runId/cancel', async (request, reply) => {
+  app.post('/api/v1/operator/approvals/:approvalId/decision', async (request, reply) => {
     try {
-      const result = await commands.cancelRun(
+      return await commands.decideApproval(
         operatorContext(request),
-        requiredParam(request, 'runId'),
-        parseRunCancellationRequest(request),
+        requiredParam(request, 'approvalId'),
+        parseApprovalDecisionRequest(request),
       );
-      return reply
-        .code(result.disposition === 'replayed' ? 200 : 202)
-        .send(result);
     } catch (error) {
       return handleOperatorError(request, reply, error);
     }

@@ -60,12 +60,11 @@ export {
 export * from './observability/recovery-service.js';
 export * from './operator/types.js';
 export * from './operator/errors.js';
-export * from './operator/operator-command-service.js';
-export { OperatorQueryService as BaseOperatorQueryService } from './operator/operator-query-service.js';
+export { OperatorCommandService } from './operator/command-scoped-operator-command-service.js';
 export {
-  RunScopedOperatorQueryService,
-  runScopedCursorSemantics,
-} from './operator/run-scoped-operator-query-service.js';
+  CommandScopedOperatorQueryService,
+  commandScopedCursorSemantics,
+} from './operator/command-scoped-operator-query-service.js';
 export { OperatorQueryService } from './inspection/template-instantiation-operator-query-service.js';
 export * from './repository-task/apply-verify-service.js';
 export * from './repository-task-planner-component.js';
