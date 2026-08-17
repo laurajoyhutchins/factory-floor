@@ -727,7 +727,7 @@ async function main(): Promise<void> {
         `failed to lease cancellation attempt: ${JSON.stringify(cancellationLease)}`,
       );
     }
-    const cancellationReceipt = await new OperatorCommandService(db).cancelRun(
+    const cancellationReceipt = await new OperatorCommandService(db).cancelCommand(
       {
         principal: {
           id: 'repository-task-dogfood-operator',
