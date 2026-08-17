@@ -13,7 +13,7 @@ export interface ActivityReadSession {
   threadId: string | null;
   principalId: string;
   adapter: string;
-  boundRunId: string | null;
+  boundCommandId: string | null;
   expiresAt: Date;
   idleExpiresAt: Date;
 }
@@ -85,7 +85,9 @@ export class DatabaseActivitySessionAuthorizer implements ActivitySessionAuthori
       threadId: row.thread_id,
       principalId: row.principal_id,
       adapter: row.adapter ?? 'discord-agent',
-      boundRunId: row.bound_run_id,
+      // The legacy column stores command IDs. Keep it for persisted compatibility,
+      // but expose its durable meaning at the Activity authorization boundary.
+      boundCommandId: row.bound_run_id,
       expiresAt: row.session_expires_at,
       idleExpiresAt: row.idle_expires_at,
     };
