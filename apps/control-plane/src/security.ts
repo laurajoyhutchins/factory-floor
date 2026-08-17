@@ -21,13 +21,15 @@ function tokenMatches(actual: string, expected: string): boolean {
 
 function securityError(
   code:
-    'authentication_required' | 'forbidden' | 'activity_run_binding_mismatch',
+    | 'authentication_required'
+    | 'forbidden'
+    | 'activity_command_binding_mismatch',
 ) {
   const message =
     code === 'authentication_required'
       ? 'A control-plane bearer token is required.'
-      : code === 'activity_run_binding_mismatch'
-        ? 'The Activity session is not authorized for this run.'
+      : code === 'activity_command_binding_mismatch'
+        ? 'The Activity session is not authorized for this command.'
         : 'The supplied bearer token is not authorized for this operation.';
   return { error: { code, message } };
 }
@@ -48,8 +50,8 @@ function isBrowserActivitySessionRoute(path: string): boolean {
   );
 }
 
-function activityRunId(path: string): string | undefined {
-  const encoded = /^\/api\/v1\/operator\/runs\/([^/]+)(?:\/|$)/.exec(path)?.[1];
+function activityCommandId(path: string): string | undefined {
+  const encoded = /^\/api\/v1\/operator\/commands\/([^/]+)(?:\/|$)/.exec(path)?.[1];
   if (!encoded) return undefined;
   try {
     return decodeURIComponent(encoded);
@@ -90,18 +92,18 @@ export function registerControlPlaneSecurity(
         : tokenMatches(supplied, security.adminToken);
     if (staticallyAuthorized) return;
 
-    const runId = activityRunId(path);
+    const commandId = activityCommandId(path);
     const activityRead =
       activitySessions &&
-      runId &&
+      commandId &&
       (request.method === 'GET' || request.method === 'HEAD');
     if (activityRead) {
       const session = await activitySessions.resolveSession(supplied);
       if (!session) return reply.code(403).send(securityError('forbidden'));
-      if (!session.boundRunId || session.boundRunId !== runId)
+      if (!session.boundCommandId || session.boundCommandId !== commandId)
         return reply
           .code(403)
-          .send(securityError('activity_run_binding_mismatch'));
+          .send(securityError('activity_command_binding_mismatch'));
 
       request.headers['x-factory-floor-principal-id'] = session.principalId;
       request.headers['x-factory-floor-adapter'] = session.adapter;
