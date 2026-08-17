@@ -14,7 +14,9 @@ import { CommandScopedOperatorQueryService } from '../operator/command-scoped-op
 import type { OperatorContext, PageRequest } from '../operator/types.js';
 import { TemplateInstantiationInspectionService } from './template-instantiation-inspection-service.js';
 
-type CommandDetails = Awaited<ReturnType<RunDetailsQueryService['getRunDetails']>>;
+type CommandDetails = Awaited<
+  ReturnType<RunDetailsQueryService['getRunDetails']>
+>;
 
 export function projectControlPlaneGlobalFreshness(
   freshness: CommandDetails['projectionFreshness'],
@@ -49,7 +51,11 @@ export class OperatorQueryService extends CommandScopedOperatorQueryService {
     commandId: string,
     request: RunDetailsRequest = {},
   ) {
-    const details = await this.details.getRunDetails(context, commandId, request);
+    const details = await this.details.getRunDetails(
+      context,
+      commandId,
+      request,
+    );
     const { runId, ...rest } = details;
     return {
       commandId: runId,

@@ -46,7 +46,11 @@ export class CommandScopedOperatorQueryService {
     commandId: string,
     options: RunTopologyRequest = {},
   ) {
-    const result = await this.legacy.getRunTopology(context, commandId, options);
+    const result = await this.legacy.getRunTopology(
+      context,
+      commandId,
+      options,
+    );
     const { run, ...rest } = result;
     return { command: run, ...rest };
   }
@@ -81,7 +85,12 @@ export class CommandScopedOperatorQueryService {
     artifactId: string,
     maxBytes?: number,
   ) {
-    return this.legacy.readRunArtifact(context, commandId, artifactId, maxBytes);
+    return this.legacy.readRunArtifact(
+      context,
+      commandId,
+      artifactId,
+      maxBytes,
+    );
   }
 
   listPendingApprovals(context: OperatorContext, page: PageRequest = {}) {
