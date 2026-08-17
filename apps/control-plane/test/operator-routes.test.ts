@@ -11,8 +11,7 @@ function services() {
   return {
     commands: {
       submitDevelopmentTask: vi.fn(async () => ({
-        runId: 'run-1',
-        commandId: 'run-1',
+        commandId: 'command-1',
         regionId: 'region-1',
         regionName: 'investigation',
         status: 'accepted',
@@ -28,8 +27,8 @@ function services() {
         clientRequestId: 'decision-1',
         disposition: 'accepted',
       })),
-      cancelRun: vi.fn(async () => ({
-        runId: 'run-1',
+      cancelCommand: vi.fn(async () => ({
+        commandId: 'command-1',
         cancellationCommandId: 'cancel-1',
         clientRequestId: 'cancel-request-1',
         disposition: 'accepted',
@@ -40,22 +39,30 @@ function services() {
     },
     queries: {
       getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
-      getRunStatus: vi.fn(async () => ({ runId: 'run-1', status: 'running' })),
-      inspectRunTrace: vi.fn(async () => ({ run: { id: 'run-1' } })),
-      getRunTopology: vi.fn(async () => ({ run: { id: 'run-1' } })),
-      listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
-      listRunEvents: vi.fn(async () => ({
+      getCommandStatus: vi.fn(async () => ({
+        commandId: 'command-1',
+        status: 'running',
+      })),
+      getCommandDetails: vi.fn(async () => ({ commandId: 'command-1' })),
+      inspectCommandTrace: vi.fn(async () => ({
+        command: { id: 'command-1' },
+      })),
+      getCommandTopology: vi.fn(async () => ({
+        command: { id: 'command-1' },
+      })),
+      listCommandAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listCommandEvents: vi.fn(async () => ({
         items: [],
         nextCursor: null,
         resumeCursor: null,
         complete: true,
       })),
-      listRunTemplateInstantiations: vi.fn(async () => ({
+      listCommandTemplateInstantiations: vi.fn(async () => ({
         items: [],
         nextCursor: null,
       })),
-      listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
-      readRunArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+      listCommandArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
+      readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
       listPendingApprovals: vi.fn(async () => ({
         items: [],
         nextCursor: null,
@@ -96,12 +103,13 @@ describe('operator routes', () => {
         clientRequestId: 'discord-message-1',
         repository: 'laurajoyhutchins/factory-floor',
         objective: 'Implement the Discord bridge.',
-        acceptanceCriteria: ['The run is visible in its Discord thread.'],
+        acceptanceCriteria: ['The command is visible in its Discord thread.'],
       },
     });
 
     expect(response.statusCode).toBe(202);
-    expect(response.json()).toMatchObject({ runId: 'run-1' });
+    expect(response.json()).toMatchObject({ commandId: 'command-1' });
+    expect(response.json()).not.toHaveProperty('runId');
     expect(context.commands.submitDevelopmentTask).toHaveBeenCalledWith(
       {
         principal: { id: 'discord:user-1', roles: ['operator'] },
@@ -144,29 +152,29 @@ describe('operator routes', () => {
     await context.instance.close();
   });
 
-  it('forwards bounded query parameters', async () => {
+  it('forwards bounded command query parameters', async () => {
     const context = await app();
     const artifacts = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/artifacts?limit=10&cursor=next',
+      url: '/api/v1/operator/commands/command-1/artifacts?limit=10&cursor=next',
       headers,
     });
     expect(artifacts.statusCode).toBe(200);
-    expect(context.queries.listRunArtifacts).toHaveBeenCalledWith(
+    expect(context.queries.listCommandArtifacts).toHaveBeenCalledWith(
       expect.any(Object),
-      'run-1',
+      'command-1',
       { limit: 10, cursor: 'next' },
     );
 
     const artifact = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/artifacts/artifact-1?maxBytes=4096',
+      url: '/api/v1/operator/commands/command-1/artifacts/artifact-1?maxBytes=4096',
       headers,
     });
     expect(artifact.statusCode).toBe(200);
-    expect(context.queries.readRunArtifact).toHaveBeenCalledWith(
+    expect(context.queries.readCommandArtifact).toHaveBeenCalledWith(
       expect.any(Object),
-      'run-1',
+      'command-1',
       'artifact-1',
       4096,
     );
@@ -225,7 +233,7 @@ describe('operator routes', () => {
     });
     const cancellation = await context.instance.inject({
       method: 'POST',
-      url: '/api/v1/operator/runs/run-1/cancel',
+      url: '/api/v1/operator/commands/command-1/cancel',
       headers,
       payload: {
         clientRequestId: 'cancel-1',
@@ -240,18 +248,18 @@ describe('operator routes', () => {
       });
     }
     expect(context.commands.decideApproval).not.toHaveBeenCalled();
-    expect(context.commands.cancelRun).not.toHaveBeenCalled();
+    expect(context.commands.cancelCommand).not.toHaveBeenCalled();
 
     await context.instance.close();
   });
 
-  it('maps durable conflicts and missing records without leaking internals', async () => {
+  it('maps durable conflicts and missing commands without leaking internals', async () => {
     const context = await app();
     context.commands.decideApproval.mockRejectedValueOnce(
       new OperatorConflictError('approval_not_pending'),
     );
-    context.queries.getRunStatus.mockRejectedValueOnce(
-      new OperatorNotFoundError('run_not_found'),
+    context.queries.getCommandStatus.mockRejectedValueOnce(
+      new OperatorNotFoundError('command_not_found'),
     );
 
     const conflict = await context.instance.inject({
@@ -271,11 +279,13 @@ describe('operator routes', () => {
 
     const missing = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/missing',
+      url: '/api/v1/operator/commands/missing',
       headers,
     });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json()).toMatchObject({ error: { code: 'run_not_found' } });
+    expect(missing.json()).toMatchObject({
+      error: { code: 'command_not_found' },
+    });
 
     await context.instance.close();
   });

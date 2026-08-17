@@ -15,7 +15,7 @@ const session = {
   threadId: null,
   principalId: 'discord:user-1',
   adapter: 'discord-agent',
-  boundRunId: 'run-1',
+  boundCommandId: 'command-1',
   expiresAt: new Date('2026-07-20T20:00:00.000Z'),
   idleExpiresAt: new Date('2026-07-20T19:05:00.000Z'),
 };
@@ -54,7 +54,7 @@ describe('Activity browser session routes', () => {
       threadId: null,
       principalId: 'discord:user-1',
       adapter: 'discord-agent',
-      runId: 'run-1',
+      commandId: 'command-1',
       expiresAt: '2026-07-20T20:00:00.000Z',
       idleExpiresAt: '2026-07-20T19:05:00.000Z',
     });
