@@ -10,8 +10,10 @@ The TypeScript client owns:
 - durable principal and adapter attribution;
 - runtime response validation and canonical errors;
 - opaque cursor preservation and deterministic pagination helpers;
-- bounded finite run-event pages and reconnect cursors;
+- bounded finite command-event pages and reconnect cursors;
 - retry of transient `GET` requests only.
+
+The public client is command-scoped. Methods such as `command`, `commandTrace`, `commandTopology`, `commandAlerts`, `commandEvents`, `commandInstantiations`, `commandArtifacts`, `commandArtifact`, and `cancelCommand` accept a durable command ID. The client does not expose the legacy `/operator/runs/*` surface and does not treat correlation IDs as authorization roots.
 
 Construct a client with injected host authentication:
 
@@ -25,6 +27,10 @@ const client = createOperatorClient({
 ```
 
 Mutation retries remain the caller's responsibility and must reuse the same durable `clientRequestId`.
+
+### Command details
+
+The `./run-details` module name is retained as a source-compatibility filename, but its public contract is command-scoped: `createCommandDetailsClient()` exposes `getCommandDetails(commandId)` and returns a payload identified by `commandId`. New code should use the command terminology regardless of the historical module filename.
 
 ### Portfolio Control Plane reads
 
@@ -47,9 +53,11 @@ The portfolio client has no outcome, owner-decision request, ingestion, reconcil
 
 ## `@factory-floor/operator-ui-react`
 
-The React package owns reusable overview, portfolio, topology, execution trace, artifact lineage, template-instantiation, resource, policy, projection, and operations views. It also exposes bounded run-status, run-topology, durable trace, current-alert, finite-event, run-artifact, and pending-approval panels over the authoritative operator HTTP API.
+The React package owns reusable overview, portfolio, topology, execution trace, artifact lineage, template-instantiation, resource, policy, projection, and operations views. It also exposes bounded command-status, command-topology, durable trace, current-alert, finite-event, command-artifact, command-details, and pending-approval panels over the authoritative operator HTTP API.
 
 The views preserve textual graph alternatives, keyboard navigation, responsive layouts, opaque JSON rendering, loading and disconnected states, and reduced-motion behavior. Pending approvals remain read-only until the safe mutation workflow is added through the existing idempotent operator command boundary.
+
+Historical source filenames such as `run-operator.tsx` and `run-details.tsx` are implementation compatibility details. Their exported UI surfaces are command-oriented and take `commandId`.
 
 `Portfolio` receives an optional `PortfolioClient`. Without one it renders an explicit unconfigured state and performs no request. With one it loads independent status, next-work, owner-decision, and semantic-work reads in parallel. It does not claim work or record outcomes.
 
@@ -66,4 +74,6 @@ For a trusted private standalone build, the Portfolio page is enabled with `VITE
 
 ## Boundary rules
 
-Neither package imports database repositories, runtime service implementations, control-plane source, worker credentials, admin credentials, Hatchable SDKs, or host SDKs. Factory Floor's operator HTTP API remains the authoritative runtime and event source. The Portfolio Control Plane remains the authoritative source-neutral coordination projection. LORE remains authoritative for accepted knowledge, Deciduous for causal development history, GitHub for source and exact-head evidence, and Linear only for migration evidence.
+Neither package imports database repositories, runtime service implementations, control-plane source, worker credentials, admin credentials, Hatchable SDKs, or host SDKs. Factory Floor's operator HTTP API remains the authoritative runtime and event source. The public operator scope root is the durable command ID; execution and attempt IDs remain distinct runtime identities, and correlation IDs remain grouping metadata only.
+
+The Portfolio Control Plane remains the authoritative source-neutral coordination projection. LORE remains authoritative for accepted knowledge, Deciduous for causal development history, GitHub for source and exact-head evidence, and Linear only for migration evidence.
