@@ -105,7 +105,9 @@ describe('command details panel', () => {
       <CommandDetailsPanel commandId="command-1" loadDetails={loadDetails} />,
     );
 
-    expect(await screen.findByText('Command governance and lineage')).toBeVisible();
+    expect(
+      await screen.findByText('Command governance and lineage'),
+    ).toBeVisible();
     const actionCells = screen.getAllByText((_, element) =>
       Boolean(
         element?.tagName === 'TD' &&
