@@ -32,19 +32,17 @@ function inspectionError(reply: FastifyReply, error: unknown) {
     : code === 'command_not_found'
       ? 404
       : 500;
-  return reply
-    .code(statusCode)
-    .send({
-      error: {
-        code,
-        message:
-          statusCode === 400
-            ? 'The inspection request is invalid.'
-            : statusCode === 404
-              ? 'The requested inspection scope was not found.'
-              : 'The inspection request failed.',
-      },
-    });
+  return reply.code(statusCode).send({
+    error: {
+      code,
+      message:
+        statusCode === 400
+          ? 'The inspection request is invalid.'
+          : statusCode === 404
+            ? 'The requested inspection scope was not found.'
+            : 'The inspection request failed.',
+    },
+  });
 }
 async function inspect<T>(
   reply: FastifyReply,
@@ -79,14 +77,12 @@ export async function registerInspectionRoutes(
       service.templateInstantiation((request.params as { id: string }).id),
     );
     if (instantiation === null)
-      return reply
-        .code(404)
-        .send({
-          error: {
-            code: 'template_instantiation_not_found',
-            message: 'Template instantiation not found.',
-          },
-        });
+      return reply.code(404).send({
+        error: {
+          code: 'template_instantiation_not_found',
+          message: 'Template instantiation not found.',
+        },
+      });
     return instantiation;
   });
   app.get('/api/v1/inspect/events', async (request, reply) =>
@@ -103,14 +99,12 @@ export async function registerInspectionRoutes(
       service.executionTrace((request.params as { id: string }).id),
     );
     if (trace === null)
-      return reply
-        .code(404)
-        .send({
-          error: {
-            code: 'execution_not_found',
-            message: 'Execution not found.',
-          },
-        });
+      return reply.code(404).send({
+        error: {
+          code: 'execution_not_found',
+          message: 'Execution not found.',
+        },
+      });
     return trace;
   });
   app.get('/api/v1/inspect/executions/:id/attempts', async (request, reply) =>
@@ -138,11 +132,9 @@ export async function registerInspectionRoutes(
       service.artifactLineage((request.params as { id: string }).id),
     );
     if (lineage === null)
-      return reply
-        .code(404)
-        .send({
-          error: { code: 'artifact_not_found', message: 'Artifact not found.' },
-        });
+      return reply.code(404).send({
+        error: { code: 'artifact_not_found', message: 'Artifact not found.' },
+      });
     return lineage;
   });
   app.get('/api/v1/inspect/projections', async (_request, reply) =>
