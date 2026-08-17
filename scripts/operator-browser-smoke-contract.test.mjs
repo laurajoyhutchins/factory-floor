@@ -106,15 +106,16 @@ describe('production operator browser smoke', () => {
       "errors.some((error) => error.includes('404 (Not Found)'))",
     );
     expect(spec).toContain(
-      'No artifact derivations are associated with this run.',
+      'No artifact derivations are associated with this command.',
     );
     expect(spec).toContain('The selected record was not found.');
     expect(spec).toContain("name: 'Text topology'");
     expect(spec).toContain('document.documentElement.scrollWidth');
     expect(spec).toContain('keyboard.press');
-    expect(spec).toContain('page.goto(`/runs/${fixture.runId}`)');
-    expect(consoleMain).toContain('RunDetailsPanel');
-    expect(consoleMain).toContain('createRunDetailsClient');
+    expect(spec).toContain('page.goto(`/commands/${fixture.commandId}`)');
+    expect(spec).not.toContain('/api/v1/operator/runs/');
+    expect(consoleMain).toContain('CommandDetailsPanel');
+    expect(consoleMain).toContain('createCommandDetailsClient');
   });
 
   it('makes the cross-browser smoke required and retains actionable failure evidence', () => {
