@@ -51,7 +51,9 @@ function isBrowserActivitySessionRoute(path: string): boolean {
 }
 
 function activityCommandId(path: string): string | undefined {
-  const encoded = /^\/api\/v1\/operator\/commands\/([^/]+)(?:\/|$)/.exec(path)?.[1];
+  const encoded = /^\/api\/v1\/operator\/commands\/([^/]+)(?:\/|$)/.exec(
+    path,
+  )?.[1];
   if (!encoded) return undefined;
   try {
     return decodeURIComponent(encoded);
