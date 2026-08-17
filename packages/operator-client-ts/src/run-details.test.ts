@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRunDetailsClient } from './run-details.js';
+import { createCommandDetailsClient } from './run-details.js';
 
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -7,11 +7,11 @@ const json = (body: unknown) =>
     headers: { 'content-type': 'application/json' },
   });
 
-describe('run details client', () => {
-  it('uses the run-scoped endpoint and normalizes database field names', async () => {
+describe('command details client', () => {
+  it('uses the command-scoped endpoint and normalizes database field names', async () => {
     const fetch = vi.fn(async () =>
       json({
-        run_id: 'run-1',
+        command_id: 'command-1',
         limits: { records: 25 },
         approvals: [
           {
@@ -31,7 +31,7 @@ describe('run details client', () => {
         },
       }),
     );
-    const client = createRunDetailsClient({
+    const client = createCommandDetailsClient({
       baseUrl: 'https://factory.example',
       token: 'activity-token',
       principalId: 'discord:user-1',
@@ -39,9 +39,9 @@ describe('run details client', () => {
       fetch: fetch as typeof globalThis.fetch,
     });
 
-    const result = await client.getRunDetails('run-1', { limit: 25 });
+    const result = await client.getCommandDetails('command-1', { limit: 25 });
 
-    expect(result.runId).toBe('run-1');
+    expect(result.commandId).toBe('command-1');
     expect(result.approvals[0]).toMatchObject({
       actionId: 'action-1',
       requestedAt: '2026-07-20T00:00:00.000Z',
@@ -51,7 +51,7 @@ describe('run details client', () => {
       staleAfterMs: 60000,
     });
     expect(fetch).toHaveBeenCalledWith(
-      'https://factory.example/api/v1/operator/runs/run-1/details?limit=25',
+      'https://factory.example/api/v1/operator/commands/command-1/details?limit=25',
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',
