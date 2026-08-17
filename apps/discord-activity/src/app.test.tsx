@@ -196,4 +196,4 @@ describe('Discord Activity shell', () => {
     });
     expect(terminalClientConfig).not.toHaveProperty('token');
   });
-}
+});
