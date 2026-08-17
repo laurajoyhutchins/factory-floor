@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { beginActivityBootstrap } from './bootstrap.js';
 
 describe('Discord Activity bootstrap', () => {
-  it('binds SDK authorization to broker state and returns only trusted run context', async () => {
+  it('binds SDK authorization to broker state and returns only trusted command context', async () => {
     const calls: string[] = [];
     const host = {
       instanceId: 'instance-1',
@@ -60,9 +60,9 @@ describe('Discord Activity bootstrap', () => {
             idleExpiresAt: '2026-07-20T19:05:00.000Z',
           },
           context: {
-            kind: 'run' as const,
+            kind: 'command' as const,
             projectId: 'project-1',
-            runId: 'run-1',
+            commandId: 'command-1',
           },
         };
       }),
@@ -86,14 +86,14 @@ describe('Discord Activity bootstrap', () => {
       'authenticate',
     ]);
     expect(result).toMatchObject({
-      runId: 'run-1',
+      commandId: 'command-1',
       projectId: 'project-1',
       instanceBindingId: 'binding-1',
       sessionToken: 'session-token',
     });
   });
 
-  it('rejects bootstrap responses without a run binding', async () => {
+  it('rejects bootstrap responses without a command binding', async () => {
     await expect(
       beginActivityBootstrap({
         host: {
@@ -123,7 +123,11 @@ describe('Discord Activity bootstrap', () => {
               expiresAt: '2026-07-20T20:00:00.000Z',
               idleExpiresAt: '2026-07-20T19:05:00.000Z',
             },
-            context: { kind: 'project', projectId: 'project-1' },
+            context: {
+              kind: 'command',
+              projectId: 'project-1',
+              commandId: '',
+            },
           }),
         },
         redirectUri: 'https://123.discordsays.com/.proxy/oauth/callback',
@@ -132,6 +136,6 @@ describe('Discord Activity bootstrap', () => {
           challenge: 'challenge',
         }),
       }),
-    ).rejects.toThrow('activity_run_binding_required');
+    ).rejects.toThrow('activity_command_binding_required');
   });
 });

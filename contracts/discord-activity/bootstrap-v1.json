@@ -44,7 +44,7 @@
       "launchId": "launch-1",
       "principalId": "user-1",
       "adapter": "discord-agent",
-      "boundRunId": "run-1"
+      "boundCommandId": "command-1"
     },
     "response": {
       "discord": {
@@ -60,9 +60,9 @@
         "idleExpiresAt": "2026-07-20T00:40:00.000Z"
       },
       "context": {
-        "kind": "run",
+        "kind": "command",
         "projectId": "ff-project-1",
-        "runId": "run-1"
+        "commandId": "command-1"
       }
     }
   },

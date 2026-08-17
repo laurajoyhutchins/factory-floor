@@ -32,9 +32,9 @@ export interface ActivityBootstrapResponse {
     instanceBindingId: string;
   };
   context: {
-    kind: string;
+    kind: 'command';
     projectId: string;
-    runId?: string;
+    commandId: string;
   };
 }
 
@@ -68,7 +68,7 @@ export interface ActivitySessionContext {
   threadId: string | null;
   principalId: string;
   adapter: string;
-  runId: string;
+  commandId: string;
   expiresAt: string;
   idleExpiresAt: string;
 }
@@ -76,5 +76,5 @@ export interface ActivitySessionContext {
 export interface BootstrappedActivity extends ActivitySessionCredentials {
   instanceBindingId: string;
   projectId: string;
-  runId: string;
+  commandId: string;
 }

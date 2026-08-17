@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const EXPECTED_FIXTURE_DIGEST =
-  'ab0fa633bedc1105db08a019489985083bc0e81a274e5260c25067eff8150ca1';
+  '5b7a2b9717dc572ea6967e9b17b487b99213587463d23f3c36a933977d6f4b0d';
 
 interface BootstrapFixture {
   schemaVersion: number;
@@ -49,7 +49,7 @@ describe('Discord Activity bootstrap contract fixture', () => {
     );
   });
 
-  it('freezes the session request accepted by Factory Floor', () => {
+  it('freezes the command-scoped session request accepted by Factory Floor', () => {
     expect(fixture.bootstrap.factoryFloorRequest).toEqual({
       applicationId: 'application-1',
       instanceId: 'i-launch-1-gc-guild-1-thread-1',
@@ -60,14 +60,14 @@ describe('Discord Activity bootstrap contract fixture', () => {
       launchId: 'launch-1',
       principalId: 'user-1',
       adapter: 'discord-agent',
-      boundRunId: 'run-1',
+      boundCommandId: 'command-1',
     });
     expect(fixture.bootstrap.response).toMatchObject({
       factoryFloor: { instanceBindingId: 'binding-1' },
       context: {
-        kind: 'run',
+        kind: 'command',
         projectId: 'ff-project-1',
-        runId: 'run-1',
+        commandId: 'command-1',
       },
     });
   });
