@@ -83,7 +83,7 @@ export function DiscordActivityApp({
         if (
           context.instanceId !== host.instanceId ||
           context.instanceBindingId !== bootstrap.instanceBindingId ||
-          context.runId !== bootstrap.runId
+          context.commandId !== bootstrap.commandId
         )
           throw new Error('activity_session_binding_mismatch');
         if (cancelled) return;
@@ -195,7 +195,7 @@ export function DiscordActivityApp({
           <div>
             <p className="eyebrow">Discord Activity · Read only</p>
             <h1>Factory Floor command</h1>
-            <p className="muted">{state.context.runId}</p>
+            <p className="muted">{state.context.commandId}</p>
           </div>
           <div className="activity-actions">
             <span className="badge status" data-status={connection}>
@@ -207,9 +207,9 @@ export function DiscordActivityApp({
           </div>
         </header>
         <main>
-          <CommandOperatorWorkspace commandId={state.context.runId} />
+          <CommandOperatorWorkspace commandId={state.context.commandId} />
           <CommandDetailsPanel
-            commandId={state.context.runId}
+            commandId={state.context.commandId}
             loadDetails={loadDetails}
           />
         </main>
