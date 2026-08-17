@@ -61,7 +61,10 @@ function services() {
         items: [],
         nextCursor: null,
       })),
-      listCommandArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listCommandArtifacts: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+      })),
       readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
       listPendingApprovals: vi.fn(async () => ({
         items: [],
