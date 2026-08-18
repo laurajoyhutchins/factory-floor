@@ -116,7 +116,9 @@ function task(objective: string) {
     clientRequestId: createUuidV7(),
     repository: 'laurajoyhutchins/factory-floor',
     objective,
-    acceptanceCriteria: ['Command details remain isolated by durable identity.'],
+    acceptanceCriteria: [
+      'Command details remain isolated by durable identity.',
+    ],
   };
 }
 
