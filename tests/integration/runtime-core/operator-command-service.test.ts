@@ -172,15 +172,17 @@ describe('operator command service', () => {
     await admin.end();
   });
 
-  it('uses the accepted command id as the run id', async () => {
+  it('returns a durable command id without a synthetic run alias', async () => {
     const receipt = await commands.submitDevelopmentTask(
       operator,
-      task('Run identity'),
+      task('Command identity'),
     );
-    expect(receipt.runId).toBe(receipt.commandId);
+    expect(receipt.commandId).toEqual(expect.any(String));
+    expect(receipt).not.toHaveProperty('runId');
     await expect(
-      queries.getRunStatus(operator, receipt.runId),
+      queries.getCommandStatus(operator, receipt.commandId),
     ).resolves.toMatchObject({
+      commandId: receipt.commandId,
       status: 'queued',
       counts: { queued: 1, active: 0 },
     });
@@ -207,7 +209,7 @@ describe('operator command service', () => {
     ).rejects.toBeInstanceOf(OperatorConflictError);
   });
 
-  it('cancels only the selected run, returns its capacity, and fences its stale attempt', async () => {
+  it('cancels only the selected command, returns its capacity, and fences its stale attempt', async () => {
     const region = await db
       .selectFrom('regions')
       .select('id')
@@ -221,14 +223,14 @@ describe('operator command service', () => {
 
     const first = await commands.submitDevelopmentTask(
       operator,
-      task('Cancel this run'),
+      task('Cancel this command'),
     );
     const firstClaim = await workers.claim({
       workerId: 'worker-a',
       capabilities: ['retrieve@1'],
     });
     if (!firstClaim.claimed) throw new Error('expected first claim');
-    await commands.submitDevelopmentTask(operator, task('Keep this run'));
+    await commands.submitDevelopmentTask(operator, task('Keep this command'));
     const secondClaim = await workers.claim({
       workerId: 'worker-b',
       capabilities: ['retrieve@1'],
@@ -240,14 +242,15 @@ describe('operator command service', () => {
       reason: 'Operator requested cancellation.',
     };
     await expect(
-      commands.cancelRun(operator, first.runId, request),
+      commands.cancelCommand(operator, first.commandId, request),
     ).resolves.toMatchObject({
+      commandId: first.commandId,
       disposition: 'accepted',
       cancelledExecutions: 1,
       cancelledAttempts: 1,
     });
     await expect(
-      commands.cancelRun(operator, first.runId, request),
+      commands.cancelCommand(operator, first.commandId, request),
     ).resolves.toMatchObject({ disposition: 'replayed' });
 
     await commands.submitDevelopmentTask(
