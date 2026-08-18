@@ -5,22 +5,18 @@ import {
   configureDefaultOperatorClient,
   createOperatorClient,
 } from '@factory-floor/operator-client-ts';
-import { RunAlertsPanel, RunEventsPanel } from './run-operator.js';
-
+import { CommandAlertsPanel, CommandEventsPanel } from './run-operator.js';
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
-
 function renderPanel(element: React.ReactElement) {
   return render(
     <QueryClientProvider
       client={
         new QueryClient({
-          defaultOptions: {
-            queries: { retry: false, refetchInterval: false },
-          },
+          defaultOptions: { queries: { retry: false, refetchInterval: false } },
         })
       }
     >
@@ -28,10 +24,8 @@ function renderPanel(element: React.ReactElement) {
     </QueryClientProvider>,
   );
 }
-
 afterEach(() => vi.restoreAllMocks());
-
-describe('run-scoped operator panels', () => {
+describe('command-scoped operator panels', () => {
   it('renders alerts through an injected authenticated transport', async () => {
     const fetch = vi.fn(async () =>
       json({
@@ -61,12 +55,10 @@ describe('run-scoped operator panels', () => {
         fetch: fetch as typeof globalThis.fetch,
       }),
     );
-
-    renderPanel(<RunAlertsPanel runId="run-1" />);
-
+    renderPanel(<CommandAlertsPanel commandId="command-1" />);
     expect(await screen.findByText('Approval required')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
-      'https://factory.example/api/v1/operator/runs/run-1/alerts?limit=25',
+      'https://factory.example/api/v1/operator/commands/command-1/alerts?limit=25',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({
@@ -77,14 +69,13 @@ describe('run-scoped operator panels', () => {
       }),
     );
   });
-
   it('renders a caught-up finite event page and its opaque resume cursor', async () => {
     const fetch = vi.fn(async () =>
       json({
         items: [
           {
             id: 'event-1',
-            eventType: 'run.completed',
+            eventType: 'command.completed',
             sourceKind: 'execution',
             createdAt: '2026-07-20T00:00:00.000Z',
             payload: { result: 'ok' },
@@ -102,10 +93,8 @@ describe('run-scoped operator panels', () => {
         fetch: fetch as typeof globalThis.fetch,
       }),
     );
-
-    renderPanel(<RunEventsPanel runId="run-1" />);
-
-    expect(await screen.findByText('run.completed')).toBeInTheDocument();
+    renderPanel(<CommandEventsPanel commandId="command-1" />);
+    expect(await screen.findByText('command.completed')).toBeInTheDocument();
     expect(screen.getByText('caught-up')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Copy opaque-resume==' }),

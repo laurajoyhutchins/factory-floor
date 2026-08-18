@@ -93,7 +93,7 @@ function parseCreateSessionRequest(request: FastifyRequest) {
     launchId: requiredString(body, 'launchId'),
     principalId: requiredString(body, 'principalId'),
     adapter: requiredString(body, 'adapter'),
-    boundRunId: optionalString(body, 'boundRunId'),
+    boundCommandId: optionalString(body, 'boundCommandId'),
   };
 }
 

@@ -15,24 +15,29 @@ function services() {
     commands: {
       submitDevelopmentTask: vi.fn(),
       decideApproval: vi.fn(),
-      cancelRun: vi.fn(),
+      cancelCommand: vi.fn(),
     },
     queries: {
       getFactoryStatus: vi.fn(async () => ({ status: 'healthy' })),
-      getRunStatus: vi.fn(async () => ({ runId: 'run-1' })),
-      inspectRunTrace: vi.fn(async () => ({ run: { id: 'run-1' } })),
-      listRunTemplateInstantiations: vi.fn(async () => ({
+      getCommandStatus: vi.fn(async () => ({ commandId: 'command-1' })),
+      getCommandDetails: vi.fn(async () => ({ commandId: 'command-1' })),
+      inspectCommandTrace: vi.fn(async () => ({
+        command: { id: 'command-1' },
+      })),
+      listCommandTemplateInstantiations: vi.fn(async () => ({
         items: [],
         nextCursor: null,
       })),
-      listRunArtifacts: vi.fn(async () => ({ items: [], nextCursor: null })),
-      readArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+      listCommandArtifacts: vi.fn(async () => ({
+        items: [],
+        nextCursor: null,
+      })),
       listPendingApprovals: vi.fn(async () => ({
         items: [],
         nextCursor: null,
       })),
-      getRunTopology: vi.fn(async () => ({
-        run: { id: 'run-1' },
+      getCommandTopology: vi.fn(async () => ({
+        command: { id: 'command-1' },
         regions: [],
         topologyRevisions: [],
         components: [],
@@ -41,13 +46,14 @@ function services() {
         executions: [],
         relationships: [],
       })),
-      listRunAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
-      listRunEvents: vi.fn(async () => ({
+      listCommandAlerts: vi.fn(async () => ({ items: [], nextCursor: null })),
+      listCommandEvents: vi.fn(async () => ({
         items: [],
         nextCursor: null,
+        resumeCursor: null,
         complete: true,
       })),
-      readRunArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
+      readCommandArtifact: vi.fn(async () => ({ artifactId: 'artifact-1' })),
     },
   };
 }
@@ -67,63 +73,63 @@ async function app() {
   return { instance, ...injected };
 }
 
-describe('run-scoped operator routes', () => {
+describe('command-scoped operator routes', () => {
   it('forwards bounded topology, alert, and finite-event requests with attribution', async () => {
     const context = await app();
 
     const topology = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/topology?regionLimit=2&componentLimit=3&connectionLimit=4',
+      url: '/api/v1/operator/commands/command-1/topology?regionLimit=2&componentLimit=3&connectionLimit=4',
       headers,
     });
     expect(topology.statusCode).toBe(200);
-    expect(context.queries.getRunTopology).toHaveBeenCalledWith(
+    expect(context.queries.getCommandTopology).toHaveBeenCalledWith(
       {
         principal: { id: 'operator:user-1', roles: ['operator'] },
         adapter: 'standalone-console',
       },
-      'run-1',
+      'command-1',
       { regionLimit: 2, componentLimit: 3, connectionLimit: 4 },
     );
 
     const alerts = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/alerts?limit=10&cursor=alert-cursor',
+      url: '/api/v1/operator/commands/command-1/alerts?limit=10&cursor=alert-cursor',
       headers,
     });
     expect(alerts.statusCode).toBe(200);
-    expect(context.queries.listRunAlerts).toHaveBeenCalledWith(
+    expect(context.queries.listCommandAlerts).toHaveBeenCalledWith(
       expect.any(Object),
-      'run-1',
+      'command-1',
       { limit: 10, cursor: 'alert-cursor' },
     );
 
     const events = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/events?limit=25&cursor=event-cursor',
+      url: '/api/v1/operator/commands/command-1/events?limit=25&cursor=event-cursor',
       headers,
     });
     expect(events.statusCode).toBe(200);
-    expect(context.queries.listRunEvents).toHaveBeenCalledWith(
+    expect(context.queries.listCommandEvents).toHaveBeenCalledWith(
       expect.any(Object),
-      'run-1',
+      'command-1',
       { limit: 25, cursor: 'event-cursor' },
     );
 
     await context.instance.close();
   });
 
-  it('requires the run identity when reading an artifact', async () => {
+  it('requires the command identity when reading an artifact', async () => {
     const context = await app();
     const scoped = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/artifacts/artifact-1?maxBytes=4096',
+      url: '/api/v1/operator/commands/command-1/artifacts/artifact-1?maxBytes=4096',
       headers,
     });
     expect(scoped.statusCode).toBe(200);
-    expect(context.queries.readRunArtifact).toHaveBeenCalledWith(
+    expect(context.queries.readCommandArtifact).toHaveBeenCalledWith(
       expect.any(Object),
-      'run-1',
+      'command-1',
       'artifact-1',
       4096,
     );
@@ -134,20 +140,19 @@ describe('run-scoped operator routes', () => {
       headers,
     });
     expect(unscoped.statusCode).toBe(404);
-    expect(context.queries.readArtifact).not.toHaveBeenCalled();
 
     await context.instance.close();
   });
 
   it('maps recoverable cursor failures to stable operator errors', async () => {
     const context = await app();
-    context.queries.listRunEvents.mockRejectedValueOnce(
+    context.queries.listCommandEvents.mockRejectedValueOnce(
       new OperatorValidationError('cursor_expired'),
     );
 
     const response = await context.instance.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1/events?cursor=expired',
+      url: '/api/v1/operator/commands/command-1/events?cursor=expired',
       headers,
     });
     expect(response.statusCode).toBe(400);

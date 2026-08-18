@@ -4,11 +4,13 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { consoleApi } from '@factory-floor/operator-client-ts';
+import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/command-details';
 import { createPortfolioClient } from '@factory-floor/operator-client-ts/portfolio';
-import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
 import {
   ArtifactDetail,
   Artifacts,
+  CommandDetailsPanel,
+  CommandOperatorWorkspace,
   ExecutionDetail,
   Executions,
   NotFound,
@@ -16,8 +18,6 @@ import {
   Overview,
   PendingApprovals,
   Portfolio,
-  RunDetailsPanel,
-  RunOperatorWorkspace,
   Shell,
   TemplateInstantiationDetail,
   TemplateInstantiations,
@@ -35,30 +35,22 @@ import {
   useParams,
 } from 'react-router';
 import './api/client.js';
-
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchInterval: 15_000,
-      staleTime: 5_000,
-      retry: 1,
-    },
+    queries: { refetchInterval: 15_000, staleTime: 5_000, retry: 1 },
   },
 });
-
-const runDetailsClient = createRunDetailsClient({
+const commandDetailsClient = createCommandDetailsClient({
   token: import.meta.env.VITE_FACTORY_FLOOR_OPERATOR_TOKEN?.trim(),
   baseUrl: import.meta.env.VITE_FACTORY_FLOOR_CONTROL_PLANE_URL?.trim(),
   principalId: 'standalone-console',
   adapter: 'standalone-console',
 });
-
 const portfolioBaseUrl =
   import.meta.env.VITE_PORTFOLIO_CONTROL_PLANE_URL?.trim();
 const portfolioClient = portfolioBaseUrl
   ? createPortfolioClient({ baseUrl: portfolioBaseUrl })
   : undefined;
-
 const titles: Record<string, string> = {
   portfolio: 'Portfolio',
   topology: 'Topology',
@@ -67,22 +59,20 @@ const titles: Record<string, string> = {
   instantiations: 'Template instantiations',
   operations: 'Operations',
   approvals: 'Pending approvals',
-  runs: 'Run inspection',
+  commands: 'Command inspection',
 };
-
-function RunRoute() {
-  const { runId = '' } = useParams();
+function CommandRoute() {
+  const { commandId = '' } = useParams();
   return (
     <>
-      <RunOperatorWorkspace runId={runId} />
-      <RunDetailsPanel
-        runId={runId}
-        loadDetails={(id) => runDetailsClient.getRunDetails(id)}
+      <CommandOperatorWorkspace commandId={commandId} />
+      <CommandDetailsPanel
+        commandId={commandId}
+        loadDetails={(id) => commandDetailsClient.getCommandDetails(id)}
       />
     </>
   );
 }
-
 function App() {
   const live = useLiveEvents(50);
   const location = useLocation();
@@ -94,7 +84,6 @@ function App() {
   const title = segment ? (titles[segment] ?? 'Not found') : 'Overview';
   const healthStatus =
     health.data?.status ?? (health.isError ? 'disconnected' : 'checking');
-
   return (
     <Shell
       title={title}
@@ -129,13 +118,12 @@ function App() {
         />
         <Route path="/operations" element={<Operations />} />
         <Route path="/approvals" element={<PendingApprovals />} />
-        <Route path="/runs/:runId" element={<RunRoute />} />
+        <Route path="/commands/:commandId" element={<CommandRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Shell>
   );
 }
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

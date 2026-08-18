@@ -26,9 +26,7 @@ describe('operator client', () => {
       adapter: 'embedded-host',
       fetch,
     });
-
     await client.operatorStatus();
-
     expect(client.streamPath).toBe(
       'https://factory.example/api/v1/inspect/stream',
     );
@@ -56,12 +54,10 @@ describe('operator client', () => {
       fetch,
       retry: { maxAttempts: 2, sleep: async () => undefined },
     });
-
     await expect(client.operatorStatus()).resolves.toMatchObject({
       status: 'healthy',
     });
     expect(fetch).toHaveBeenCalledTimes(2);
-
     fetch.mockReset();
     fetch.mockResolvedValue(json({ error: { code: 'busy' } }, { status: 503 }));
     await expect(
@@ -75,10 +71,10 @@ describe('operator client', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves opaque cursors and validates finite event pages', async () => {
+  it('preserves opaque cursors and validates finite command event pages', async () => {
     const fetch = vi.fn(async () =>
       json({
-        items: [{ id: 'event-1', eventType: 'run.started' }],
+        items: [{ id: 'event-1', eventType: 'command.started' }],
         nextCursor: null,
         resumeCursor: 'opaque==',
         complete: true,
@@ -89,11 +85,13 @@ describe('operator client', () => {
       adapter: 'test',
       fetch,
     });
-
     await expect(
-      client.runEvents('run-1', { cursor: 'opaque==', limit: 1 }),
+      client.commandEvents('command-1', { cursor: 'opaque==', limit: 1 }),
     ).resolves.toMatchObject({ resumeCursor: 'opaque==', complete: true });
     const calls = fetch.mock.calls as unknown as [string, RequestInit][];
+    expect(String(calls[0]?.[0])).toContain(
+      '/operator/commands/command-1/events',
+    );
     expect(String(calls[0]?.[0])).toContain('cursor=opaque%3D%3D');
   });
 
@@ -110,13 +108,11 @@ describe('operator client', () => {
       fetch,
       retry: { maxAttempts: 1 },
     });
-
-    await expect(client.runEvents('run-1')).rejects.toMatchObject({
+    await expect(client.commandEvents('command-1')).rejects.toMatchObject({
       kind: 'http',
       status: 400,
       code: 'cursor_expired',
     });
-
     fetch.mockResolvedValueOnce(
       json({ items: 'not-an-array', nextCursor: null }),
     );
@@ -143,7 +139,6 @@ describe('operator client', () => {
     configureDefaultOperatorClient(
       createOperatorClient({ principalId: 'shell', adapter: 'shell', fetch }),
     );
-
     await expect(operatorClient.health()).resolves.toEqual({
       status: 'healthy',
       service: 'cp',

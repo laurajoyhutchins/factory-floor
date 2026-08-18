@@ -4,7 +4,7 @@ import {
   type OperatorClientConfig,
 } from './index.js';
 
-export interface RunApprovalDetail {
+export interface CommandApprovalDetail {
   id: string;
   status: string;
   requestedAt: string;
@@ -21,8 +21,7 @@ export interface RunApprovalDetail {
   outcome: string;
   policyReason: string;
 }
-
-export interface RunPolicyDecisionDetail {
+export interface CommandPolicyDecisionDetail {
   id: string;
   policyName: string;
   policyVersion: string;
@@ -40,8 +39,7 @@ export interface RunPolicyDecisionDetail {
   risk: string;
   actionStatus: string;
 }
-
-export interface RunResourceDetail {
+export interface CommandResourceDetail {
   id: string;
   regionId: string;
   executionId: string | null;
@@ -53,8 +51,7 @@ export interface RunResourceDetail {
   attributes: unknown;
   createdAt: string;
 }
-
-export interface RunArtifactDerivationDetail {
+export interface CommandArtifactDerivationDetail {
   id: string;
   artifactId: string;
   sourceArtifactId: string | null;
@@ -63,38 +60,34 @@ export interface RunArtifactDerivationDetail {
   derivationType: string;
   createdAt: string;
 }
-
-export interface RunProjectionFreshnessDetail {
+export interface CommandProjectionFreshnessDetail {
   projectionName: string;
   updatedAt: string;
   stalenessMs: number;
   stale: boolean;
 }
-
-export interface RunDetailsPage {
-  runId: string;
+export interface CommandDetailsPage {
+  commandId: string;
   limits: { records: number };
-  approvals: RunApprovalDetail[];
-  policyDecisions: RunPolicyDecisionDetail[];
-  resources: RunResourceDetail[];
-  derivations: RunArtifactDerivationDetail[];
+  approvals: CommandApprovalDetail[];
+  policyDecisions: CommandPolicyDecisionDetail[];
+  resources: CommandResourceDetail[];
+  derivations: CommandArtifactDerivationDetail[];
   projectionFreshness: {
     scope: 'control_plane_global';
     staleAfterMs: number;
     generatedAt: string;
-    items: RunProjectionFreshnessDetail[];
+    items: CommandProjectionFreshnessDetail[];
   };
 }
-
-export interface RunDetailsRequest {
+export interface CommandDetailsRequest {
   limit?: number;
 }
-
-export interface RunDetailsClient {
-  getRunDetails(
-    runId: string,
-    request?: RunDetailsRequest,
-  ): Promise<RunDetailsPage>;
+export interface CommandDetailsClient {
+  getCommandDetails(
+    commandId: string,
+    request?: CommandDetailsRequest,
+  ): Promise<CommandDetailsPage>;
 }
 
 function normalizeBaseUrl(value?: string): string | undefined {
@@ -102,25 +95,20 @@ function normalizeBaseUrl(value?: string): string | undefined {
   if (!trimmed) return undefined;
   return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
 }
-
 function targetUrl(baseUrl: string | undefined, path: string): string {
   return baseUrl ? new URL(path.replace(/^\//, ''), baseUrl).toString() : path;
 }
-
 function positiveInteger(value: number | undefined, fallback: number): number {
   return Number.isInteger(value) && Number(value) > 0
     ? Number(value)
     : fallback;
 }
-
 function transientStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-
 function errorDetails(body: unknown): { code?: string; message?: string } {
   if (!isRecord(body) || !isRecord(body.error)) return {};
   return {
@@ -129,15 +117,14 @@ function errorDetails(body: unknown): { code?: string; message?: string } {
       typeof body.error.message === 'string' ? body.error.message : undefined,
   };
 }
-
-function assertRunDetails(value: unknown): RunDetailsPage {
+function assertCommandDetails(value: unknown): CommandDetailsPage {
   if (!isRecord(value))
     throw new OperatorClientError(
       'malformed-response',
-      'Expected run details to be an object.',
+      'Expected command details to be an object.',
     );
   if (
-    typeof value.runId !== 'string' ||
+    typeof value.commandId !== 'string' ||
     !isRecord(value.limits) ||
     typeof value.limits.records !== 'number' ||
     !Array.isArray(value.approvals) ||
@@ -150,14 +137,14 @@ function assertRunDetails(value: unknown): RunDetailsPage {
   )
     throw new OperatorClientError(
       'malformed-response',
-      'The run details response is incomplete.',
+      'The command details response is incomplete.',
     );
-  return value as unknown as RunDetailsPage;
+  return value as unknown as CommandDetailsPage;
 }
 
-export function createRunDetailsClient(
+export function createCommandDetailsClient(
   config: OperatorClientConfig,
-): RunDetailsClient {
+): CommandDetailsClient {
   const principalId = config.principalId.trim();
   const adapter = config.adapter.trim();
   if (!principalId)
@@ -167,7 +154,6 @@ export function createRunDetailsClient(
     );
   if (!adapter)
     throw new OperatorClientError('malformed-response', 'adapter is required.');
-
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const token = config.token?.trim();
   const fetchImplementation = config.fetch ?? globalThis.fetch;
@@ -177,23 +163,21 @@ export function createRunDetailsClient(
     config.retry?.sleep ??
     ((milliseconds: number) =>
       new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
-
   return {
-    async getRunDetails(runId, request = {}) {
-      const normalizedRunId = runId.trim();
-      if (!normalizedRunId)
+    async getCommandDetails(commandId, request = {}) {
+      const normalizedCommandId = commandId.trim();
+      if (!normalizedCommandId)
         throw new OperatorClientError(
           'malformed-response',
-          'runId is required.',
+          'commandId is required.',
         );
       const url = new URL(
-        `/api/v1/operator/runs/${encodeURIComponent(normalizedRunId)}/details`,
+        `/api/v1/operator/commands/${encodeURIComponent(normalizedCommandId)}/details`,
         'http://factory-floor.local',
       );
       if (request.limit !== undefined)
         url.searchParams.set('limit', String(request.limit));
       const path = `${url.pathname}${url.search}`;
-
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         let response: Response;
         try {
@@ -219,12 +203,10 @@ export function createRunDetailsClient(
             'Unable to reach the control plane.',
           );
         }
-
         if (transientStatus(response.status) && attempt < maxAttempts) {
           await sleep(baseDelayMs * 2 ** (attempt - 1));
           continue;
         }
-
         const text = await response.text();
         let parsed: unknown = null;
         if (text)
@@ -243,7 +225,6 @@ export function createRunDetailsClient(
               response.status,
             );
           }
-
         if (!response.ok) {
           const details = errorDetails(parsed);
           throw new OperatorClientError(
@@ -254,9 +235,8 @@ export function createRunDetailsClient(
             details.code,
           );
         }
-        return assertRunDetails(normalize(parsed));
+        return assertCommandDetails(normalize(parsed));
       }
-
       throw new OperatorClientError(
         'transport',
         'Unable to reach the control plane.',

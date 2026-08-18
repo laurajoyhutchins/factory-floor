@@ -40,15 +40,15 @@ export async function beginActivityBootstrap(options: {
     codeVerifier: pkce.verifier,
     redirectUri,
   });
-  if (bootstrap.context.kind !== 'run' || !bootstrap.context.runId)
-    throw new Error('activity_run_binding_required');
+  if (bootstrap.context.kind !== 'command' || !bootstrap.context.commandId)
+    throw new Error('activity_command_binding_required');
   if (!bootstrap.factoryFloor.sessionToken)
     throw new Error('activity_session_token_required');
 
   await options.host.authenticate(bootstrap.discord.accessToken);
   return {
     projectId: bootstrap.context.projectId,
-    runId: bootstrap.context.runId,
+    commandId: bootstrap.context.commandId,
     instanceBindingId: bootstrap.factoryFloor.instanceBindingId,
     sessionToken: bootstrap.factoryFloor.sessionToken,
     expiresAt: bootstrap.factoryFloor.expiresAt,

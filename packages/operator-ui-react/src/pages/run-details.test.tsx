@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { RunDetailsPanel } from './run-details.js';
+import { CommandDetailsPanel } from './run-details.js';
 
 function renderPanel(element: React.ReactElement) {
   return render(
@@ -17,10 +17,10 @@ function renderPanel(element: React.ReactElement) {
   );
 }
 
-describe('run details panel', () => {
+describe('command details panel', () => {
   it('renders approvals, resources, policies, lineage, and projection freshness', async () => {
     const loadDetails = vi.fn(async () => ({
-      runId: 'run-1',
+      commandId: 'command-1',
       limits: { records: 100 },
       approvals: [
         {
@@ -101,9 +101,13 @@ describe('run details panel', () => {
       },
     }));
 
-    renderPanel(<RunDetailsPanel runId="run-1" loadDetails={loadDetails} />);
+    renderPanel(
+      <CommandDetailsPanel commandId="command-1" loadDetails={loadDetails} />,
+    );
 
-    expect(await screen.findByText('Run governance and lineage')).toBeVisible();
+    expect(
+      await screen.findByText('Command governance and lineage'),
+    ).toBeVisible();
     const actionCells = screen.getAllByText((_, element) =>
       Boolean(
         element?.tagName === 'TD' &&
@@ -122,6 +126,6 @@ describe('run details panel', () => {
     expect(
       screen.getByText('Control-plane projection freshness'),
     ).toBeVisible();
-    expect(loadDetails).toHaveBeenCalledWith('run-1');
+    expect(loadDetails).toHaveBeenCalledWith('command-1');
   });
 });

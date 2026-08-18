@@ -37,13 +37,13 @@ export async function registerActivityBrowserRoutes(
       const token = bearer(request);
       const session = token ? await authorizer.resolveSession(token) : null;
       if (!session) return unauthorized(reply);
-      if (!session.boundRunId)
+      if (!session.boundCommandId)
         return noStore(reply)
           .code(409)
           .send({
             error: {
-              code: 'activity_run_binding_required',
-              message: 'Activity session is not bound to a run.',
+              code: 'activity_command_binding_required',
+              message: 'Activity session is not bound to a command.',
             },
           });
       return noStore(reply).send({
@@ -56,7 +56,7 @@ export async function registerActivityBrowserRoutes(
         threadId: session.threadId,
         principalId: session.principalId,
         adapter: session.adapter,
-        runId: session.boundRunId,
+        commandId: session.boundCommandId,
         expiresAt: session.expiresAt.toISOString(),
         idleExpiresAt: session.idleExpiresAt.toISOString(),
       });

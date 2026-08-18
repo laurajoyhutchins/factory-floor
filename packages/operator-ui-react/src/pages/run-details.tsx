@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { RunDetailsPage } from '@factory-floor/operator-client-ts/run-details';
+import type { CommandDetailsPage } from '@factory-floor/operator-client-ts/command-details';
 import {
   CopyId,
   JsonBlock,
@@ -7,38 +7,39 @@ import {
   StatusBadge,
   Timestamp,
 } from '../components/ui.js';
-
-export interface RunDetailsPanelProps {
-  runId: string;
-  loadDetails: (runId: string) => Promise<RunDetailsPage>;
+export interface CommandDetailsPanelProps {
+  commandId: string;
+  loadDetails: (commandId: string) => Promise<CommandDetailsPage>;
 }
-
-export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
+export function CommandDetailsPanel({
+  commandId,
+  loadDetails,
+}: CommandDetailsPanelProps) {
   const query = useQuery({
-    queryKey: ['operator-run-details', runId],
-    queryFn: () => loadDetails(runId),
+    queryKey: ['operator-command-details', commandId],
+    queryFn: () => loadDetails(commandId),
   });
   const details = query.data;
-
   return (
     <State q={query}>
       {details ? (
-        <section className="panel" aria-labelledby="run-details-heading">
+        <section className="panel" aria-labelledby="command-details-heading">
           <div className="section-heading">
             <div>
-              <h3 id="run-details-heading">Run governance and lineage</h3>
+              <h3 id="command-details-heading">
+                Command governance and lineage
+              </h3>
               <p className="muted">
-                Run-isolated approvals, policy outcomes, resource usage,
+                Command-scoped approvals, policy outcomes, resource usage,
                 artifact derivations, and aggregate control-plane projection
                 freshness.
               </p>
             </div>
             <span className="badge">Bound {details.limits.records}</span>
           </div>
-
           <DetailTable
             title="Approvals"
-            empty="No approvals are associated with this run."
+            empty="No approvals are associated with this command."
             headers={['Approval', 'Action', 'Policy', 'Status', 'Requested']}
             rows={details.approvals.map((approval) => [
               <CopyId key="id" value={approval.id} />,
@@ -52,10 +53,9 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <Timestamp key="requested" value={approval.requestedAt} />,
             ])}
           />
-
           <DetailTable
             title="Resource ledger"
-            empty="No resource usage is associated with this run."
+            empty="No resource usage is associated with this command."
             headers={['Resource', 'Type', 'Quantity', 'Execution', 'Recorded']}
             rows={details.resources.map((resource) => [
               <CopyId key="id" value={resource.id} />,
@@ -67,10 +67,9 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <Timestamp key="recorded" value={resource.createdAt} />,
             ])}
           />
-
           <DetailTable
             title="Policy decisions"
-            empty="No policy decisions are associated with this run."
+            empty="No policy decisions are associated with this command."
             headers={['Decision', 'Policy', 'Outcome', 'Action', 'Recorded']}
             rows={details.policyDecisions.map((decision) => [
               <CopyId key="id" value={decision.id} />,
@@ -84,10 +83,9 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <Timestamp key="recorded" value={decision.createdAt} />,
             ])}
           />
-
           <DetailTable
             title="Artifact derivations"
-            empty="No artifact derivations are associated with this run."
+            empty="No artifact derivations are associated with this command."
             headers={[
               'Derivation',
               'Source artifact',
@@ -103,7 +101,6 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <Timestamp key="recorded" value={derivation.createdAt} />,
             ])}
           />
-
           <DetailTable
             title="Control-plane projection freshness"
             empty="No control-plane projection checkpoints are available."
@@ -117,9 +114,8 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
               <Timestamp key="updated" value={projection.updatedAt} />,
             ])}
           />
-
           <details>
-            <summary>Raw bounded run details</summary>
+            <summary>Raw bounded command details</summary>
             <JsonBlock value={details} />
           </details>
         </section>
@@ -127,7 +123,6 @@ export function RunDetailsPanel({ runId, loadDetails }: RunDetailsPanelProps) {
     </State>
   );
 }
-
 function DetailTable({
   title,
   empty,

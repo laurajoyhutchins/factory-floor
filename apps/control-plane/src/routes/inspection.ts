@@ -3,7 +3,6 @@ import {
   type ObservabilityService,
 } from '@factory-floor/runtime-core';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-
 function pageQuery(request: { query: unknown }) {
   const query = request.query as { cursor?: string; limit?: string | number };
   return {
@@ -11,17 +10,15 @@ function pageQuery(request: { query: unknown }) {
     limit: query.limit === undefined ? undefined : Number(query.limit),
   };
 }
-
 function instantiationScope(request: { query: unknown }) {
-  const query = request.query as { regionId?: string; runId?: string };
-  return {
-    regionId: query.regionId,
-    runId: query.runId,
-  };
+  const query = request.query as { regionId?: string; commandId?: string };
+  return { regionId: query.regionId, runId: query.commandId };
 }
-
 function inspectionError(reply: FastifyReply, error: unknown) {
-  const code = error instanceof Error ? error.message : 'inspection_error';
+  const internalCode =
+    error instanceof Error ? error.message : 'inspection_error';
+  const code =
+    internalCode === 'run_not_found' ? 'command_not_found' : internalCode;
   const statusCode = [
     'invalid_cursor',
     'invalid_limit',
@@ -32,7 +29,7 @@ function inspectionError(reply: FastifyReply, error: unknown) {
     'topology_connection_bound_exceeded',
   ].includes(code)
     ? 400
-    : code === 'run_not_found'
+    : code === 'command_not_found'
       ? 404
       : 500;
   return reply.code(statusCode).send({
@@ -47,7 +44,6 @@ function inspectionError(reply: FastifyReply, error: unknown) {
     },
   });
 }
-
 async function inspect<T>(
   reply: FastifyReply,
   operation: () => Promise<T>,
@@ -58,7 +54,6 @@ async function inspect<T>(
     return inspectionError(reply, error);
   }
 }
-
 export async function registerInspectionRoutes(
   app: FastifyInstance,
   service: ObservabilityService,
@@ -105,7 +100,10 @@ export async function registerInspectionRoutes(
     );
     if (trace === null)
       return reply.code(404).send({
-        error: { code: 'execution_not_found', message: 'Execution not found.' },
+        error: {
+          code: 'execution_not_found',
+          message: 'Execution not found.',
+        },
       });
     return trace;
   });
@@ -152,7 +150,6 @@ export async function registerInspectionRoutes(
       ),
     ),
   );
-
   app.get('/api/v1/inspect/stream', async (request, reply) => {
     const query = request.query as { cursor?: string; limit?: string };
     const lastEventId = request.headers['last-event-id'];
@@ -168,7 +165,6 @@ export async function registerInspectionRoutes(
     } catch (error) {
       return inspectionError(reply, error);
     }
-
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache, no-transform',

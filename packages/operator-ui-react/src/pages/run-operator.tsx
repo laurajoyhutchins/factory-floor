@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   operatorClient,
+  type CommandEventPage,
   type InspectionRecord,
   type Page,
-  type RunEventPage,
 } from '../api/client.js';
 import {
   CopyId,
@@ -19,39 +19,36 @@ const record = (value: unknown): InspectionRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as InspectionRecord)
     : {};
-
 const records = (value: unknown): InspectionRecord[] =>
   Array.isArray(value) ? value.map(record) : [];
-
 function pageItems<T extends InspectionRecord>(query: {
   data?: { pages: Array<Page<T>> };
 }): T[] {
   return query.data?.pages.flatMap((page) => page.items) ?? [];
 }
 
-export function RunStatusPanel({ runId }: { runId: string }) {
+export function CommandStatusPanel({ commandId }: { commandId: string }) {
   const query = useQuery({
-    queryKey: ['operator-run', runId],
-    enabled: runId.length > 0,
-    queryFn: ({ signal }) => operatorClient.run(runId, signal),
+    queryKey: ['operator-command', commandId],
+    enabled: commandId.length > 0,
+    queryFn: ({ signal }) => operatorClient.command(commandId, signal),
   });
-  const run = query.data ?? {};
-
+  const command = query.data ?? {};
   return (
     <State q={query}>
       <section>
         <div className="section-heading">
           <div>
-            <h3>Run status</h3>
+            <h3>Command status</h3>
             <p>
-              <CopyId value={run.runId ?? runId} />{' '}
-              <StatusBadge value={run.status} />
+              <CopyId value={command.commandId ?? commandId} />{' '}
+              <StatusBadge value={command.status} />
             </p>
           </div>
-          <Timestamp value={run.completedAt ?? run.createdAt} />
+          <Timestamp value={command.completedAt ?? command.createdAt} />
         </div>
         <DataTable
-          rows={[run]}
+          rows={[command]}
           cols={[
             'commandType',
             'regionName',
@@ -63,11 +60,11 @@ export function RunStatusPanel({ runId }: { runId: string }) {
           ]}
         />
         <h4>Counts</h4>
-        <JsonBlock value={run.counts} />
-        {run.blockingReason ? (
+        <JsonBlock value={command.counts} />
+        {command.blockingReason ? (
           <>
             <h4>Blocking reason</h4>
-            <JsonBlock value={run.blockingReason} />
+            <JsonBlock value={command.blockingReason} />
           </>
         ) : null}
       </section>
@@ -75,14 +72,13 @@ export function RunStatusPanel({ runId }: { runId: string }) {
   );
 }
 
-export function RunTracePanel({ runId }: { runId: string }) {
+export function CommandTracePanel({ commandId }: { commandId: string }) {
   const query = useQuery({
-    queryKey: ['operator-run-trace', runId],
-    enabled: runId.length > 0,
-    queryFn: ({ signal }) => operatorClient.runTrace(runId, signal),
+    queryKey: ['operator-command-trace', commandId],
+    enabled: commandId.length > 0,
+    queryFn: ({ signal }) => operatorClient.commandTrace(commandId, signal),
   });
   const trace = query.data ?? {};
-
   return (
     <State q={query}>
       <section>
@@ -110,22 +106,22 @@ export function RunTracePanel({ runId }: { runId: string }) {
   );
 }
 
-export function RunTopologyPanel({ runId }: { runId: string }) {
+export function CommandTopologyPanel({ commandId }: { commandId: string }) {
   const query = useQuery({
-    queryKey: ['operator-run-topology', runId],
-    enabled: runId.length > 0,
-    queryFn: ({ signal }) => operatorClient.runTopology(runId, {}, signal),
+    queryKey: ['operator-command-topology', commandId],
+    enabled: commandId.length > 0,
+    queryFn: ({ signal }) =>
+      operatorClient.commandTopology(commandId, {}, signal),
   });
   const topology = query.data ?? {};
-
   return (
     <State q={query}>
       <section>
         <div className="section-heading">
           <div>
-            <h3>Run topology</h3>
+            <h3>Command topology</h3>
             <p className="muted">
-              Immutable execution context with run-filtered runtime records.
+              Immutable execution context with command-scoped runtime records.
             </p>
           </div>
           <JsonBlock value={topology.bounds} />
@@ -170,7 +166,7 @@ export function RunTopologyPanel({ runId }: { runId: string }) {
             'targetPortName',
           ]}
         />
-        <h4>Run deliveries</h4>
+        <h4>Command deliveries</h4>
         <DataTable
           rows={records(topology.deliveries)}
           cols={[
@@ -182,7 +178,7 @@ export function RunTopologyPanel({ runId }: { runId: string }) {
             'createdAt',
           ]}
         />
-        <h4>Run executions</h4>
+        <h4>Command executions</h4>
         <DataTable
           rows={records(topology.executions)}
           cols={[
@@ -203,18 +199,21 @@ export function RunTopologyPanel({ runId }: { runId: string }) {
   );
 }
 
-export function RunAlertsPanel({ runId }: { runId: string }) {
+export function CommandAlertsPanel({ commandId }: { commandId: string }) {
   const query = useInfiniteQuery({
-    queryKey: ['operator-run-alerts', runId],
-    enabled: runId.length > 0,
+    queryKey: ['operator-command-alerts', commandId],
+    enabled: commandId.length > 0,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.runAlerts(runId, { cursor: pageParam, limit: 25 }, signal),
+      operatorClient.commandAlerts(
+        commandId,
+        { cursor: pageParam, limit: 25 },
+        signal,
+      ),
     getNextPageParam: (lastPage: Page<InspectionRecord>) =>
       lastPage.nextCursor ?? undefined,
   });
   const alerts = pageItems(query);
-
   return (
     <State q={query}>
       <section>
@@ -246,25 +245,28 @@ export function RunAlertsPanel({ runId }: { runId: string }) {
   );
 }
 
-export function RunEventsPanel({ runId }: { runId: string }) {
+export function CommandEventsPanel({ commandId }: { commandId: string }) {
   const query = useInfiniteQuery({
-    queryKey: ['operator-run-events', runId],
-    enabled: runId.length > 0,
+    queryKey: ['operator-command-events', commandId],
+    enabled: commandId.length > 0,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.runEvents(runId, { cursor: pageParam, limit: 25 }, signal),
-    getNextPageParam: (lastPage: RunEventPage) =>
+      operatorClient.commandEvents(
+        commandId,
+        { cursor: pageParam, limit: 25 },
+        signal,
+      ),
+    getNextPageParam: (lastPage: CommandEventPage) =>
       lastPage.nextCursor ?? undefined,
   });
   const events = pageItems(query);
   const latest = query.data?.pages.at(-1);
-
   return (
     <State q={query}>
       <section>
         <div className="section-heading">
           <div>
-            <h3>Finite run event stream</h3>
+            <h3>Finite command event stream</h3>
             <p className="muted">
               Ordered, resumable event pages with deduplication identity.
             </p>
@@ -299,14 +301,14 @@ export function RunEventsPanel({ runId }: { runId: string }) {
   );
 }
 
-export function RunArtifactsPanel({ runId }: { runId: string }) {
+export function CommandArtifactsPanel({ commandId }: { commandId: string }) {
   const query = useInfiniteQuery({
-    queryKey: ['operator-run-artifacts', runId],
-    enabled: runId.length > 0,
+    queryKey: ['operator-command-artifacts', commandId],
+    enabled: commandId.length > 0,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      operatorClient.runArtifacts(
-        runId,
+      operatorClient.commandArtifacts(
+        commandId,
         { cursor: pageParam, limit: 25 },
         signal,
       ),
@@ -314,11 +316,10 @@ export function RunArtifactsPanel({ runId }: { runId: string }) {
       lastPage.nextCursor ?? undefined,
   });
   const artifacts = pageItems(query);
-
   return (
     <State q={query}>
       <section>
-        <h3>Run artifacts</h3>
+        <h3>Command artifacts</h3>
         <DataTable
           rows={artifacts}
           cols={[
@@ -353,7 +354,6 @@ export function PendingApprovals() {
       lastPage.nextCursor ?? undefined,
   });
   const approvals = pageItems(query);
-
   return (
     <State q={query}>
       <section>
@@ -387,22 +387,21 @@ export function PendingApprovals() {
   );
 }
 
-export function RunOperatorWorkspace({ runId }: { runId: string }) {
-  if (!runId)
+export function CommandOperatorWorkspace({ commandId }: { commandId: string }) {
+  if (!commandId)
     return (
       <div role="alert" className="panel-state">
-        A run ID is required.
+        A command ID is required.
       </div>
     );
-
   return (
     <>
-      <RunStatusPanel runId={runId} />
-      <RunAlertsPanel runId={runId} />
-      <RunEventsPanel runId={runId} />
-      <RunTopologyPanel runId={runId} />
-      <RunTracePanel runId={runId} />
-      <RunArtifactsPanel runId={runId} />
+      <CommandStatusPanel commandId={commandId} />
+      <CommandAlertsPanel commandId={commandId} />
+      <CommandEventsPanel commandId={commandId} />
+      <CommandTopologyPanel commandId={commandId} />
+      <CommandTracePanel commandId={commandId} />
+      <CommandArtifactsPanel commandId={commandId} />
     </>
   );
 }

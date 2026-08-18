@@ -132,7 +132,7 @@ async function submitAndClaim(
     capabilities: ['durable-result-worker@1'],
   });
   if (!claim.claimed) throw new Error('expected a claimed execution attempt');
-  return { runId: command.commandId, envelope: claim.envelope };
+  return { commandId: command.commandId, envelope: claim.envelope };
 }
 
 function completedResult(envelope: {
@@ -280,11 +280,11 @@ describe('durable worker-result handoff recovery', () => {
       },
       () => new Date(now),
     );
-    const { runId, envelope } = await submitAndClaim(db, workers);
+    const { commandId, envelope } = await submitAndClaim(db, workers);
     const submission = workers.submitResult(completedResult(envelope));
     await handoffPersisted;
 
-    await new OperatorCommandService(db).cancelRun(operator, runId, {
+    await new OperatorCommandService(db).cancelCommand(operator, commandId, {
       clientRequestId: createUuidV7(),
       reason: 'Cancellation must win before authoritative publication.',
     });

@@ -9,7 +9,7 @@ import { registerInspectionRoutes } from '../src/routes/inspection.js';
 import { registerOperatorRoutes } from '../src/routes/operator.js';
 
 const regionId = '019bb22e-58b0-7d87-8000-000000000501';
-const runId = '019bb22e-58b0-7d87-8000-000000000502';
+const commandId = '019bb22e-58b0-7d87-8000-000000000502';
 const instantiationId = '019bb22e-58b0-7d87-8000-000000000503';
 
 describe('template-instantiation inspection routes', () => {
@@ -82,8 +82,8 @@ describe('template-instantiation inspection routes', () => {
     });
   });
 
-  it('exposes run-scoped history through the authenticated operator boundary', async () => {
-    const listRunTemplateInstantiations = vi.fn().mockResolvedValue({
+  it('exposes command-scoped history through the authenticated operator boundary', async () => {
+    const listCommandTemplateInstantiations = vi.fn().mockResolvedValue({
       items: [{ id: instantiationId }],
       nextCursor: null,
     });
@@ -92,13 +92,13 @@ describe('template-instantiation inspection routes', () => {
       app,
       {} as OperatorCommandService,
       {
-        listRunTemplateInstantiations,
+        listCommandTemplateInstantiations,
       } as unknown as OperatorQueryService,
     );
 
     const response = await app.inject({
       method: 'GET',
-      url: `/api/v1/operator/runs/${runId}/instantiations?limit=3`,
+      url: `/api/v1/operator/commands/${commandId}/instantiations?limit=3`,
       headers: {
         'x-factory-floor-principal-id': 'operator-1',
         'x-factory-floor-adapter': 'test',
@@ -110,12 +110,12 @@ describe('template-instantiation inspection routes', () => {
       items: [{ id: instantiationId }],
       nextCursor: null,
     });
-    expect(listRunTemplateInstantiations).toHaveBeenCalledWith(
+    expect(listCommandTemplateInstantiations).toHaveBeenCalledWith(
       {
         principal: { id: 'operator-1', roles: ['operator'] },
         adapter: 'test',
       },
-      runId,
+      commandId,
       { limit: 3 },
     );
   });

@@ -3,7 +3,9 @@
 **Status:** Stable authenticated boundary for trusted operator adapters  
 **Base path:** `/api/v1/operator`
 
-The operator HTTP API exposes the transport-neutral `OperatorCommandService` and `OperatorQueryService` to trusted adapters. Factory Floor remains authoritative for commands, run state, approvals, cancellation, topology, alerts, events, and artifacts. Clients render and route that state; they do not maintain a second runtime.
+The operator HTTP API exposes the transport-neutral `OperatorCommandService` and `OperatorQueryService` to trusted adapters. Factory Floor remains authoritative for commands, deliveries, executions, attempts, approvals, cancellation, topology, alerts, events, and artifacts. Clients render and route that state; they do not maintain a second runtime.
+
+ADR-004 requires commands, events, deliveries, executions, and attempts to keep distinct durable identities. The operator API therefore uses the accepted command ID as its public scope root. Correlation IDs remain internal grouping metadata and are never accepted as an authorization root or public route identity.
 
 The broader Discord Activity architecture is described in [Discord Activity operator interface](../explanation/discord-activity-operator-interface.md).
 
@@ -23,11 +25,11 @@ The operator token authorizes:
 
 Registration, system application, generic command submission, projection rebuild, and other mutation namespaces remain admin-only. A trusted adapter should receive only the operator token unless it separately requires administrative access.
 
-The static operator-token path used by the standalone console remains supported for trusted private deployments. Embedded browser hosts should inject a short-lived host session through their shell rather than compile the operator token into a public bundle.
+The static operator-token path used by the standalone console remains supported for trusted private deployments. Embedded browser hosts use short-lived host sessions rather than compiling the operator token into a public bundle.
 
 ## Required attribution headers
 
-Every operator request must include:
+Every statically authenticated operator request must include:
 
 ```http
 Authorization: Bearer <operator token>
@@ -35,48 +37,57 @@ X-Factory-Floor-Principal-Id: <stable external principal id>
 X-Factory-Floor-Adapter: <stable adapter id>
 ```
 
-The principal and adapter are recorded for operator commands and are required for operator queries so every adapter access remains attributable. The principal value is limited to 200 characters and the adapter value to 100 characters.
+The principal and adapter are recorded for operator commands and required for operator queries so adapter access remains attributable. The principal value is limited to 200 characters and the adapter value to 100 characters.
 
 Missing or invalid attribution returns `400 Bad Request` with a stable error code such as `operator_principal_required` or `operator_adapter_required`.
 
+A valid Discord Activity bearer is a separate read-only authorization path. Factory Floor resolves the server-side Activity session, requires the requested command ID to equal the session's immutable bound command ID, overrides browser-supplied attribution with the session principal and adapter, and rejects a different command with `activity_command_binding_mismatch`.
+
 ## Endpoints
 
-| Method | Path                                                 | Purpose                                           |
-| ------ | ---------------------------------------------------- | ------------------------------------------------- |
-| `GET`  | `/api/v1/operator/status`                            | Factory health and active-work summary            |
-| `POST` | `/api/v1/operator/tasks`                             | Submit a development task                         |
-| `GET`  | `/api/v1/operator/runs/:runId`                       | Read canonical run status                         |
-| `GET`  | `/api/v1/operator/runs/:runId/trace`                 | Read the bounded durable run trace                |
-| `GET`  | `/api/v1/operator/runs/:runId/topology`              | Read topology and runtime relationships for a run |
-| `GET`  | `/api/v1/operator/runs/:runId/alerts`                | Read current durable operational conditions       |
-| `GET`  | `/api/v1/operator/runs/:runId/events`                | Read a finite resumable event page                |
-| `GET`  | `/api/v1/operator/runs/:runId/instantiations`        | List template instantiations attributable to run  |
-| `GET`  | `/api/v1/operator/runs/:runId/artifacts`             | List artifacts produced by the run                |
-| `GET`  | `/api/v1/operator/runs/:runId/artifacts/:artifactId` | Read a run-owned bounded textual artifact         |
-| `GET`  | `/api/v1/operator/approvals`                         | List pending approvals                            |
-| `POST` | `/api/v1/operator/approvals/:approvalId/decision`    | Approve or reject a pending action                |
-| `POST` | `/api/v1/operator/runs/:runId/cancel`                | Cancel only the selected run graph                |
+| Method | Path                                                         | Purpose                                               |
+| ------ | ------------------------------------------------------------ | ----------------------------------------------------- |
+| `GET`  | `/api/v1/operator/status`                                    | Factory health and active-work summary                |
+| `POST` | `/api/v1/operator/tasks`                                     | Submit a development task                             |
+| `GET`  | `/api/v1/operator/commands/:commandId`                       | Read canonical command status                         |
+| `GET`  | `/api/v1/operator/commands/:commandId/details`               | Read bounded governance, resource, and lineage detail |
+| `GET`  | `/api/v1/operator/commands/:commandId/trace`                 | Read the bounded durable command trace                |
+| `GET`  | `/api/v1/operator/commands/:commandId/topology`              | Read topology and runtime relationships               |
+| `GET`  | `/api/v1/operator/commands/:commandId/alerts`                | Read current durable operational conditions           |
+| `GET`  | `/api/v1/operator/commands/:commandId/events`                | Read a finite resumable event page                    |
+| `GET`  | `/api/v1/operator/commands/:commandId/instantiations`        | List template instantiations attributable to command  |
+| `GET`  | `/api/v1/operator/commands/:commandId/artifacts`             | List artifacts attributable to the command            |
+| `GET`  | `/api/v1/operator/commands/:commandId/artifacts/:artifactId` | Read a bounded command-owned textual artifact         |
+| `GET`  | `/api/v1/operator/approvals`                                 | List pending approvals                                |
+| `POST` | `/api/v1/operator/approvals/:approvalId/decision`            | Approve or reject a pending action                    |
+| `POST` | `/api/v1/operator/commands/:commandId/cancel`                | Cancel only the selected command graph                |
 
-List endpoints accept `limit` and opaque `cursor` query parameters. Artifact reads accept `maxBytes`, bounded by the runtime to 1 MiB.
+List endpoints accept `limit` and opaque `cursor` query parameters. Artifact reads accept `maxBytes`, bounded by the runtime to 1 MiB. Command details accept an optional bounded `limit`.
 
-The former unscoped artifact path is intentionally absent. Clients must provide both the run ID and artifact ID so the service can verify ownership without revealing whether an artifact exists in another run.
+The legacy `/api/v1/operator/runs/*` surface is intentionally absent. The former unscoped artifact path is also absent. Clients must provide both command ID and artifact ID so the service can verify ownership without revealing whether an artifact exists outside the selected command scope.
 
-## Run isolation
+## Durable command isolation
 
-A run is identified by its accepted command ID and durable correlation ID. Run-scoped queries first resolve that command and then select runtime records only through its correlation boundary. A response never includes deliveries, executions, events, or artifacts from another correlation.
+The accepted command ID is the public operator identity. Query services may use persisted correlation metadata internally to recover historical records, but that correlation value is not a public identity and cannot grant access.
 
-Topology definitions are included only when their revision was referenced by a delivery or execution in the selected run. The response can include all component instances and connections in those referenced revisions because those definitions are the immutable execution context for the run. Runtime delivery and execution records remain strictly run-filtered.
+A command-scoped response is assembled only from records attributable to that command. The public model preserves the real runtime distinctions:
 
-A cross-run artifact lookup returns `artifact_not_found`. This deliberately does not distinguish a missing artifact from an artifact owned by a different run.
+`command → delivery → execution → attempt`
 
-## Run topology
+Executions and attempts keep their own durable IDs. A command ID is not rewritten into a synthetic execution/run identity, and a correlation ID is never treated as an execution ID or authorization token.
 
-`GET /api/v1/operator/runs/:runId/topology` returns:
+Topology definitions may be included when their revision was referenced by a delivery or execution attributable to the selected command. Those definitions are immutable execution context. Runtime delivery and execution records remain command-filtered.
 
-- the selected run summary;
-- regions and immutable topology revisions used by the run;
+A cross-command artifact lookup returns `artifact_not_found`. This deliberately does not distinguish a missing artifact from an artifact attributable to a different command.
+
+## Command topology
+
+`GET /api/v1/operator/commands/:commandId/topology` returns:
+
+- the selected command summary;
+- regions and immutable topology revisions used by attributable work;
 - component instances, definitions, ports, and connections from those revisions;
-- run-filtered deliveries and executions;
+- command-attributed deliveries and executions;
 - explicit connection, delivery-target, execution-delivery, and execution-component relationships;
 - the effective response bounds.
 
@@ -89,11 +100,17 @@ Supported bounds are:
 | `connectionLimit` |     500 |   2,000 |
 | `recordLimit`     |     500 |   2,000 |
 
-A bound violation returns a stable validation code such as `topology_component_bound_exceeded`. Clients should narrow the selected run or request a larger documented bound rather than retry indefinitely.
+A bound violation returns a stable validation code such as `topology_component_bound_exceeded`. Clients should narrow the selected command or request a larger documented bound rather than retry indefinitely.
+
+## Command details
+
+`GET /api/v1/operator/commands/:commandId/details` returns a bounded command-scoped view of approvals, policy decisions, resource-ledger entries, artifact derivations, and control-plane projection freshness. The payload is identified by `commandId`, not `runId`.
+
+Projection freshness is explicitly control-plane-global. It is operational context, not evidence that unrelated runtime records belong to the selected command.
 
 ## Alert projection
 
-`GET /api/v1/operator/runs/:runId/alerts` derives a current projection from canonical durable records. It does not create a second alert store. Stable alert kinds are:
+`GET /api/v1/operator/commands/:commandId/alerts` derives a current projection from canonical durable records. It does not create a second alert store. Stable alert kinds include:
 
 - `approval_required`;
 - `blocked_work`;
@@ -103,15 +120,15 @@ A bound violation returns a stable validation code such as `topology_component_b
 - `projection_stale`;
 - `execution_failed`.
 
-Alert IDs are deterministic from their durable source. Ordering is deterministic by severity, kind, and ID. An alert disappears when its canonical condition clears—for example, when a blocked region resumes or a pending approval is decided.
+Alert IDs are deterministic from their durable source. Ordering is deterministic by severity, kind, and ID. An alert disappears when its canonical condition clears.
 
-Budget pressure is reported when a run-attributed resource-ledger row contains a positive integer `budgetLimit` or `budget_limit` attribute and usage reaches at least 80 percent. Projection staleness uses the durable global projection checkpoint and a 60-second freshness window; the alert reveals only projection identity and age, not another run's records.
+Projection staleness may use a durable global projection checkpoint, but the alert reveals only projection identity and age, not another command's runtime records.
 
 Alert cursors identify an item in the current projection. If that source condition clears before the next page, the cursor returns `cursor_expired`; restart pagination from the beginning.
 
-## Finite run events
+## Finite command events
 
-`GET /api/v1/operator/runs/:runId/events` returns a bounded JSON page rather than holding an HTTP connection open:
+`GET /api/v1/operator/commands/:commandId/events` returns a bounded JSON page rather than holding an HTTP connection open:
 
 ```json
 {
@@ -124,17 +141,17 @@ Alert cursors identify an item in the current projection. If that source conditi
 
 Semantics:
 
-- events are ordered by immutable UUIDv7 event ID;
-- `limit` defaults to 25 and is bounded to 100;
+- events are ordered by immutable event ID;
+- `limit` defaults to 25 and is bounded;
 - `nextCursor` is present only when another page was already available;
 - `resumeCursor` identifies the last delivered event even after the client catches up;
-- `complete: true` means the response reached the end visible to that request, not that the run itself is terminal;
+- `complete: true` means the response reached the end visible to that request, not that the command itself is terminal;
 - poll using `resumeCursor` to receive later events;
 - deduplicate by event `id` across retries or reconnects.
 
-Cursors are opaque, versioned, endpoint-specific, and bound to the run ID. A cursor from another run returns `cursor_run_mismatch`. Malformed data returns `invalid_cursor`. If the cursor anchor is no longer retained, the service returns `cursor_expired`; restart from the beginning or re-read canonical run status before deciding how much history to replay.
+Cursors are opaque, versioned, endpoint-specific, and bound to the command scope. Malformed data returns `invalid_cursor`. If the cursor anchor is no longer retained, the service returns `cursor_expired`; restart from the beginning or re-read canonical command status before deciding how much history to replay.
 
-Runtime events are currently append-only and Factory Floor does not automatically prune them. The explicit expired-cursor behavior is retained so a future configured retention policy can remove old events without changing the client contract.
+Runtime events are currently append-only and Factory Floor does not automatically prune them. Explicit expired-cursor behavior preserves a stable client contract if retention is configured later.
 
 ## Task submission
 
@@ -160,7 +177,7 @@ Runtime events are currently append-only and Factory Floor does not automaticall
 }
 ```
 
-The returned `runId` is the durable identity the adapter must persist. Reusing the same principal and `clientRequestId` replays the original submission instead of creating duplicate work.
+The returned `commandId` is the durable operator identity the adapter must persist. Reusing the same principal and `clientRequestId` replays the original submission instead of creating duplicate work.
 
 Factory Floor deliberately refuses merge authority at this boundary. A later explicit user action may merge through a separately authorized workflow.
 
@@ -185,7 +202,7 @@ Equivalent retries are idempotent. A reused request ID with different content, a
 }
 ```
 
-Cancellation is scoped to the selected run correlation. It does not cancel unrelated work in the same region, and stale worker results are fenced after cancellation.
+Cancellation is requested through `POST /api/v1/operator/commands/:commandId/cancel`. It is scoped to work attributable to the selected command and does not cancel unrelated work. The public command service exposes `cancelCommand`; any internal legacy `cancelRun` adapter is persistence compatibility only and is not part of the operator API.
 
 ## Request validation
 
@@ -210,8 +227,8 @@ Domain validation remains in the operator services and may return more specific 
 | ----------- | ----------------------------------------------------------- |
 | `400`       | Malformed input, invalid/expired cursor, or bound violation |
 | `401`       | Bearer token missing                                        |
-| `403`       | Token or operator authorization denied                      |
-| `404`       | Run, run-owned artifact, or approval not found              |
+| `403`       | Token, Activity binding, or operator authorization denied   |
+| `404`       | Command, command-owned artifact, or approval not found      |
 | `409`       | Idempotency or durable-state conflict                       |
 | `422`       | Development task rejected by command policy                 |
 | `500`       | Unexpected internal error                                   |
@@ -222,11 +239,11 @@ Unexpected errors are logged server-side and returned only as `internal_error`; 
 
 An adapter should persist only the binding needed to recover its presentation after restart:
 
-- Factory Floor run ID;
+- Factory Floor command ID;
 - installation or project identity;
 - external channel, thread, message, or interaction identifiers;
 - initiating principal ID;
 - last event `resumeCursor`;
 - last rendered state and last successful refresh time.
 
-Factory Floor remains the source of truth. After restart, re-read canonical run status and alerts rather than inferring completion from adapter-local state.
+Factory Floor remains the source of truth. After restart, re-read canonical command status and alerts rather than inferring completion from adapter-local state.

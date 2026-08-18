@@ -20,7 +20,7 @@ const admin = new pg.Pool({
   connectionString: base,
   connectionTimeoutMillis: 10_000,
 });
-const databaseName = `ff_run_details_${randomUUID().replaceAll('-', '')}`;
+const databaseName = `ff_command_details_${randomUUID().replaceAll('-', '')}`;
 const testUrl = base.replace(/\/[^/?]+(\?|$)/, `/${databaseName}$1`);
 const operator = {
   principal: { id: 'operator-test', roles: ['operator'] },
@@ -116,20 +116,22 @@ function task(objective: string) {
     clientRequestId: createUuidV7(),
     repository: 'laurajoyhutchins/factory-floor',
     objective,
-    acceptanceCriteria: ['Run details remain isolated by correlation.'],
+    acceptanceCriteria: [
+      'Command details remain isolated by durable identity.',
+    ],
   };
 }
 
-type ClaimedRun = {
-  runId: string;
+type ClaimedCommand = {
+  commandId: string;
   executionId: string;
   attemptId: string;
   deliveryId: string;
 };
 
-async function seedRunDetails(
+async function seedCommandDetails(
   db: ReturnType<typeof createDatabase>,
-  run: ClaimedRun,
+  command: ClaimedCommand,
   schemaId: string,
   regionId: string,
   capabilityGrantId: string,
@@ -141,7 +143,7 @@ async function seedRunDetails(
   const derivationId = createUuidV7();
   const resourceId = createUuidV7();
   const policyName = `approval-policy-${ordinal}`;
-  const policyReason = `Approval required for run ${ordinal}.`;
+  const policyReason = `Approval required for command ${ordinal}.`;
 
   await db
     .insertInto('policies')
@@ -189,7 +191,7 @@ async function seedRunDetails(
         state: 'committed',
         media_type: 'application/json',
         committed_locator: `memory://source-${ordinal}`,
-        provenance: { runId: run.runId, role: 'source' },
+        provenance: { commandId: command.commandId, role: 'source' },
         tombstoned_at: null,
       },
       {
@@ -201,7 +203,7 @@ async function seedRunDetails(
         state: 'committed',
         media_type: 'application/json',
         committed_locator: `memory://result-${ordinal}`,
-        provenance: { runId: run.runId, role: 'result' },
+        provenance: { commandId: command.commandId, role: 'result' },
         tombstoned_at: null,
       },
     ])
@@ -209,9 +211,9 @@ async function seedRunDetails(
   const executionInput = await db
     .selectFrom('execution_inputs')
     .select('id')
-    .where('execution_id', '=', run.executionId)
+    .where('execution_id', '=', command.executionId)
     .where('port_name', '=', 'objective')
-    .where('delivery_id', '=', run.deliveryId)
+    .where('delivery_id', '=', command.deliveryId)
     .executeTakeFirst();
   if (!executionInput) throw new Error('expected claimed execution input');
   await db
@@ -223,8 +225,8 @@ async function seedRunDetails(
     .insertInto('execution_outputs')
     .values({
       id: createUuidV7(),
-      execution_id: run.executionId,
-      attempt_id: run.attemptId,
+      execution_id: command.executionId,
+      attempt_id: command.attemptId,
       port_name: 'result',
       artifact_id: resultArtifactId,
       published_event_id: null,
@@ -236,8 +238,8 @@ async function seedRunDetails(
       id: derivationId,
       artifact_id: resultArtifactId,
       source_artifact_id: sourceArtifactId,
-      execution_id: run.executionId,
-      attempt_id: run.attemptId,
+      execution_id: command.executionId,
+      attempt_id: command.attemptId,
       derivation_type: 'test-transform',
     })
     .execute();
@@ -245,8 +247,8 @@ async function seedRunDetails(
     .insertInto('external_actions')
     .values({
       id: actionId,
-      execution_id: run.executionId,
-      attempt_id: run.attemptId,
+      execution_id: command.executionId,
+      attempt_id: command.attemptId,
       proposal_id: createUuidV7(),
       capability_grant_id: capabilityGrantId,
       outbound_request_artifact_id: resultArtifactId,
@@ -255,7 +257,7 @@ async function seedRunDetails(
       action_type: `test.action.${ordinal}`,
       risk: 'medium',
       status: 'awaiting_approval',
-      idempotency_key: `run-details-${ordinal}`,
+      idempotency_key: `command-details-${ordinal}`,
     })
     .execute();
   await db
@@ -263,8 +265,8 @@ async function seedRunDetails(
     .values({
       id: resourceId,
       region_id: regionId,
-      execution_id: run.executionId,
-      attempt_id: run.attemptId,
+      execution_id: command.executionId,
+      attempt_id: command.attemptId,
       external_action_id: actionId,
       resource_type: 'tokens',
       quantity: String(ordinal * 10),
@@ -284,7 +286,7 @@ async function seedRunDetails(
   };
 }
 
-describe('run details query service', () => {
+describe('command details query service', () => {
   const db = createDatabase(testUrl);
   const commands = new OperatorCommandService(db);
   const queries = new OperatorQueryService(db);
@@ -310,7 +312,7 @@ describe('run details query service', () => {
     await admin.end();
   });
 
-  it('returns bounded details for one run without leaking a concurrent run', async () => {
+  it('returns bounded details for one command without leaking a concurrent command', async () => {
     const { schemaId, definitionId, regionId } = await seedRuntime(db);
     const capabilityId = createUuidV7();
     const capabilityGrantId = createUuidV7();
@@ -340,7 +342,7 @@ describe('run details query service', () => {
 
     const firstReceipt = await commands.submitDevelopmentTask(
       operator,
-      task('First isolated run'),
+      task('First isolated command'),
     );
     const firstClaim = await workers.claim({
       workerId: 'worker-a',
@@ -349,8 +351,8 @@ describe('run details query service', () => {
     if (!firstClaim.claimed) throw new Error('expected first claim');
     const firstDeliveryId = firstClaim.envelope.inputs[0]?.deliveryId;
     if (!firstDeliveryId) throw new Error('expected first delivery');
-    const firstRun = {
-      runId: firstReceipt.runId,
+    const firstCommand = {
+      commandId: firstReceipt.commandId,
       executionId: firstClaim.envelope.executionId,
       attemptId: firstClaim.envelope.attemptId,
       deliveryId: firstDeliveryId,
@@ -358,7 +360,7 @@ describe('run details query service', () => {
 
     const secondReceipt = await commands.submitDevelopmentTask(
       operator,
-      task('Second isolated run'),
+      task('Second isolated command'),
     );
     const secondClaim = await workers.claim({
       workerId: 'worker-b',
@@ -367,24 +369,24 @@ describe('run details query service', () => {
     if (!secondClaim.claimed) throw new Error('expected second claim');
     const secondDeliveryId = secondClaim.envelope.inputs[0]?.deliveryId;
     if (!secondDeliveryId) throw new Error('expected second delivery');
-    const secondRun = {
-      runId: secondReceipt.runId,
+    const secondCommand = {
+      commandId: secondReceipt.commandId,
       executionId: secondClaim.envelope.executionId,
       attemptId: secondClaim.envelope.attemptId,
       deliveryId: secondDeliveryId,
     };
 
-    const first = await seedRunDetails(
+    const first = await seedCommandDetails(
       db,
-      firstRun,
+      firstCommand,
       schemaId,
       regionId,
       capabilityGrantId,
       1,
     );
-    const second = await seedRunDetails(
+    const second = await seedCommandDetails(
       db,
-      secondRun,
+      secondCommand,
       schemaId,
       regionId,
       capabilityGrantId,
@@ -402,9 +404,12 @@ describe('run details query service', () => {
       })
       .execute();
 
-    const details = await queries.getRunDetails(operator, firstRun.runId);
+    const details = await queries.getCommandDetails(
+      operator,
+      firstCommand.commandId,
+    );
 
-    expect(details.runId).toBe(firstRun.runId);
+    expect(details.commandId).toBe(firstCommand.commandId);
     expect(details.approvals.map((item) => item.id)).toEqual([
       first.approvalId,
     ]);
@@ -438,6 +443,6 @@ describe('run details query service', () => {
     expect(JSON.stringify(details)).not.toContain(second.policyDecisionId);
     expect(JSON.stringify(details)).not.toContain(second.resourceId);
     expect(JSON.stringify(details)).not.toContain(second.derivationId);
-    expect(JSON.stringify(details)).not.toContain(secondRun.runId);
+    expect(JSON.stringify(details)).not.toContain(secondCommand.commandId);
   });
 });

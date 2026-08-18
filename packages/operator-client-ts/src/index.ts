@@ -20,9 +20,9 @@ export type Page<T> = { items: T[]; nextCursor: string | null };
 export type PageOptions = { cursor?: string | null; limit?: number };
 export type TemplateInstantiationScope = {
   regionId?: string;
-  runId?: string;
+  commandId?: string;
 };
-export type RunEventPage<T extends InspectionRecord = InspectionRecord> =
+export type CommandEventPage<T extends InspectionRecord = InspectionRecord> =
   Page<T> & {
     resumeCursor: string | null;
     complete: boolean;
@@ -44,7 +44,7 @@ export type ApprovalDecisionRequest = {
   decision: 'approve' | 'reject';
   reason: string;
 };
-export type RunCancellationRequest = {
+export type CommandCancellationRequest = {
   clientRequestId: string;
   reason: string;
 };
@@ -151,7 +151,7 @@ function assertPage(value: unknown): Page<InspectionRecord> {
   };
 }
 
-function assertRunEventPage(value: unknown): RunEventPage {
+function assertCommandEventPage(value: unknown): CommandEventPage {
   const page = assertPage(value);
   const record = value as InspectionRecord;
   if (
@@ -161,7 +161,7 @@ function assertRunEventPage(value: unknown): RunEventPage {
   )
     throw new OperatorClientError(
       'malformed-response',
-      'Expected a finite run event response.',
+      'Expected a finite command event response.',
     );
   return {
     ...page,
@@ -278,35 +278,38 @@ export interface OperatorClient {
     request: DevelopmentTaskRequest,
     signal?: AbortSignal,
   ): Promise<InspectionRecord>;
-  run(runId: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  runTrace(runId: string, signal?: AbortSignal): Promise<InspectionRecord>;
-  runTopology(
-    runId: string,
+  command(commandId: string, signal?: AbortSignal): Promise<InspectionRecord>;
+  commandTrace(
+    commandId: string,
+    signal?: AbortSignal,
+  ): Promise<InspectionRecord>;
+  commandTopology(
+    commandId: string,
     options?: Record<string, number | undefined>,
     signal?: AbortSignal,
   ): Promise<InspectionRecord>;
-  runAlerts(
-    runId: string,
+  commandAlerts(
+    commandId: string,
     options?: PageOptions,
     signal?: AbortSignal,
   ): Promise<Page<InspectionRecord>>;
-  runEvents(
-    runId: string,
+  commandEvents(
+    commandId: string,
     options?: PageOptions,
     signal?: AbortSignal,
-  ): Promise<RunEventPage>;
-  runInstantiations(
-    runId: string,
-    options?: PageOptions,
-    signal?: AbortSignal,
-  ): Promise<Page<InspectionRecord>>;
-  runArtifacts(
-    runId: string,
+  ): Promise<CommandEventPage>;
+  commandInstantiations(
+    commandId: string,
     options?: PageOptions,
     signal?: AbortSignal,
   ): Promise<Page<InspectionRecord>>;
-  runArtifact(
-    runId: string,
+  commandArtifacts(
+    commandId: string,
+    options?: PageOptions,
+    signal?: AbortSignal,
+  ): Promise<Page<InspectionRecord>>;
+  commandArtifact(
+    commandId: string,
     artifactId: string,
     maxBytes?: number,
     signal?: AbortSignal,
@@ -320,9 +323,9 @@ export interface OperatorClient {
     request: ApprovalDecisionRequest,
     signal?: AbortSignal,
   ): Promise<InspectionRecord>;
-  cancelRun(
-    runId: string,
-    request: RunCancellationRequest,
+  cancelCommand(
+    commandId: string,
+    request: CommandCancellationRequest,
     signal?: AbortSignal,
   ): Promise<InspectionRecord>;
 }
@@ -530,7 +533,7 @@ export function createOperatorClient(
         'http://factory-floor.local',
       );
       if (scope.regionId) url.searchParams.set('regionId', scope.regionId);
-      if (scope.runId) url.searchParams.set('runId', scope.runId);
+      if (scope.commandId) url.searchParams.set('commandId', scope.commandId);
       return assertPage(
         await requestJson(
           'GET',
@@ -551,64 +554,64 @@ export function createOperatorClient(
       getRecord(`${operatorPath}/status`, 'operator status', signal),
     submitTask: (request, signal) =>
       postRecord(`${operatorPath}/tasks`, request, signal),
-    run: (runId, signal) =>
+    command: (commandId, signal) =>
       getRecord(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}`,
-        'run status',
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}`,
+        'command status',
         signal,
       ),
-    runTrace: (runId, signal) =>
+    commandTrace: (commandId, signal) =>
       getRecord(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}/trace`,
-        'run trace',
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/trace`,
+        'command trace',
         signal,
       ),
-    runTopology: (runId, options = {}, signal) =>
+    commandTopology: (commandId, options = {}, signal) =>
       getRecord(
         withQuery(
-          `${operatorPath}/runs/${encodeURIComponent(runId)}/topology`,
+          `${operatorPath}/commands/${encodeURIComponent(commandId)}/topology`,
           options,
         ),
-        'run topology',
+        'command topology',
         signal,
       ),
-    runAlerts: (runId, options, signal) =>
+    commandAlerts: (commandId, options, signal) =>
       getPage(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}/alerts`,
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/alerts`,
         options,
         signal,
       ),
-    runEvents: async (runId, options, signal) =>
-      assertRunEventPage(
+    commandEvents: async (commandId, options, signal) =>
+      assertCommandEventPage(
         await requestJson(
           'GET',
           pagePath(
-            `${operatorPath}/runs/${encodeURIComponent(runId)}/events`,
+            `${operatorPath}/commands/${encodeURIComponent(commandId)}/events`,
             options,
           ),
           undefined,
           signal,
         ),
       ),
-    runInstantiations: (runId, options, signal) =>
+    commandInstantiations: (commandId, options, signal) =>
       getPage(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}/instantiations`,
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/instantiations`,
         options,
         signal,
       ),
-    runArtifacts: (runId, options, signal) =>
+    commandArtifacts: (commandId, options, signal) =>
       getPage(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts`,
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/artifacts`,
         options,
         signal,
       ),
-    runArtifact: (runId, artifactId, maxBytes, signal) =>
+    commandArtifact: (commandId, artifactId, maxBytes, signal) =>
       getRecord(
         withQuery(
-          `${operatorPath}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`,
+          `${operatorPath}/commands/${encodeURIComponent(commandId)}/artifacts/${encodeURIComponent(artifactId)}`,
           { maxBytes },
         ),
-        'a run artifact',
+        'a command artifact',
         signal,
       ),
     pendingApprovals: (options, signal) =>
@@ -619,9 +622,9 @@ export function createOperatorClient(
         request,
         signal,
       ),
-    cancelRun: (runId, request, signal) =>
+    cancelCommand: (commandId, request, signal) =>
       postRecord(
-        `${operatorPath}/runs/${encodeURIComponent(runId)}/cancel`,
+        `${operatorPath}/commands/${encodeURIComponent(commandId)}/cancel`,
         request,
         signal,
       ),
@@ -668,17 +671,18 @@ export const operatorClient: OperatorClient = {
   },
   operatorStatus: (...args) => currentClient().operatorStatus(...args),
   submitTask: (...args) => currentClient().submitTask(...args),
-  run: (...args) => currentClient().run(...args),
-  runTrace: (...args) => currentClient().runTrace(...args),
-  runTopology: (...args) => currentClient().runTopology(...args),
-  runAlerts: (...args) => currentClient().runAlerts(...args),
-  runEvents: (...args) => currentClient().runEvents(...args),
-  runInstantiations: (...args) => currentClient().runInstantiations(...args),
-  runArtifacts: (...args) => currentClient().runArtifacts(...args),
-  runArtifact: (...args) => currentClient().runArtifact(...args),
+  command: (...args) => currentClient().command(...args),
+  commandTrace: (...args) => currentClient().commandTrace(...args),
+  commandTopology: (...args) => currentClient().commandTopology(...args),
+  commandAlerts: (...args) => currentClient().commandAlerts(...args),
+  commandEvents: (...args) => currentClient().commandEvents(...args),
+  commandInstantiations: (...args) =>
+    currentClient().commandInstantiations(...args),
+  commandArtifacts: (...args) => currentClient().commandArtifacts(...args),
+  commandArtifact: (...args) => currentClient().commandArtifact(...args),
   pendingApprovals: (...args) => currentClient().pendingApprovals(...args),
   decideApproval: (...args) => currentClient().decideApproval(...args),
-  cancelRun: (...args) => currentClient().cancelRun(...args),
+  cancelCommand: (...args) => currentClient().cancelCommand(...args),
 };
 
 export const consoleApi = operatorClient;
@@ -699,15 +703,15 @@ export async function* paginate<T>(
   } while (cursor !== null);
 }
 
-export async function* iterateRunEvents(
+export async function* iterateCommandEvents(
   client: OperatorClient,
-  runId: string,
+  commandId: string,
   options: PageOptions = {},
 ): AsyncGenerator<InspectionRecord, string | null, void> {
   let cursor = options.cursor ?? null;
   const seen = new Set<string>();
   while (true) {
-    const page = await client.runEvents(runId, { ...options, cursor });
+    const page = await client.commandEvents(commandId, { ...options, cursor });
     for (const event of page.items) {
       const id = typeof event.id === 'string' ? event.id : undefined;
       if (id && seen.has(id)) continue;

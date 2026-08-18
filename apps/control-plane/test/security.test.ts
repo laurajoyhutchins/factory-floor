@@ -51,11 +51,10 @@ describe('control-plane HTTP security', () => {
         headers: { authorization: 'Bearer admin-secret' },
       }),
     ).resolves.toMatchObject({ statusCode: 200 });
-
     await app.close();
   });
 
-  it('accepts Activity sessions only for immutable bound-run reads and overrides browser assertions', async () => {
+  it('accepts Activity sessions only for immutable bound-command reads and overrides browser assertions', async () => {
     const app = Fastify();
     const resolveSession = vi.fn(async () => ({
       sessionId: 'session-1',
@@ -68,7 +67,7 @@ describe('control-plane HTTP security', () => {
       threadId: null,
       principalId: 'discord:user-1',
       adapter: 'discord-agent',
-      boundRunId: 'run-1',
+      boundCommandId: 'command-1',
       expiresAt: new Date(Date.now() + 60_000),
       idleExpiresAt: new Date(Date.now() + 30_000),
     }));
@@ -77,16 +76,18 @@ describe('control-plane HTTP security', () => {
       { operatorToken: 'operator-secret', adminToken: 'admin-secret' },
       { resolveSession },
     );
-    app.get('/api/v1/operator/runs/:runId', async (request) => ({
+    app.get('/api/v1/operator/commands/:commandId', async (request) => ({
       principal: request.headers['x-factory-floor-principal-id'],
       adapter: request.headers['x-factory-floor-adapter'],
     }));
-    app.post('/api/v1/operator/runs/:runId/cancel', async () => ({ ok: true }));
+    app.post('/api/v1/operator/commands/:commandId/cancel', async () => ({
+      ok: true,
+    }));
     app.get('/api/v1/inspect/events', async () => ({ items: [] }));
 
     const allowed = await app.inject({
       method: 'GET',
-      url: '/api/v1/operator/runs/run-1',
+      url: '/api/v1/operator/commands/command-1',
       headers: {
         authorization: 'Bearer activity-session-token',
         'x-factory-floor-principal-id': 'attacker',
@@ -103,14 +104,14 @@ describe('control-plane HTTP security', () => {
     await expect(
       app.inject({
         method: 'GET',
-        url: '/api/v1/operator/runs/run-2',
+        url: '/api/v1/operator/commands/command-2',
         headers: { authorization: 'Bearer activity-session-token' },
       }),
     ).resolves.toMatchObject({ statusCode: 403 });
     await expect(
       app.inject({
         method: 'POST',
-        url: '/api/v1/operator/runs/run-1/cancel',
+        url: '/api/v1/operator/commands/command-1/cancel',
         headers: { authorization: 'Bearer activity-session-token' },
       }),
     ).resolves.toMatchObject({ statusCode: 403 });
@@ -135,14 +136,12 @@ describe('control-plane HTTP security', () => {
     app.get('/api/v1/discord/activity/session', async () => ({
       session: true,
     }));
-
     await expect(
       app.inject({ method: 'POST', url: '/worker/v1/claim' }),
     ).resolves.toMatchObject({ statusCode: 200 });
     await expect(
       app.inject({ method: 'GET', url: '/api/v1/discord/activity/session' }),
     ).resolves.toMatchObject({ statusCode: 200 });
-
     await app.close();
   });
 
@@ -161,9 +160,6 @@ describe('control-plane HTTP security', () => {
         CONTROL_PLANE_OPERATOR_TOKEN: 'operator-secret',
         CONTROL_PLANE_ADMIN_TOKEN: 'admin-secret',
       }),
-    ).toEqual({
-      operatorToken: 'operator-secret',
-      adminToken: 'admin-secret',
-    });
+    ).toEqual({ operatorToken: 'operator-secret', adminToken: 'admin-secret' });
   });
 });

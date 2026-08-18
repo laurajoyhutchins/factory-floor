@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 const fixture = JSON.parse(
   readFileSync('.factory-floor/browser-smoke/fixture.json', 'utf8'),
 ) as {
-  runId: string;
+  commandId: string;
   baseUrl: string;
 };
 
@@ -196,52 +196,54 @@ test.describe('production operator console', () => {
     expect(errors).toEqual([]);
   });
 
-  test('renders authenticated run, lineage, pagination, and canonical states', async ({
+  test('renders authenticated command, lineage, pagination, and canonical states', async ({
     page,
   }) => {
     const errors = browserErrors(page);
-    let releaseRunStatus: () => void = () => {};
-    const runStatusGate = new Promise<void>((resolve) => {
-      releaseRunStatus = resolve;
+    let releaseCommandStatus: () => void = () => {};
+    const commandStatusGate = new Promise<void>((resolve) => {
+      releaseCommandStatus = resolve;
     });
-    const runStatusPath = new RegExp(`/api/v1/operator/runs/${fixture.runId}$`);
+    const commandStatusPath = new RegExp(
+      `/api/v1/operator/commands/${fixture.commandId}$`,
+    );
     await page.route(
-      runStatusPath,
+      commandStatusPath,
       async (route) => {
-        await runStatusGate;
+        await commandStatusGate;
         await route.continue();
       },
       { times: 1 },
     );
 
-    await page.goto(`/runs/${fixture.runId}`);
+    await page.goto(`/commands/${fixture.commandId}`);
     await expect(page.getByText('Loading…').first()).toBeVisible();
-    releaseRunStatus();
+    releaseCommandStatus();
 
     await expect(
-      page.getByRole('heading', { name: 'Run status' }),
+      page.getByRole('heading', { name: 'Command status' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Run topology' }),
+      page.getByRole('heading', { name: 'Command topology' }),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Bounded durable trace' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Run artifacts' }),
+      page.getByRole('heading', { name: 'Command artifacts' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Finite run event stream' }),
+      page.getByRole('heading', { name: 'Finite command event stream' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Run governance and lineage' }),
+      page.getByRole('heading', { name: 'Command governance and lineage' }),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Artifact derivations' }),
     ).toBeVisible();
 
     const finiteEvents = page
-      .getByRole('heading', { name: 'Finite run event stream' })
+      .getByRole('heading', { name: 'Finite command event stream' })
       .locator('xpath=ancestor::section[1]');
     const before = await finiteEvents.locator('tbody tr').count();
     const loadMore = finiteEvents.getByRole('button', { name: /load more/i });
@@ -270,14 +272,14 @@ test.describe('production operator console', () => {
     expect(unauthorized).toEqual({ status: 401 });
 
     const detailsPath = new RegExp(
-      `/api/v1/operator/runs/${fixture.runId}/details(?:\\?.*)?$`,
+      `/api/v1/operator/commands/${fixture.commandId}/details(?:\\?.*)?$`,
     );
     await page.route(detailsPath, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          runId: fixture.runId,
+          commandId: fixture.commandId,
           limits: { records: 25 },
           approvals: [],
           policyDecisions: [],
@@ -294,11 +296,13 @@ test.describe('production operator console', () => {
     });
     await page.reload();
     await expect(
-      page.getByText('No artifact derivations are associated with this run.'),
+      page.getByText(
+        'No artifact derivations are associated with this command.',
+      ),
     ).toBeVisible();
     await page.unroute(detailsPath);
 
-    await page.goto('/runs/00000000-0000-7000-8000-000000000000');
+    await page.goto('/commands/00000000-0000-7000-8000-000000000000');
     await expect(
       page.getByText('The selected record was not found.').first(),
     ).toBeVisible();

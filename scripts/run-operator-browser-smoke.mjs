@@ -172,7 +172,7 @@ function assertNoPrivilegedCredentialsInBundle() {
   }
 }
 
-async function latestRunCandidates(demoOutput) {
+async function latestCommandCandidates(demoOutput) {
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -197,7 +197,7 @@ async function latestRunCandidates(demoOutput) {
   }
 }
 
-async function selectRunId(controlPlaneUrl, candidates) {
+async function selectCommandId(controlPlaneUrl, candidates) {
   const headers = {
     accept: 'application/json',
     authorization: `Bearer ${operatorToken}`,
@@ -206,17 +206,17 @@ async function selectRunId(controlPlaneUrl, candidates) {
   };
   for (const candidate of candidates) {
     const response = await globalThis.fetch(
-      `${controlPlaneUrl}/api/v1/operator/runs/${encodeURIComponent(candidate)}`,
+      `${controlPlaneUrl}/api/v1/operator/commands/${encodeURIComponent(candidate)}`,
       { headers },
     );
     if (response.ok) return candidate;
     if (response.status !== 404) {
       throw new Error(
-        `run probe ${candidate} returned unexpected HTTP ${response.status}`,
+        `command probe ${candidate} returned unexpected HTTP ${response.status}`,
       );
     }
   }
-  throw new Error('unable to identify the seeded durable run');
+  throw new Error('unable to identify the seeded durable command');
 }
 
 await rm(evidenceDirectory, { recursive: true, force: true });
@@ -274,9 +274,9 @@ try {
   );
   await waitForHttp(`${controlPlaneUrl}/health`);
 
-  const runId = await selectRunId(
+  const commandId = await selectCommandId(
     controlPlaneUrl,
-    await latestRunCandidates(demoOutput),
+    await latestCommandCandidates(demoOutput),
   );
 
   const preview = spawnTracked(
@@ -307,7 +307,7 @@ try {
     join(evidenceDirectory, 'fixture.json'),
     `${JSON.stringify(
       {
-        runId,
+        commandId,
         baseUrl: consoleUrl,
         controlPlaneUrl,
         viewports: ['chromium-desktop', 'chromium-mobile'],

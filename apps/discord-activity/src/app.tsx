@@ -3,10 +3,10 @@ import {
   configureDefaultOperatorClient,
   createOperatorClient,
 } from '@factory-floor/operator-client-ts';
-import { createRunDetailsClient } from '@factory-floor/operator-client-ts/run-details';
+import { createCommandDetailsClient } from '@factory-floor/operator-client-ts/command-details';
 import {
-  RunDetailsPanel,
-  RunOperatorWorkspace,
+  CommandDetailsPanel,
+  CommandOperatorWorkspace,
 } from '@factory-floor/operator-ui-react';
 import { useEffect, useRef, useState } from 'react';
 import { beginActivityBootstrap } from './bootstrap.js';
@@ -23,30 +23,22 @@ import {
   ActivitySessionController,
   type ActivityConnectionState,
 } from './session.js';
-
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 5_000,
-      refetchInterval: 15_000,
-    },
+    queries: { retry: 1, staleTime: 5_000, refetchInterval: 15_000 },
   },
 });
-
 type AppState =
   | { kind: 'disabled' }
   | { kind: 'starting' }
   | { kind: 'ready'; context: ActivitySessionContext }
   | { kind: 'error'; code: string }
   | { kind: 'expired' };
-
 function errorCode(error: unknown): string {
   return error instanceof Error && /^[a-z0-9_:-]+$/i.test(error.message)
     ? error.message
     : 'activity_bootstrap_failed';
 }
-
 function clearOperatorState(controlPlaneUrl: string): void {
   configureDefaultOperatorClient(
     createOperatorClient({
@@ -58,7 +50,6 @@ function clearOperatorState(controlPlaneUrl: string): void {
   );
   queryClient.clear();
 }
-
 export function DiscordActivityApp({
   config,
   createHost = createDiscordActivityHost,
@@ -72,14 +63,12 @@ export function DiscordActivityApp({
   const [connection, setConnection] =
     useState<ActivityConnectionState>('active');
   const controller = useRef<ActivitySessionController | undefined>(undefined);
-
   useEffect(() => {
     if (!config.enabled) return;
     let cancelled = false;
     clearOperatorState(config.controlPlaneUrl);
     const host = createHost(config.discordClientId);
     const broker = createActivityBroker(config.brokerUrl);
-
     void (async () => {
       try {
         const bootstrap = await beginActivityBootstrap({
@@ -94,11 +83,10 @@ export function DiscordActivityApp({
         if (
           context.instanceId !== host.instanceId ||
           context.instanceBindingId !== bootstrap.instanceBindingId ||
-          context.runId !== bootstrap.runId
+          context.commandId !== bootstrap.commandId
         )
           throw new Error('activity_session_binding_mismatch');
         if (cancelled) return;
-
         const configureClient = (sessionToken: string) =>
           configureDefaultOperatorClient(
             createOperatorClient({
@@ -110,7 +98,6 @@ export function DiscordActivityApp({
             }),
           );
         configureClient(bootstrap.sessionToken);
-
         const sessionController = new ActivitySessionController(bootstrap, {
           refresh: (sessionToken) =>
             refreshActivitySession(config.controlPlaneUrl, sessionToken),
@@ -134,7 +121,6 @@ export function DiscordActivityApp({
         }
       }
     })();
-
     const reconnect = () => void controller.current?.refreshNow();
     window.addEventListener('online', reconnect);
     return () => {
@@ -145,7 +131,6 @@ export function DiscordActivityApp({
       clearOperatorState(config.controlPlaneUrl);
     };
   }, [config, createHost]);
-
   if (state.kind === 'disabled')
     return (
       <main className="activity-state" role="status">
@@ -157,7 +142,7 @@ export function DiscordActivityApp({
     return (
       <main className="activity-state" role="status">
         <h1>Connecting to Factory Floor</h1>
-        <p>Validating the Discord Activity launch and bound run.</p>
+        <p>Validating the Discord Activity launch and bound command.</p>
       </main>
     );
   if (state.kind === 'error')
@@ -179,7 +164,6 @@ export function DiscordActivityApp({
         </p>
       </main>
     );
-
   const leave = async () => {
     const session = controller.current?.current();
     controller.current?.stop();
@@ -192,28 +176,26 @@ export function DiscordActivityApp({
       ).catch(() => undefined);
     setState({ kind: 'expired' });
   };
-
-  const loadDetails = (runId: string) => {
+  const loadDetails = (commandId: string) => {
     const sessionToken = controller.current?.current().sessionToken;
     if (!sessionToken)
       return Promise.reject(new Error('activity_session_invalid'));
-    return createRunDetailsClient({
+    return createCommandDetailsClient({
       baseUrl: config.controlPlaneUrl,
       token: sessionToken,
       principalId: state.context.principalId,
       adapter: state.context.adapter,
       retry: { maxAttempts: 2, baseDelayMs: 250 },
-    }).getRunDetails(runId);
+    }).getCommandDetails(commandId);
   };
-
   return (
     <QueryClientProvider client={queryClient}>
       <div className="activity-shell">
         <header className="activity-header">
           <div>
             <p className="eyebrow">Discord Activity · Read only</p>
-            <h1>Factory Floor run</h1>
-            <p className="muted">{state.context.runId}</p>
+            <h1>Factory Floor command</h1>
+            <p className="muted">{state.context.commandId}</p>
           </div>
           <div className="activity-actions">
             <span className="badge status" data-status={connection}>
@@ -225,9 +207,9 @@ export function DiscordActivityApp({
           </div>
         </header>
         <main>
-          <RunOperatorWorkspace runId={state.context.runId} />
-          <RunDetailsPanel
-            runId={state.context.runId}
+          <CommandOperatorWorkspace commandId={state.context.commandId} />
+          <CommandDetailsPanel
+            commandId={state.context.commandId}
             loadDetails={loadDetails}
           />
         </main>

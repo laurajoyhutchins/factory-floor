@@ -12,7 +12,7 @@ export interface ActivitySessionRequest {
   launchId: string;
   principalId: string;
   adapter: string;
-  boundRunId?: string;
+  boundCommandId?: string;
   boundView?: Json;
 }
 
@@ -28,6 +28,7 @@ interface ExistingBinding {
   guild_id: string | null;
   channel_id: string | null;
   thread_id: string | null;
+  // Persisted compatibility column. Its stored value is a command ID.
   bound_run_id: string | null;
   adapter: string;
   expires_at: Date;
@@ -62,11 +63,11 @@ function assertBindingMatches(
     existing.channel_id === optionalValue(request.channelId) &&
     existing.thread_id === optionalValue(request.threadId);
   const adapterMatches = existing.adapter === request.adapter;
-  const runMatches =
-    request.boundRunId === undefined ||
-    existing.bound_run_id === request.boundRunId;
+  const commandMatches =
+    request.boundCommandId === undefined ||
+    existing.bound_run_id === request.boundCommandId;
 
-  if (!locationMatches || !adapterMatches || !runMatches)
+  if (!locationMatches || !adapterMatches || !commandMatches)
     throw new ActivitySessionError('instance_binding_mismatch');
 }
 
@@ -113,7 +114,7 @@ export class ActivitySessionService {
           thread_id: request.threadId ?? null,
           launch_id: request.launchId,
           installation_identifier: `${request.applicationId}:${request.installationId}`,
-          bound_run_id: request.boundRunId ?? null,
+          bound_run_id: request.boundCommandId ?? null,
           bound_view: request.boundView ?? {},
           principal_id: request.principalId,
           adapter: request.adapter,
