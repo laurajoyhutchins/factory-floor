@@ -1,32 +1,47 @@
-# Production promotion boundary
+# Production deployment identity
 
-Factory Floor currently uses `main` as its reviewed, releasable integration branch. It does not yet maintain a long-lived `production` branch.
+Factory Floor uses `main` as its only long-lived integration branch. Production identity is represented by an exact verified repository coordinate, not by a second permanent `production` branch.
 
-## Why production is deferred
+## Why there is no production branch
 
-A separate operational pointer becomes valuable only when Factory Floor operates a persistent instance carrying real runs, artifacts, workers, credentials, or other durable production state. Before that boundary exists, a second long-lived branch would add synchronization cost without protecting a distinct live system.
+A long-lived deployment branch would duplicate repository state without creating a stronger authority boundary. The live system needs an immutable answer to a narrower question:
 
-## Activation criteria
+> Which exact reviewed Factory Floor revision is this deployment running?
 
-Create a protected `production` branch only after all of the following are true:
+That fact is better represented by an exact commit SHA together with the deployment, release, tag, or immutable deployment receipt that selected it.
 
-- a persistent production instance exists;
+`main` may continue to advance after a deployment. The deployed revision does not.
+
+## Production-readiness criteria
+
+A persistent production deployment should not be promoted until all applicable readiness conditions are satisfied:
+
 - canonical non-watch production entrypoints are verified;
 - readiness, graceful shutdown, restart, and reconciliation behavior are covered by acceptance tests;
 - database and artifact-store migration and rollback procedures are documented;
 - the deployed instance can report its exact repository commit;
-- deployment automation can require a clean checkout matching the remote production head;
-- post-deployment smoke and recovery checks are defined.
+- deployment automation requires a clean checkout of the selected exact revision;
+- post-deployment smoke and recovery checks are defined;
+- repository-owned verification has passed for the exact candidate under the current verification contract.
 
-## Future branch contract
+These are deployment gates. Satisfying them does not create or require another long-lived branch.
 
-When activated:
+## Deployment contract
 
-- `main` remains the reviewed integration branch;
-- `production` becomes the exact commit approved for the live instance;
-- routine pull requests continue to target `main`;
-- promotion fast-forwards `production` to an exact verified commit from `main`;
-- direct commits, force pushes, and divergent history on `production` are prohibited;
-- deployment records the exact SHA and fails closed if the branch moves or the target checkout differs.
+When a revision is selected for a live instance:
 
-Until these criteria are satisfied, use exact-SHA test evidence and release tags rather than a placeholder production branch.
+- ordinary pull requests continue to target `main`;
+- the deployment selects one exact verified commit reachable through the repository's accepted integration history;
+- the deployment record stores that exact SHA and, where useful, an immutable release or tag coordinate;
+- deployment fails closed if the checkout differs from the selected revision;
+- post-deployment evidence is attributed to the deployed exact SHA;
+- rollback selects another explicit previously verified deployment coordinate rather than moving an implicit environment branch;
+- force pushes or branch movement cannot redefine the identity of an already recorded deployment.
+
+## Tags and releases
+
+Tags and releases may provide durable human-facing names for deployment coordinates, but they do not replace the commit identity they reference. Any production receipt should retain the exact SHA even when a release or tag is also recorded.
+
+## Historical note
+
+An earlier repository decision proposed creating a protected long-lived `production` branch after a persistent production instance existed. That proposal is superseded by the portfolio branch policy: `main` is the sole long-lived branch, and production state is represented by exact deployment identity instead.
