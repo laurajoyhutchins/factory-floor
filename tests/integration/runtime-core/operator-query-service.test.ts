@@ -191,7 +191,10 @@ describe('operator query service', () => {
     const secondDeliveryId = secondClaim.envelope.inputs[0]?.deliveryId;
     if (!secondDeliveryId) throw new Error('expected second delivery');
 
-    const topology = await queries.getCommandTopology(operator, first.commandId);
+    const topology = await queries.getCommandTopology(
+      operator,
+      first.commandId,
+    );
     expect(topology.command.id).toBe(first.commandId);
     expect(topology.regions.map((region) => region.id)).toContain(regionId);
     expect(topology.deliveries.map((delivery) => delivery.id)).toContain(
@@ -288,18 +291,26 @@ describe('operator query service', () => {
       .where('correlation_id', '=', first.commandId)
       .orderBy('id')
       .execute();
-    const firstPage = await queries.listCommandEvents(operator, first.commandId, {
-      limit: 1,
-    });
+    const firstPage = await queries.listCommandEvents(
+      operator,
+      first.commandId,
+      {
+        limit: 1,
+      },
+    );
     expect(firstPage.items).toHaveLength(1);
     expect(firstPage.nextCursor).toEqual(expect.any(String));
     expect(firstPage.resumeCursor).toEqual(firstPage.nextCursor);
     expect(firstPage.complete).toBe(false);
 
-    const secondPage = await queries.listCommandEvents(operator, first.commandId, {
-      limit: 10,
-      cursor: firstPage.nextCursor!,
-    });
+    const secondPage = await queries.listCommandEvents(
+      operator,
+      first.commandId,
+      {
+        limit: 10,
+        cursor: firstPage.nextCursor!,
+      },
+    );
     const observed = [...firstPage.items, ...secondPage.items];
     expect(observed.map((event) => event.id)).toEqual(
       expectedEvents.map((event) => event.id),
@@ -350,7 +361,10 @@ describe('operator query service', () => {
       .where('id', '=', regionId)
       .execute();
 
-    const blocked = await queries.listCommandAlerts(operator, receipt.commandId);
+    const blocked = await queries.listCommandAlerts(
+      operator,
+      receipt.commandId,
+    );
     expect(blocked.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -365,7 +379,10 @@ describe('operator query service', () => {
       .set({ lifecycle_status: 'running' })
       .where('id', '=', regionId)
       .execute();
-    const cleared = await queries.listCommandAlerts(operator, receipt.commandId);
+    const cleared = await queries.listCommandAlerts(
+      operator,
+      receipt.commandId,
+    );
     expect(cleared.items.some((alert) => alert.kind === 'blocked_work')).toBe(
       false,
     );
