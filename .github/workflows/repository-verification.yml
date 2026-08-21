@@ -96,7 +96,7 @@ jobs:
             formatted-files.txt
             formatted-files.tar.gz
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: ${{ github.event_name == 'pull_request' && 7 || github.ref == 'refs/heads/main' && 14 || 7 }}
 
       - name: Write agent CI handoff
         id: agent-summary
@@ -116,7 +116,7 @@ jobs:
           name: agent-ci-handoff-fast-${{ github.run_number }}
           path: .factory-floor/ci-metrics/agent-ci-summary.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: ${{ github.event_name == 'pull_request' && 7 || github.ref == 'refs/heads/main' && 14 || 7 }}
 
       - name: Enforce fast evidence publication
         if: always() && steps.evidence-upload.outcome == 'failure'
@@ -207,7 +207,7 @@ jobs:
             cleanup.log
             metrics-summary.log
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: ${{ github.event_name == 'pull_request' && 7 || github.ref == 'refs/heads/main' && 14 || 7 }}
 
       - name: Write agent CI handoff
         id: agent-summary
@@ -227,7 +227,7 @@ jobs:
           name: agent-ci-handoff-service-${{ github.run_number }}
           path: .factory-floor/ci-metrics/agent-ci-summary.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: ${{ github.event_name == 'pull_request' && 7 || github.ref == 'refs/heads/main' && 14 || 7 }}
 
       - name: Enforce service evidence publication
         if: always() && steps.evidence-upload.outcome == 'failure'

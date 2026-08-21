@@ -97,7 +97,7 @@ jobs:
             repository-task-dogfood.log
           if-no-files-found: error
           include-hidden-files: true
-          retention-days: 30
+          retention-days: ${{ github.event_name == 'pull_request' && 7 || github.ref == 'refs/heads/main' && 14 || 7 }}
 
       - name: Stop durable services
         if: always()
